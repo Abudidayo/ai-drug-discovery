@@ -22,4 +22,3 @@ Results are research hypotheses, not medical advice. A ranking, a jury verdict o
 
 - Research notes in `research_notes/`. They are a dated record; where they differ from the plan, `plan.md` wins.
 - Data-source test bench in `demos/data-sources/`.
-- UI prototypes in `prototypes/`; open the HTML files in a browser.
