@@ -22,8 +22,7 @@ The headline result is a **backtest across many diseases**. We hide the direct e
 - [HRT] Best Use of Data for Predictions and Decision Making;
 - MLH Best Use of Snowflake API;
 - MLH Best Use of Tiger Data;
-- MLH Best Use of Vultr;
-- MLH Best Use of Gemini API.
+- MLH Best Use of Vultr.
 
 ### Workflow
 
@@ -35,7 +34,7 @@ flowchart TD
   M --> D["Reach drugs through the top targets<br/>Open Targets mechanisms + ChEMBL bioactivity"]
   D --> F["Keep regulator-approved drugs<br/>FDA · EMA · PMDA · DailyMed"]
   F --> L["Two lists with evidence, safety and leak flags<br/>Already used or trialled · Repurposing candidates"]
-  L --> J["Model jury ranks the same evidence<br/>Snowflake Cortex + Gemini, plus juror zero"]
+  L --> J["Model jury ranks the same evidence<br/>Snowflake Cortex models, plus juror zero"]
   J --> K{"Dock a candidate?"}
   K -->|"prepared structure"| V["Vina docking job<br/>poses + redocking control"]
   V --> X["3D viewer<br/>3Dmol.js"]
@@ -54,11 +53,11 @@ flowchart TD
 | Backend | Python 3.11 with FastAPI. A separate docking worker process. |
 | Frontend | React, Vite and TypeScript. 3Dmol.js for the 3D viewer. |
 | Database | Tiger Cloud Postgres (TimescaleDB), on a trial service in `eu-west-2` (London). |
-| Model jury | Snowflake Cortex REST and Gemini, both through OpenAI-compatible endpoints, so there is one code path. |
+| Model jury | Four models from one Snowflake account, called through Cortex REST's OpenAI-compatible endpoint. |
 | Docking | AutoDock Vina 1.2.7 with Meeko and RDKit, on CPU. Prepared structures only. |
 | Hosting | One Vultr VM in London runs the API, the worker and the built frontend. |
 | GPU | Not needed for the committed scope, because Vina runs on CPU. Rent a Vultr A40 only for the optional GPU work in section 12. |
-| Not building | DiffDock, Boltz-2, GNINA, co-folding models, B200/B300 rental, DGX Spark, docking inside Snowflake, database forks, experiment branching, cross-experiment comparison, new molecules, ElevenLabs, Solana, Presage, Delta. |
+| Not building | DiffDock, Boltz-2, GNINA, co-folding models, B200/B300 rental, DGX Spark, docking inside Snowflake, database forks, experiment branching, cross-experiment comparison, new molecules, Gemini, ElevenLabs, Solana, Presage, Delta. |
 
 Abudi's Node test bench (`demos/data-sources/`) stays as a reference for working query text. The production backend is Python, because RDKit, Vina, Meeko, pandas and SciPy are Python libraries.
 
@@ -70,7 +69,7 @@ flowchart LR
   API["Vultr VM · London<br/>FastAPI: API + built frontend"]
   W["Vultr VM · London<br/>Docking worker: Vina + Meeko + RDKit"]
   DATA["Public data APIs<br/>Open Targets · ChEMBL · PubChem · RCSB PDB"]
-  JURY["Model jury<br/>Snowflake Cortex: Claude · GPT · Grok · Llama<br/>Gemini API"]
+  JURY["Model jury<br/>Snowflake Cortex REST<br/>Claude · GPT · Grok · Llama"]
   DB[("Tiger Cloud Postgres · eu-west-2<br/>experiments · candidates · dock_jobs<br/>jury_votes + runs hypertables")]
   DISK[("VM disk<br/>result files · Parquet cache")]
 
@@ -104,7 +103,7 @@ flowchart LR
 | Role | Owns |
 |---|---|
 | A | Evidence pipeline, scoring modes, backtest |
-| B | Model jury (Snowflake and Gemini), agreement metrics |
+| B | Model jury (Snowflake Cortex), agreement metrics |
 | C | Vultr VM, docking worker, prepared structures, 3D viewer |
 | D | Frontend, Tiger schema and time-series features, README and Devpost |
 
@@ -141,8 +140,6 @@ flowchart LR
    DATABASE_URL=
    SNOWFLAKE_ACCOUNT=        # <orgname>-<accountname>
    SNOWFLAKE_PAT=
-   GEMINI_API_KEY=
-   GEMINI_MODEL=             # copy the current model ID from Google AI Studio
    RESULTS_DIR=/data/results
    ```
 
@@ -170,11 +167,6 @@ Done when one REST call returns text.
    ```
 
 5. If AI functions are disabled, check Snowflake's trial-account docs: self-service trials need a payment card on the account before AI features work, and adding one does not end the trial. Decide as a team, ask the Snowflake mentor, or use the fallback in section 13.
-
-### Gemini (B)
-
-1. Create an API key in Google AI Studio and copy the current model ID into `GEMINI_MODEL`.
-2. Make one test call through the OpenAI-compatible base URL `https://generativelanguage.googleapis.com/v1beta/openai/`.
 
 ### Tiger Cloud (D)
 
@@ -618,22 +610,19 @@ Sort by `(evidence_score, breadth)`. The UI shows every supported target, with n
 
 ## 8. Workstream B: model jury
 
-**B1. Set up the clients.** Use the OpenAI Python SDK for both providers:
+**B1. Set up the client.** Use the OpenAI Python SDK against Snowflake's endpoint:
 
 ```python
 from openai import OpenAI
 
 snowflake = OpenAI(base_url=f"https://{SNOWFLAKE_ACCOUNT}.snowflakecomputing.com/api/v2/cortex/v1",
                    api_key=SNOWFLAKE_PAT)
-gemini = OpenAI(base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-                api_key=GEMINI_API_KEY)
 
 JURORS = [
     (snowflake, "claude-sonnet-5"),
     (snowflake, "openai-gpt-5.4"),
     (snowflake, "grok-4.7"),      # preview; kimi-k3 or glm-5.3 are alternatives
     (snowflake, "llama3.1-8b"),   # deliberately small baseline
-    (gemini, GEMINI_MODEL),
 ]
 ```
 
@@ -653,7 +642,7 @@ JURORS = [
 - The user message is the packet JSON.
 - Set `temperature=0`.
 - Set `response_format={"type": "json_schema", "json_schema": {"name": "jury_ranking", "strict": True, "schema": SCHEMA}}`, using the schema from 6.4.
-- If a provider rejects strict schemas, fall back to JSON mode; the validator still checks every reply.
+- If a model rejects strict schemas, fall back to JSON mode; the validator still checks every reply.
 
 **B4. Validate in code.**
 - The reply is valid JSON that matches the schema.
@@ -672,9 +661,9 @@ On failure, re-ask once with the list of errors. On a second failure, drop that 
 
 **B6. Log.** Write every vote to `jury_votes` and every call to `runs`, including latency and token counts.
 
-**B7. Backtest calls (with A).** One call per disease, juror, condition and candidate order: 50 × 5 × 2 × 2 = 1,000 calls. Retry HTTP 429 with exponential backoff.
+**B7. Backtest calls (with A).** One call per disease, juror, condition and candidate order: 50 × 4 × 2 × 2 = 800 calls. Retry HTTP 429 with exponential backoff.
 
-**Done when:** one experiment shows a heatmap of 5 jurors by candidates, plus Kendall's W, contested flags, citation validity and decision labels.
+**Done when:** one experiment shows a heatmap of 4 jurors by candidates, plus Kendall's W, contested flags, citation validity and decision labels.
 
 ## 9. Workstream C: docking and viewer
 
@@ -904,7 +893,7 @@ Keep the viewer instance in a ref, never in React state. Compute the surface onl
 - what the app does and how to run it;
 - the architecture;
 - data sources and versions (Open Targets 26.09, ChEMBL 37);
-- how each sponsor is used (Snowflake, Tiger Data, Vultr, Gemini);
+- how each sponsor is used (Snowflake, Tiger Data, Vultr);
 - the backtest card;
 - limits and the disclaimer;
 - every AI tool used.
@@ -913,9 +902,9 @@ Keep the viewer instance in a ref, never in React state. Compute the surface onl
 
 | # | Milestone | Done when |
 |---|---|---|
-| M1 | Accounts and contracts | Cortex and Gemini calls return; Tiger schema loaded; VM reachable; section 6 agreed |
+| M1 | Accounts and contracts | Cortex REST call returns; Tiger schema loaded; VM reachable; section 6 agreed |
 | M2 | Evidence pipeline | `POST /api/experiments` works for 3 diseases from different therapeutic areas, in all three modes; default re-score matches the API |
-| M3 | Jury | 5 jurors return validated rankings for one experiment; W, contested flags and citation validity computed |
+| M3 | Jury | 4 jurors return validated rankings for one experiment; W, contested flags and citation validity computed |
 | M4 | Pilot backtest | 10 frozen pairs produce metrics for every ranker |
 | M5 | Docking | Redocking control passes on 6WTO; a user job completes through the queue and shows in the viewer |
 | M6 | Full integration | Full backtest frozen and displayed; history, archive and restore work; app deployed on Vultr |
@@ -941,7 +930,7 @@ Do these only if M6 is done and the Vultr credit covers an A40:
 
 | If | Then |
 |---|---|
-| Snowflake AI stays unavailable | Run the jury on Gemini plus any other reachable models, and drop the Snowflake prize entry |
+| Snowflake AI stays unavailable | Point the same OpenAI-compatible client at any LLM API the team already has access to, and drop the Snowflake prize entry |
 | Vultr credit does not cover GPUs | Nothing changes: the committed scope runs on CPU |
 | Vultr is unavailable | Run the API and worker on a laptop (Vina runs natively on Apple silicon), and drop the Vultr entry |
 | Open Targets is slow or down | Serve from the Parquet cache and the cached association rows |
@@ -986,7 +975,7 @@ Do these only if M6 is done and the Vultr credit covers an A40:
 - [ ] Public repo whose first commit was made during the event; kept public afterwards.
 - [ ] README complete (D5).
 - [ ] Devpost: description, screenshots, repo link, "built with" list.
-- [ ] Prize opt-ins: First Place, Runner Up, [HRT] Best Use of Data for Predictions and Decision Making, Best Use of Snowflake API, Best Use of Tiger Data, Best Use of Vultr, Best Use of Gemini API.
+- [ ] Prize opt-ins: First Place, Runner Up, [HRT] Best Use of Data for Predictions and Decision Making, Best Use of Snowflake API, Best Use of Tiger Data, Best Use of Vultr.
 - [ ] Each sponsor's use is visible in the demo and named in the README.
 - [ ] GenAI disclosure lists AI coding tools separately from the models used inside the app.
 - [ ] Devpost states that planning happened before the event and all code during it.
