@@ -1,0 +1,2021 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI and drug discovery: a primer for OxHack '26</title>
+<meta name="description" content="How drugs are discovered, why most fail, and where AI actually helps. A primer for picking an OxHack '26 project.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #F7F5F9;
+  --panel: #EFECF4;
+  --ink: #1E1A2B;
+  --ink-2: #4A4459;
+  --muted: #6E687F;
+  --rule: #DDD7E6;
+  --faint: #E6E1EE;
+  --hema: #4C45A6;
+  --hema-wash: #E6E4F5;
+  --eosin: #C93D72;
+  --eosin-ink: #A8295A;
+  --eosin-wash: #F8E4EC;
+
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "Source Serif 4", Georgia, serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  --measure: 760px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #16131F;
+    --panel: #1F1B2B;
+    --ink: #ECE8F3;
+    --ink-2: #C4BED2;
+    --muted: #9A93AB;
+    --rule: #332D43;
+    --faint: #2A2538;
+    --hema: #8A82E2;
+    --hema-wash: #26223F;
+    --eosin: #E2618F;
+    --eosin-ink: #F282AB;
+    --eosin-wash: #3A1F2E;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 1.125rem;
+  line-height: 1.65;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--hema); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 2px solid var(--hema); outline-offset: 3px; border-radius: 3px; }
+strong { font-weight: 600; }
+em { font-style: italic; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+
+/* ---------- hero ---------- */
+.hero {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 72px 32px 56px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 440px;
+  gap: 64px;
+  align-items: center;
+}
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 20px;
+}
+h1 {
+  font-family: var(--display);
+  font-variation-settings: "wdth" 78;
+  font-weight: 760;
+  font-size: clamp(2.7rem, 5.4vw, 4.6rem);
+  line-height: 0.98;
+  letter-spacing: -0.025em;
+  margin: 0 0 28px;
+  text-wrap: balance;
+}
+h1 .out { color: var(--hema); }
+.dek {
+  font-size: 1.28rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+  max-width: 34ch;
+  margin: 0 0 24px;
+}
+.byline { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); margin: 0; }
+
+.plate { position: relative; }
+.plate canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; }
+.plate-readout {
+  display: flex; align-items: baseline; gap: 14px;
+  margin: 18px 0 14px; min-height: 3.3rem;
+}
+.plate-count {
+  font-family: var(--display);
+  font-variation-settings: "wdth" 78;
+  font-weight: 700;
+  font-size: 2.6rem;
+  line-height: 1;
+  color: var(--hema);
+  font-variant-numeric: tabular-nums;
+  min-width: 4.2ch;
+}
+.plate-label { font-size: 1rem; line-height: 1.35; color: var(--ink-2); }
+.stages { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.stages button {
+  font: 500 0.72rem/1.25 var(--mono);
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--rule);
+  padding: 10px 6px;
+  cursor: pointer;
+}
+.stages button:first-child { border-left: 0; }
+.stages button[aria-pressed="true"] { background: var(--hema-wash); color: var(--ink); }
+.stages button:hover { color: var(--ink); }
+.plate-note { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); margin: 10px 0 0; }
+
+/* ---------- shell ---------- */
+.shell {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0 32px 120px;
+  display: grid;
+  grid-template-columns: 220px minmax(0, var(--measure));
+  gap: 72px;
+  border-top: 1px solid var(--rule);
+}
+.toc { position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; padding: 40px 0 24px; }
+.toc p { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 14px; }
+.toc ol { list-style: none; margin: 0; padding: 0; }
+.toc li { margin: 0; }
+.toc a {
+  display: grid; grid-template-columns: 2.6em 1fr;
+  font-family: var(--display); font-size: 0.92rem; line-height: 1.3;
+  color: var(--ink-2); text-decoration: none;
+  padding: 5px 0 5px 10px; border-left: 2px solid transparent;
+}
+.toc a .n { font-family: var(--mono); font-size: 0.74rem; color: var(--muted); padding-top: 2px; }
+.toc ol ol a { font-size: 0.84rem; padding-top: 3px; padding-bottom: 3px; }
+.toc a:hover { color: var(--ink); }
+.toc a.active { border-left-color: var(--hema); color: var(--ink); }
+
+main { padding-top: 40px; min-width: 0; }
+section { margin-bottom: 88px; }
+section > section { margin: 64px 0 0; }
+
+h2, h3 { font-family: var(--display); letter-spacing: -0.015em; text-wrap: balance; }
+h2 {
+  font-variation-settings: "wdth" 82;
+  font-weight: 720;
+  font-size: 2.3rem;
+  line-height: 1.05;
+  margin: 0 0 20px;
+}
+h3 { font-weight: 640; font-size: 1.45rem; line-height: 1.2; margin: 0 0 14px; }
+h4 { font-family: var(--display); font-weight: 640; font-size: 1.08rem; margin: 32px 0 8px; }
+.num { display: block; font-family: var(--mono); font-size: 0.8rem; font-weight: 500; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 8px; }
+p { margin: 0 0 1.1em; }
+.lede { font-size: 1.25rem; line-height: 1.55; color: var(--ink-2); }
+ul.plain { padding-left: 1.2em; margin: 0 0 1.2em; }
+ul.plain li { margin-bottom: 0.45em; }
+ul.plain li::marker { color: var(--muted); }
+
+/* reading key */
+.key {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+  border: 1px solid var(--rule); border-radius: 10px; margin: 0 0 72px; overflow: hidden;
+}
+.key div { padding: 16px 20px; font-size: 0.95rem; line-height: 1.45; color: var(--ink-2); }
+.key div + div { border-left: 1px solid var(--rule); }
+.key b { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 500; color: var(--ink); margin-bottom: 4px; }
+.sw { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.sw.h { background: var(--hema); }
+.sw.e { background: var(--eosin); }
+
+/* AI callout: the one place eosin appears as a surface */
+.ai {
+  border-left: 3px solid var(--eosin);
+  background: var(--eosin-wash);
+  border-radius: 0 10px 10px 0;
+  padding: 18px 22px 8px;
+  margin: 28px 0;
+}
+.ai > .ai-label {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--eosin-ink); font-weight: 500; margin: 0 0 8px;
+}
+.ai p, .ai li { font-size: 1.02rem; }
+
+.caveat { border-left: 3px solid var(--rule); padding: 2px 0 2px 18px; color: var(--ink-2); font-size: 1.02rem; margin: 24px 0; }
+.caveat b { font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 500; color: var(--muted); display: block; margin-bottom: 2px; }
+
+/* figures */
+figure { margin: 36px 0 40px; }
+figure svg { display: block; width: 100%; height: auto; overflow: visible; }
+.fig-title { font-family: var(--display); font-weight: 640; font-size: 1.02rem; margin: 0 0 4px; }
+.fig-sub { font-size: 0.92rem; color: var(--muted); margin: 0 0 16px; line-height: 1.4; }
+figcaption { font-family: var(--mono); font-size: 0.72rem; line-height: 1.5; color: var(--muted); margin-top: 12px; }
+details.data { margin-top: 10px; }
+details.data summary { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); cursor: pointer; width: max-content; }
+details.data table { margin-top: 10px; }
+
+svg text { font-family: var(--body); fill: var(--ink); }
+svg .lbl { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+svg .lbl-ink { font-family: var(--mono); font-size: 11px; fill: var(--ink-2); }
+svg .name { font-family: var(--display); font-weight: 600; font-size: 14px; fill: var(--ink); }
+svg .body { font-family: var(--body); font-size: 13px; fill: var(--ink-2); }
+svg .grid { stroke: var(--faint); stroke-width: 1; }
+svg .axis { stroke: var(--rule); stroke-width: 1; }
+svg .hema { fill: var(--hema); }
+svg .hema-s { stroke: var(--hema); }
+svg .eosin { fill: var(--eosin); }
+svg .eosin-s { stroke: var(--eosin); }
+svg .wash { fill: var(--hema-wash); }
+svg .panel { fill: var(--panel); }
+svg .paper { fill: var(--paper); }
+svg .rule-s { stroke: var(--rule); }
+svg .muted-s { stroke: var(--muted); }
+svg .ink-s { stroke: var(--ink-2); }
+svg .faint { fill: var(--faint); }
+[data-tip] { cursor: default; }
+
+/* stat row */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin: 32px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.stat { padding: 20px 20px 20px 0; }
+.stat + .stat { padding-left: 20px; border-left: 1px solid var(--rule); }
+.stat .v { font-family: var(--display); font-variation-settings: "wdth" 78; font-weight: 700; font-size: 2.5rem; line-height: 1; color: var(--hema); font-variant-numeric: tabular-nums; }
+.stat .l { font-size: 0.95rem; line-height: 1.4; color: var(--ink-2); margin-top: 8px; }
+.stat .s { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); margin-top: 6px; }
+
+/* cards */
+.cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 28px 0; }
+.card { border: 1px solid var(--rule); border-radius: 10px; padding: 18px 20px 16px; background: var(--paper); }
+.card h4 { margin: 0 0 6px; font-size: 1.08rem; }
+.card p { font-size: 0.98rem; line-height: 1.5; margin: 0 0 10px; color: var(--ink-2); }
+.card .eg { font-family: var(--mono); font-size: 0.72rem; line-height: 1.55; color: var(--muted); margin: 0; }
+.card .eg b { color: var(--ink-2); font-weight: 500; }
+.card .tag { display: inline-block; font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.card.wide { grid-column: 1 / -1; }
+
+/* AI map (metro line) */
+.metro { list-style: none; margin: 32px 0; padding: 0; position: relative; }
+.metro::before { content: ""; position: absolute; left: 9px; top: 14px; bottom: 14px; width: 2px; background: var(--hema); opacity: 0.35; }
+.metro > li { position: relative; padding: 0 0 22px 44px; }
+.metro > li::before {
+  content: ""; position: absolute; left: 3px; top: 7px; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--paper); border: 2px solid var(--hema);
+}
+.metro .stage { font-family: var(--display); font-weight: 640; font-size: 1.08rem; line-height: 1.3; display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.metro .stage a { font-family: var(--mono); font-size: 0.72rem; font-weight: 400; white-space: nowrap; }
+.metro .stage span { font-family: var(--mono); font-size: 0.72rem; font-weight: 400; color: var(--muted); white-space: nowrap; }
+.metro .q { font-size: 0.96rem; color: var(--muted); margin: 2px 0 8px; line-height: 1.4; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: 0.72rem; line-height: 1.2;
+  color: var(--eosin-ink); background: var(--eosin-wash);
+  border-radius: 999px; padding: 5px 10px 5px 8px;
+}
+.chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--eosin); }
+.chip.none { color: var(--muted); background: transparent; border: 1px dashed var(--rule); }
+.chip.none::before { background: var(--rule); }
+
+/* tables */
+table { width: 100%; border-collapse: collapse; font-size: 0.96rem; line-height: 1.45; }
+th { text-align: left; font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 500; color: var(--muted); padding: 0 12px 10px 0; border-bottom: 1px solid var(--rule); vertical-align: bottom; }
+td { padding: 12px 12px 12px 0; border-bottom: 1px solid var(--faint); vertical-align: top; color: var(--ink-2); }
+td:first-child { color: var(--ink); font-weight: 600; font-family: var(--display); font-size: 0.98rem; }
+td.mono, td .mono { font-family: var(--mono); font-size: 0.8rem; }
+.pips { display: inline-flex; gap: 3px; vertical-align: middle; margin-right: 8px; }
+.pips i { width: 9px; height: 9px; border-radius: 2px; background: var(--faint); display: block; }
+.pips i.on { background: var(--hema); }
+.verdict { white-space: nowrap; font-family: var(--mono); font-size: 0.78rem; color: var(--ink); }
+.pass { font-family: var(--mono); font-size: 0.8rem; }
+.pass.y::before { content: "✓ "; color: var(--hema); }
+.pass.n::before { content: "✗ "; color: var(--muted); }
+
+/* molecule panels */
+.reps { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.rep { border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 12px; min-width: 0; }
+.rep .tag { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.rep .what { font-size: 0.9rem; line-height: 1.4; color: var(--ink-2); margin: 8px 0 0; }
+.rep .smiles { font-family: var(--mono); font-size: 1.05rem; color: var(--ink); word-break: break-all; margin: 22px 0 18px; line-height: 1.5; }
+.rep .smiles span { border-bottom: 2px solid var(--hema); }
+.mol { color: var(--ink); }
+.mol svg { width: 100%; height: auto; max-height: 190px; }
+.fp { display: grid; grid-template-columns: repeat(16, 1fr); gap: 3px; margin: 18px 0 14px; }
+.fp i { aspect-ratio: 1; border-radius: 2px; background: var(--faint); display: block; }
+.fp i.on { background: var(--hema); }
+
+/* glossary */
+dl.gloss { display: grid; grid-template-columns: 11rem 1fr; gap: 0; margin: 0; }
+dl.gloss dt, dl.gloss dd { padding: 12px 0; border-bottom: 1px solid var(--faint); margin: 0; }
+dl.gloss dt { font-family: var(--display); font-weight: 640; font-size: 1rem; padding-right: 16px; }
+dl.gloss dd { font-size: 1rem; color: var(--ink-2); line-height: 1.5; }
+
+ol.sources { padding-left: 1.4em; font-size: 0.92rem; line-height: 1.5; color: var(--ink-2); }
+ol.sources li { margin-bottom: 0.6em; }
+ol.sources li::marker { font-family: var(--mono); font-size: 0.8em; color: var(--muted); }
+
+.next {
+  border: 1px solid var(--hema); border-radius: 12px; padding: 22px 24px 10px; margin-top: 36px;
+  background: var(--hema-wash);
+}
+.next h4 { margin: 0 0 8px; }
+
+/* tooltip */
+#tip {
+  position: fixed; z-index: 10; pointer-events: none;
+  background: var(--ink); color: var(--paper);
+  font-family: var(--mono); font-size: 0.74rem; line-height: 1.45;
+  padding: 8px 10px; border-radius: 6px; max-width: 260px;
+  opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s;
+}
+#tip.on { opacity: 1; transform: none; }
+#tip b { font-weight: 500; display: block; }
+
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 1040px) {
+  .hero { grid-template-columns: 1fr; gap: 40px; padding-top: 48px; }
+  .plate { max-width: 460px; }
+  .shell { grid-template-columns: 1fr; gap: 0; }
+  .toc { position: static; max-height: none; padding: 28px 0 0; border-bottom: 1px solid var(--rule); }
+  .toc > ol { columns: 2; column-gap: 32px; padding-bottom: 20px; }
+  .toc ol ol { display: none; }
+}
+@media (max-width: 640px) {
+  body { font-size: 1.05rem; }
+  .hero { padding: 36px 20px 40px; }
+  .shell { padding: 0 20px 80px; }
+  .toc > ol { columns: 1; }
+  h2 { font-size: 1.9rem; }
+  .key, .cards, .reps { grid-template-columns: 1fr; }
+  .key div + div { border-left: 0; border-top: 1px solid var(--rule); }
+  .stats { grid-template-columns: 1fr; }
+  .stat + .stat { padding-left: 0; border-left: 0; border-top: 1px solid var(--rule); }
+  dl.gloss { grid-template-columns: 1fr; }
+  dl.gloss dt { border-bottom: 0; padding-bottom: 0; }
+  .stages button { font-size: 0.66rem; padding: 9px 3px; }
+  .scroll-x { overflow-x: auto; }
+  figure { overflow-x: auto; }
+  figure > svg, figure > div[id^="fig-"] > svg { min-width: 620px; }
+  figure.side { float: none !important; width: 160px !important; margin: 0 0 16px !important; overflow: visible; }
+  figure.side > svg { min-width: 0; }
+  .scroll-x table { min-width: 560px; }
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div>
+    <p class="eyebrow">OxHack '26 · Background primer</p>
+    <h1>Ten thousand molecules in. <span class="out">One medicine out.</span></h1>
+    <p class="dek">How drugs get discovered, why most of them fail, and where AI actually helps. Read this before we pick what to build.</p>
+    <p class="byline">Prepared 23 Oct 2026 · numbers rounded, sources at the end</p>
+  </div>
+  <div class="plate" id="plate">
+    <canvas id="plate-canvas" width="440" height="440" role="img" aria-label="A grid of 10,000 dots, one per compound screened. About 250 reach preclinical testing, about 5 reach clinical trials, and 1 is approved."></canvas>
+    <div class="plate-readout" aria-live="polite">
+      <div class="plate-count" id="plate-count">10,000</div>
+      <div class="plate-label" id="plate-label">compounds screened against a disease target. Each dot is one.</div>
+    </div>
+    <div class="stages" role="group" aria-label="Pipeline stage">
+      <button type="button" data-stage="0" aria-pressed="true">Screened</button>
+      <button type="button" data-stage="1" aria-pressed="false">Preclinical</button>
+      <button type="button" data-stage="2" aria-pressed="false">In trials</button>
+      <button type="button" data-stage="3" aria-pressed="false">Approved</button>
+    </div>
+    <p class="plate-note">Industry rule of thumb (PhRMA). Varies a lot by disease.</p>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="toc" aria-label="Contents">
+    <p>Contents</p>
+    <ol>
+      <li><a href="#s1"><span class="n">1</span>How a drug is found</a></li>
+      <li><a href="#s2"><span class="n">2</span>Kinds of drugs</a></li>
+      <li><a href="#s3"><span class="n">3</span>Where AI comes in</a>
+        <ol>
+          <li><a href="#s3-1"><span class="n">3.1</span>Target identification</a></li>
+          <li><a href="#s3-2"><span class="n">3.2</span>Protein structure</a></li>
+          <li><a href="#s3-3"><span class="n">3.3</span>Virtual screening</a></li>
+          <li><a href="#s3-4"><span class="n">3.4</span>Generative design</a></li>
+          <li><a href="#s3-5"><span class="n">3.5</span>Property prediction</a></li>
+          <li><a href="#s3-6"><span class="n">3.6</span>Protein design</a></li>
+          <li><a href="#s3-7"><span class="n">3.7</span>Clinical trials</a></li>
+          <li><a href="#s3-8"><span class="n">3.8</span>Repurposing</a></li>
+        </ol>
+      </li>
+      <li><a href="#s4"><span class="n">4</span>Hype and reality</a></li>
+      <li><a href="#s5"><span class="n">5</span>Data and tools</a></li>
+      <li><a href="#s6"><span class="n">6</span>What fits in 24 hours</a></li>
+      <li><a href="#gloss"><span class="n">A</span>Glossary</a></li>
+      <li><a href="#sources"><span class="n">B</span>Sources</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <div class="key" aria-label="Reading key">
+      <div><b><span class="sw h"></span>Violet</b>The biology and chemistry: what happens anyway, with or without AI.</div>
+      <div><b><span class="sw e"></span>Pink</b>Where AI comes in. Look for the pink boxes and tags to see where software changes the work.</div>
+    </div>
+
+    <!-- ================= 1 ================= -->
+    <section id="s1">
+      <span class="num">Section 1</span>
+      <h2>How a drug is found</h2>
+      <p class="lede">Most drugs are small molecules that stick to one particular protein in your body and change what that protein does.</p>
+      <p>Many diseases involve a protein doing too much, too little, or the wrong thing. The job is to find a molecule that fixes that protein's behaviour, gets to where it needs to go in the body, and doesn't harm you on the way. The protein you aim at is called the <strong>target</strong>.</p>
+
+      <figure>
+        <p class="fig-title">A drug binds its target</p>
+        <p class="fig-sub">The protein has a pocket. A good drug fits it closely, like a key in a lock. A bad drug fits loosely, or fits other proteins too.</p>
+        <svg viewBox="0 0 760 270" role="img" aria-label="Diagram: a target protein with a binding pocket, and a drug molecule fitting into it.">
+          <!-- protein -->
+          <path class="wash" d="M70 220 C 40 160, 60 70, 150 52 C 210 40, 250 70, 290 64 C 330 58, 360 40, 410 54 C 470 72, 492 132, 470 182 C 452 222, 400 240, 330 236 C 250 232, 130 262, 70 220 Z"/>
+          <path fill="none" class="hema-s" stroke-width="2" d="M70 220 C 40 160, 60 70, 150 52 C 210 40, 250 70, 290 64 C 330 58, 360 40, 410 54 C 470 72, 492 132, 470 182 C 452 222, 400 240, 330 236 C 250 232, 130 262, 70 220 Z"/>
+          <!-- pocket -->
+          <path class="paper" d="M232 66 C 236 104, 250 128, 280 130 C 312 132, 326 106, 330 60 C 310 64, 296 62, 290 64 C 270 68, 250 64, 232 66 Z"/>
+          <path fill="none" class="hema-s" stroke-width="2" stroke-dasharray="0" d="M232 66 C 236 104, 250 128, 280 130 C 312 132, 326 106, 330 60"/>
+          <!-- ligand -->
+          <path class="hema" d="M250 64 C 252 96, 262 120, 281 122 C 302 124, 314 98, 316 60 C 300 50, 268 50, 250 64 Z"/>
+          <!-- labels -->
+          <line class="ink-s" stroke-width="1" x1="314" y1="62" x2="560" y2="40"/>
+          <text class="name" x="568" y="44">Drug molecule</text>
+          <text class="body" x="568" y="62">also called the ligand. Small:</text>
+          <text class="body" x="568" y="78">usually 20 to 70 atoms</text>
+
+          <line class="ink-s" stroke-width="1" x1="324" y1="104" x2="560" y2="128"/>
+          <text class="name" x="568" y="132">Binding pocket</text>
+          <text class="body" x="568" y="150">a groove the drug sits in.</text>
+          <text class="body" x="568" y="166">No pocket, no pill.</text>
+
+          <line class="ink-s" stroke-width="1" x1="452" y1="196" x2="560" y2="214"/>
+          <text class="name" x="568" y="218">Target protein</text>
+          <text class="body" x="568" y="236">thousands of atoms, folded</text>
+          <text class="body" x="568" y="252">into a specific 3D shape</text>
+        </svg>
+      </figure>
+
+      <p>A drug candidate has to do three things at once, and they often conflict:</p>
+      <ul class="plain">
+        <li><strong>Potency:</strong> bind the target strongly, at a low dose.</li>
+        <li><strong>Selectivity:</strong> leave the other 20,000 or so human proteins alone.</li>
+        <li><strong>ADMET:</strong> be absorbed, reach the right tissue, get broken down and cleared at a sensible rate, and not be toxic. (More in <a href="#s3-5">3.5</a>.)</li>
+      </ul>
+
+      <section id="s1-2">
+        <span class="num">1.2</span>
+        <h3>The pipeline</h3>
+        <p>Discovery runs in a fixed order, because each stage costs more than the one before. You want to kill bad candidates as early and as cheaply as possible.</p>
+        <figure>
+          <p class="fig-title">A typical drug program, start to approval</p>
+          <p class="fig-sub">Stages overlap. Real programs vary widely. The right-hand notes show how many candidates are left at each point.</p>
+          <div id="fig-timeline"></div>
+          <figcaption>Illustrative durations. Trial sizes from the FDA's description of clinical research phases. Candidate counts are the PhRMA rule of thumb.</figcaption>
+          <details class="data"><summary>Show as table</summary><div id="tbl-timeline"></div></details>
+        </figure>
+        <p>The most important loop is inside <strong>lead optimization</strong>. Chemists design a variant of the molecule, make it, test it, and analyze the result. This is the <strong>design-make-test-analyze (DMTA) cycle</strong>. Each lap takes weeks, and a program can take dozens of laps. A lot of AI work tries to make those laps faster, or to need fewer of them.</p>
+      </section>
+
+      <section id="s1-3">
+        <span class="num">1.3</span>
+        <h3>The economics drive everything</h3>
+        <div class="stats">
+          <div class="stat"><div class="v">10-15 yrs</div><div class="l">from first idea to an approved drug</div><div class="s">BIO 2021: 10.5 yrs from Phase 1 alone</div></div>
+          <div class="stat"><div class="v">$2.6B</div><div class="l">average cost per approved drug, counting the failures</div><div class="s">DiMasi et al. 2016, incl. cost of capital</div></div>
+          <div class="stat"><div class="v">7.9%</div><div class="l">of drugs that start human trials end up approved</div><div class="s">BIO 2021, programs from 2011-2020</div></div>
+        </div>
+        <p>The headline cost is mostly the cost of the failures, not the cost of the winner. And it has been getting worse. This is known as <strong>Eroom's law</strong> (Moore's law spelled backwards): for decades, each billion dollars of R&amp;D produced fewer new drugs, even as the tools got better.</p>
+
+        <figure>
+          <p class="fig-title">New drugs per $1B of R&amp;D, 1950 = 100</p>
+          <p class="fig-sub">Productivity halved about every nine years from 1950 to 2010, despite better tools.</p>
+          <div id="fig-eroom"></div>
+          <figcaption>Schematic of the trend described by Scannell et al. 2012: roughly 80-fold down from 1950 to 2010, inflation-adjusted. Not their individual data points. Log scale.</figcaption>
+        </figure>
+
+        <p>Why do 9 in 10 drugs fail once they reach people? The biggest reason is that the drug hit its target, but hitting that target did not help the disease enough. <strong>That is a biology failure, not a chemistry failure.</strong> Keep it in mind when judging AI claims later.</p>
+
+        <figure>
+          <p class="fig-title">Why drugs fail in clinical trials</p>
+          <p class="fig-sub">Share of clinical failures, by main cause. The lighter bar extensions show the reported range.</p>
+          <div id="fig-fail"></div>
+          <figcaption>Sun et al. 2022, summarizing clinical trial data from 2010-2017. Other analyses split it differently, but efficacy always comes first.</figcaption>
+          <details class="data"><summary>Show as table</summary><div id="tbl-fail"></div></details>
+        </figure>
+      </section>
+    </section>
+
+    <!-- ================= 2 ================= -->
+    <section id="s2">
+      <span class="num">Section 2</span>
+      <h2>Kinds of drugs</h2>
+      <p class="lede">"Drug" covers very different kinds of things. Their sizes span more than four orders of magnitude, and AI helps each kind differently.</p>
+      <figure>
+        <p class="fig-title">How big each kind of drug is</p>
+        <p class="fig-sub">Molecular mass in daltons (Da), log scale. The shaded band is the classic "under 500 Da" guideline for drugs taken as pills.</p>
+        <div id="fig-size"></div>
+        <figcaption>Aspirin and imatinib masses calculated with RDKit. Other masses are approximate published values.</figcaption>
+        <details class="data"><summary>Show as table</summary><div id="tbl-size"></div></details>
+      </figure>
+
+      <div class="cards">
+        <div class="card">
+          <span class="tag">Most AI chemistry work</span>
+          <h4>Small molecules</h4>
+          <p>Classic pills. Small enough to get into cells and survive the gut. The best-measured kind of drug, with decades of public data.</p>
+          <p class="eg"><b>e.g.</b> aspirin, statins, imatinib</p>
+        </div>
+        <div class="card">
+          <span class="tag">Biologics</span>
+          <h4>Antibodies</h4>
+          <p>Large Y-shaped proteins, given by injection. Very specific, but only reach targets on the outside of cells. A huge share of modern drug sales.</p>
+          <p class="eg"><b>e.g.</b> trastuzumab (Herceptin), adalimumab (Humira)</p>
+        </div>
+        <div class="card">
+          <span class="tag">In between</span>
+          <h4>Peptides</h4>
+          <p>Short chains of amino acids. Bigger and more specific than small molecules, cheaper to make than antibodies.</p>
+          <p class="eg"><b>e.g.</b> semaglutide (Ozempic), insulin</p>
+        </div>
+        <div class="card">
+          <span class="tag">Instructions, not binders</span>
+          <h4>Nucleic acids</h4>
+          <p>Deliver genetic instructions instead of a molecule that binds something. mRNA makes a protein; siRNA and antisense switch one off.</p>
+          <p class="eg"><b>e.g.</b> mRNA vaccines, patisiran</p>
+        </div>
+        <div class="card">
+          <span class="tag">Living medicines</span>
+          <h4>Cell and gene therapy</h4>
+          <p>Re-engineer a patient's own cells (CAR-T), or deliver a working copy of a gene using a harmless virus shell (AAV).</p>
+          <p class="eg"><b>e.g.</b> CAR-T for leukaemia, Zolgensma</p>
+        </div>
+        <div class="card">
+          <span class="tag">Newer mechanism</span>
+          <h4>Protein degraders</h4>
+          <p>Small molecules that mark a protein for the cell to destroy, instead of just blocking it. This opens up targets that have no usable pocket.</p>
+          <p class="eg"><b>e.g.</b> PROTACs, molecular glues</p>
+        </div>
+      </div>
+      <p>AI has the most traction with <strong>small molecules</strong>, because there are decades of measured data to learn from, and with <strong>antibodies and other proteins</strong>, because protein structure prediction now works well. These are the two areas this primer focuses on.</p>
+    </section>
+
+    <!-- ================= 3 ================= -->
+    <section id="s3">
+      <span class="num">Section 3</span>
+      <h2>Where AI comes in</h2>
+      <p class="lede">Here is the same pipeline again, this time showing where AI methods plug in. The rest of this section takes each stage in turn.</p>
+
+      <ol class="metro">
+        <li>
+          <div class="stage">Target identification <a href="#s3-1">3.1 →</a></div>
+          <p class="q">Which protein, if changed, would actually treat the disease?</p>
+          <div class="chips"><span class="chip">knowledge graphs</span><span class="chip">genetics and GWAS</span><span class="chip">single-cell analysis</span><span class="chip">LLM literature mining</span></div>
+        </li>
+        <li>
+          <div class="stage">Protein structure <a href="#s3-2">3.2 →</a></div>
+          <p class="q">What does the target look like in 3D, and where would a drug bind?</p>
+          <div class="chips"><span class="chip">AlphaFold</span><span class="chip">co-folding models</span><span class="chip">pocket detection</span></div>
+        </li>
+        <li>
+          <div class="stage">Hit identification <a href="#s3-3">3.3 →</a></div>
+          <p class="q">Out of billions of possible molecules, which ones bind at all?</p>
+          <div class="chips"><span class="chip">docking</span><span class="chip">ML-accelerated screening</span><span class="chip">affinity prediction</span></div>
+        </li>
+        <li>
+          <div class="stage">Lead optimization <span><a href="#s3-4">3.4</a> · <a href="#s3-5">3.5 →</a></span></div>
+          <p class="q">How do we improve a weak hit without breaking something else?</p>
+          <div class="chips"><span class="chip">generative models</span><span class="chip">ADMET prediction</span><span class="chip">retrosynthesis</span><span class="chip">multi-objective optimization</span></div>
+        </li>
+        <li>
+          <div class="stage">Biologics design <a href="#s3-6">3.6 →</a></div>
+          <p class="q">Can we design a protein or antibody that binds the target?</p>
+          <div class="chips"><span class="chip">RFdiffusion</span><span class="chip">protein language models</span><span class="chip">developability prediction</span></div>
+        </li>
+        <li>
+          <div class="stage">Preclinical</div>
+          <p class="q">Is it safe enough in animals to try in people?</p>
+          <div class="chips"><span class="chip">toxicity prediction</span><span class="chip none">mostly lab work</span></div>
+        </li>
+        <li>
+          <div class="stage">Clinical trials <a href="#s3-7">3.7 →</a></div>
+          <p class="q">Does it work in people, and in which people?</p>
+          <div class="chips"><span class="chip">patient stratification</span><span class="chip">trial design</span><span class="chip">document drafting</span><span class="chip">safety signal mining</span></div>
+        </li>
+        <li>
+          <div class="stage">Shortcut: repurposing <a href="#s3-8">3.8 →</a></div>
+          <p class="q">Could a drug that is already approved treat a different disease?</p>
+          <div class="chips"><span class="chip">link prediction</span><span class="chip">signature matching</span><span class="chip">literature-based discovery</span></div>
+        </li>
+      </ol>
+
+      <!-- 3.1 -->
+      <section id="s3-1">
+        <span class="num">3.1</span>
+        <h3>Target identification: picking the protein</h3>
+        <p>This is the highest-leverage decision in the whole pipeline. Pick the wrong target and every later step is wasted, however well it's done. Remember the efficacy failures in 1.3? Most of them come back to the target.</p>
+
+        <h4>How many proteins are candidates?</h4>
+        <p>Humans have about 20,000 protein-coding genes. Only a fraction of their proteins can plausibly be reached by a drug (the "druggable genome"), and fewer still have an approved drug today.</p>
+        <figure>
+          <p class="fig-title">From the genome to approved drug targets</p>
+          <p class="fig-sub">Square areas are drawn to scale.</p>
+          <div id="fig-genome"></div>
+          <figcaption>Finan et al. 2017 (druggable genome: 4,479 genes). Santos et al. 2017 (667 human proteins targeted by FDA-approved drugs).</figcaption>
+          <details class="data"><summary>Show as table</summary><div id="tbl-genome"></div></details>
+        </figure>
+
+        <h4>What kinds of proteins become targets?</h4>
+        <p>Most approved drugs hit one of a handful of protein families. Where a protein sits in the cell matters: antibodies can only reach things on the outside, while small molecules can get inside.</p>
+        <figure>
+          <p class="fig-title">Where the main target families sit in a cell</p>
+          <svg viewBox="0 0 760 350" role="img" aria-label="Cell cross-section showing a GPCR, ion channel and transporter in the membrane, a kinase inside the cell, and a nuclear receptor on DNA inside the nucleus.">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--ink-2)"/></marker>
+            </defs>
+            <text class="lbl" x="0" y="22">OUTSIDE THE CELL</text>
+            <rect x="0" y="62" width="760" height="34" class="faint"/>
+            <line x1="0" y1="62" x2="760" y2="62" class="rule-s" stroke-width="2"/>
+            <line x1="0" y1="96" x2="760" y2="96" class="rule-s" stroke-width="2"/>
+            <text class="lbl" x="760" y="52" text-anchor="end">MEMBRANE</text>
+            <text class="lbl" x="760" y="118" text-anchor="end">INSIDE THE CELL</text>
+
+            <!-- GPCR: 7 helices spanning the membrane, signal molecule on top -->
+            <g transform="translate(66 50)">
+              <rect x="0" y="0" width="9" height="58" rx="4" class="hema"/><rect x="13" y="0" width="9" height="58" rx="4" class="hema"/>
+              <rect x="26" y="0" width="9" height="58" rx="4" class="hema"/><rect x="39" y="0" width="9" height="58" rx="4" class="hema"/>
+              <rect x="52" y="0" width="9" height="58" rx="4" class="hema"/><rect x="65" y="0" width="9" height="58" rx="4" class="hema"/>
+              <rect x="78" y="0" width="9" height="58" rx="4" class="hema"/>
+              <circle cx="44" cy="-16" r="7" fill="none" class="ink-s" stroke-width="1.5"/>
+            </g>
+            <text class="name" x="110" y="146" text-anchor="middle">GPCR</text>
+            <text class="body" x="110" y="164" text-anchor="middle">a receptor that relays</text>
+            <text class="body" x="110" y="180" text-anchor="middle">outside signals inward</text>
+
+            <!-- ion channel -->
+            <g transform="translate(297 46)">
+              <rect x="0" y="0" width="26" height="66" rx="8" class="hema"/>
+              <rect x="40" y="0" width="26" height="66" rx="8" class="hema"/>
+              <circle cx="33" cy="-14" r="4" fill="none" class="ink-s" stroke-width="1.5"/>
+              <circle cx="33" cy="33" r="4" fill="none" class="ink-s" stroke-width="1.5"/>
+              <circle cx="33" cy="80" r="4" fill="none" class="ink-s" stroke-width="1.5"/>
+            </g>
+            <text class="name" x="330" y="146" text-anchor="middle">Ion channel</text>
+            <text class="body" x="330" y="164" text-anchor="middle">a pore that lets charged atoms</text>
+            <text class="body" x="330" y="180" text-anchor="middle">through (nerves, heart)</text>
+
+            <!-- transporter -->
+            <g transform="translate(515 44)">
+              <path class="hema" d="M0 10 C 0 -2, 70 -2, 70 10 L 70 60 C 70 72, 0 72, 0 60 Z"/>
+              <path d="M35 -20 L 35 84" class="ink-s" stroke-width="1.5" fill="none" style="stroke:var(--paper)"/>
+              <path d="M35 -20 L 35 -2 M35 72 L 35 84" class="ink-s" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+            </g>
+            <text class="name" x="550" y="146" text-anchor="middle">Transporter</text>
+            <text class="body" x="550" y="164" text-anchor="middle">a pump that moves molecules</text>
+            <text class="body" x="550" y="180" text-anchor="middle">across the membrane</text>
+
+            <!-- kinase -->
+            <g transform="translate(40 236)">
+              <path class="hema" d="M0 26 C 0 4, 30 -4, 48 6 C 66 -6, 92 6, 88 30 C 86 52, 54 60, 40 50 C 20 60, 0 48, 0 26 Z"/>
+              <circle cx="102" cy="10" r="11" class="paper ink-s" stroke-width="1.5"/>
+              <text class="lbl-ink" x="102" y="14" text-anchor="middle">P</text>
+            </g>
+            <text class="name" x="164" y="246">Kinase / other enzyme</text>
+            <text class="body" x="164" y="264">a protein that does chemistry, e.g.</text>
+            <text class="body" x="164" y="280">tagging other proteins with</text>
+            <text class="body" x="164" y="296">phosphate (P) to switch them on</text>
+
+            <!-- nucleus -->
+            <ellipse cx="596" cy="276" rx="164" ry="70" class="panel"/>
+            <ellipse cx="596" cy="276" rx="164" ry="70" fill="none" class="rule-s" stroke-width="2"/>
+            <text class="lbl" x="596" y="228" text-anchor="middle">NUCLEUS</text>
+            <text class="name" x="596" y="250" text-anchor="middle">Nuclear receptor</text>
+            <text class="body" x="596" y="268" text-anchor="middle">senses a hormone, then switches genes on or off</text>
+            <path d="M470 312 C 490 296, 510 328, 530 312 S 570 296, 590 312 S 630 328, 650 312 S 690 296, 710 312" fill="none" class="muted-s" stroke-width="2"/>
+            <path d="M470 320 C 490 304, 510 336, 530 320 S 570 304, 590 320 S 630 336, 650 320 S 690 304, 710 320" fill="none" class="muted-s" stroke-width="2" opacity=".5"/>
+            <path class="hema" d="M566 306 C 566 286, 584 278, 598 286 C 612 276, 630 288, 626 306 Z"/>
+            <text class="lbl" x="716" y="334">DNA</text>
+          </svg>
+        </figure>
+
+        <div class="cards">
+          <div class="card">
+            <span class="tag">The biggest family</span>
+            <h4>GPCRs (G-protein-coupled receptors)</h4>
+            <p>Sit in the cell membrane and pass signals from hormones and neurotransmitters inward. About a third of all approved drugs act on one.</p>
+            <p class="eg"><b>e.g.</b> semaglutide → GLP-1 receptor (diabetes, obesity) · propranolol → beta-adrenergic receptor (heart) · antihistamines → histamine H1 receptor</p>
+          </div>
+          <div class="card">
+            <span class="tag">Cancer workhorses</span>
+            <h4>Kinases</h4>
+            <p>Enzymes that switch other proteins on by tagging them with phosphate. When one gets stuck "on", cells can grow out of control.</p>
+            <p class="eg"><b>e.g.</b> imatinib → BCR-ABL (leukaemia, 2001) · osimertinib → EGFR (lung cancer)</p>
+          </div>
+          <div class="card">
+            <span class="tag">Electrical signalling</span>
+            <h4>Ion channels</h4>
+            <p>Pores that open and close to let charged atoms (sodium, potassium, calcium, chloride) through. They run nerves, muscles and the heartbeat.</p>
+            <p class="eg"><b>e.g.</b> lidocaine → sodium channels (local anaesthetic) · amlodipine → calcium channels (blood pressure) · ivacaftor → CFTR (cystic fibrosis)</p>
+          </div>
+          <div class="card">
+            <span class="tag">Hormone sensors</span>
+            <h4>Nuclear receptors</h4>
+            <p>Sit inside the cell, bind a hormone, and switch genes on or off. A small family, but it accounts for a large number of drugs.</p>
+            <p class="eg"><b>e.g.</b> tamoxifen → estrogen receptor (breast cancer) · dexamethasone → glucocorticoid receptor (inflammation)</p>
+          </div>
+          <div class="card">
+            <span class="tag">Chemistry machines</span>
+            <h4>Other enzymes</h4>
+            <p>Proteins that speed up a specific chemical reaction. Block the enzyme and you block the reaction.</p>
+            <p class="eg"><b>e.g.</b> statins → HMG-CoA reductase (cholesterol) · aspirin → COX enzymes (pain) · HIV protease inhibitors</p>
+          </div>
+          <div class="card">
+            <span class="tag">Pumps</span>
+            <h4>Transporters</h4>
+            <p>Move molecules across membranes. Block the pump and the molecule builds up on one side, or stops arriving on the other.</p>
+            <p class="eg"><b>e.g.</b> SSRIs → serotonin transporter (depression) · omeprazole → stomach proton pump (acid reflux)</p>
+          </div>
+          <div class="card wide">
+            <span class="tag">The frontier</span>
+            <h4>"Undruggable" targets</h4>
+            <p>Transcription factors, smooth protein surfaces, and proteins that act by sticking to other proteins often have no pocket to bind. KRAS, a cancer driver, was called undruggable for about 40 years until sotorasib was approved in 2021 for one mutant form. Degraders, peptides and AI-designed binders are all aimed at this group.</p>
+          </div>
+        </div>
+
+        <h4>What makes a good target?</h4>
+        <table>
+          <thead><tr><th style="width:28%">Test</th><th>The question</th></tr></thead>
+          <tbody>
+            <tr><td>Causal link</td><td>Does changing this protein <em>cause</em> a change in the disease, or does it just correlate with it? Human genetic evidence is the strongest proof. Drug programs whose target has genetic support are about <strong>2.6 times</strong> more likely to reach approval (Minikel et al. 2024).</td></tr>
+            <tr><td>Druggable</td><td>Is there a pocket a small molecule can bind? Or is the protein on the cell surface, where an antibody can reach it?</td></tr>
+            <tr><td>Safe to change</td><td>Will blocking it also break something essential in healthy tissue? Where else in the body is it made?</td></tr>
+            <tr><td>Measurable</td><td>Can you build a lab test for it, and a biomarker to show the drug is working in patients?</td></tr>
+          </tbody>
+        </table>
+
+        <figure>
+          <p class="fig-title">Case study: PCSK9, a target found through human genetics</p>
+          <p class="fig-sub">The textbook example of genetics pointing straight at a target.</p>
+          <svg viewBox="0 0 760 176" role="img" aria-label="Timeline: 2003 PCSK9 gene linked to very high cholesterol; 2006 people with broken PCSK9 found to have low cholesterol and far less heart disease; 2015 two PCSK9 antibody drugs approved.">
+            <line x1="20" y1="40" x2="740" y2="40" class="hema-s" stroke-width="2" opacity=".4"/>
+            <circle cx="20" cy="40" r="7" class="hema"/>
+            <circle cx="290" cy="40" r="7" class="hema"/>
+            <circle cx="560" cy="40" r="9" class="hema"/>
+            <circle cx="560" cy="40" r="14" fill="none" class="hema-s" stroke-width="1.5"/>
+            <text class="lbl-ink" x="20" y="18" text-anchor="start">2003</text>
+            <text class="lbl-ink" x="290" y="18" text-anchor="start">2006</text>
+            <text class="lbl-ink" x="560" y="18" text-anchor="start">2015</text>
+            <text class="name" x="0" y="82">Families with high cholesterol</text>
+            <text class="body" x="0" y="100">carry an overactive version</text>
+            <text class="body" x="0" y="116">of the PCSK9 gene.</text>
+            <text class="name" x="270" y="82">People with a broken copy</text>
+            <text class="body" x="270" y="100">have low LDL cholesterol and about</text>
+            <text class="body" x="270" y="116">88% fewer heart disease events.</text>
+            <text class="name" x="540" y="82">Two antibody drugs approved</text>
+            <text class="body" x="540" y="100">evolocumab and alirocumab</text>
+            <text class="body" x="540" y="116">both block PCSK9.</text>
+            <text class="lbl" x="0" y="160">In effect, nature ran the experiment: blocking PCSK9 lowers cholesterol, and people do fine without it.</text>
+          </svg>
+          <figcaption>Cohen et al. 2006 (88% figure from the study's population with nonsense mutations).</figcaption>
+        </figure>
+
+        <div class="ai">
+          <p class="ai-label"><span class="sw e"></span>Where AI comes in</p>
+          <ul class="plain">
+            <li><strong>Knowledge graphs.</strong> Link millions of facts (gene A is linked to disease B, drug C inhibits protein D) and predict missing links, i.e. targets nobody has tested yet.</li>
+            <li><strong>Genetics at scale.</strong> Find which genetic variants are linked to a disease in data from hundreds of thousands of people (GWAS), then work out which gene each variant actually affects.</li>
+            <li><strong>Single-cell data.</strong> Compare which genes are switched on in individual diseased and healthy cells, to find the cell type and gene that matter.</li>
+            <li><strong>CRISPR screens.</strong> Learn from experiments that knock out each gene in turn (for example in DepMap, which shows which genes cancer cells can't survive without).</li>
+            <li><strong>LLM literature mining.</strong> Read the papers no human team has time for, pull out claims with their evidence, and point out contradictions.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- 3.2 -->
+      <section id="s3-2">
+        <span class="num">3.2</span>
+        <h3>Protein structure prediction</h3>
+        <p>To design a drug for a pocket, you need to know the pocket's shape. Measuring a protein's 3D structure in the lab can take months or years. <strong>AlphaFold2</strong> (2020) predicts it from the amino acid sequence, often as accurately as an experiment. It is the clearest AI success in the field, and won a share of the 2024 Nobel Prize in Chemistry.</p>
+        <figure>
+          <p class="fig-title">Sequence in, 3D shape out</p>
+          <svg viewBox="0 0 760 190" role="img" aria-label="Diagram: an amino acid sequence string goes into a model, which outputs a folded 3D protein structure with a pocket.">
+            <rect x="0" y="54" width="250" height="80" rx="10" class="panel"/>
+            <text class="lbl" x="16" y="78">AMINO ACID SEQUENCE</text>
+            <text x="16" y="102" style="font-family:var(--mono);font-size:13px;fill:var(--ink)">MKTAYIAKQRQISFVKSHFSRQ</text>
+            <text x="16" y="120" style="font-family:var(--mono);font-size:13px;fill:var(--ink)">LEERLGLIEVQAPILSRVGDGT…</text>
+            <path d="M262 94 L 330 94" class="ink-s" stroke-width="1.5" marker-end="url(#arrow2)"/>
+            <rect x="340" y="70" width="110" height="48" rx="24" class="eosin" opacity=".14"/>
+            <rect x="340" y="70" width="110" height="48" rx="24" fill="none" class="eosin-s" stroke-width="1.5"/>
+            <text x="395" y="99" text-anchor="middle" style="font-family:var(--mono);font-size:12px;fill:var(--eosin-ink)">AlphaFold</text>
+            <path d="M462 94 L 520 94" class="ink-s" stroke-width="1.5" marker-end="url(#arrow2)"/>
+            <path d="M560 150 C 530 120, 560 100, 590 112 C 620 124, 600 70, 570 64 C 540 58, 556 26, 594 28 C 640 30, 650 60, 680 50 C 712 40, 730 80, 706 104 C 684 126, 712 150, 690 166 C 668 182, 640 150, 620 166 C 600 182, 580 170, 560 150 Z" class="wash"/>
+            <path d="M556 150 C 528 124, 560 98, 590 116 S 640 140, 652 112 S 600 72, 620 54 S 690 38, 702 70 S 668 118, 698 140 S 688 176, 656 166" fill="none" class="hema-s" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="636" cy="92" r="13" fill="none" class="ink-s" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <text class="lbl" x="656" y="96">pocket</text>
+            <text class="lbl" x="624" y="188" text-anchor="middle">PREDICTED 3D STRUCTURE</text>
+            <defs><marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--ink-2)"/></marker></defs>
+          </svg>
+          <figcaption>Schematic. The public AlphaFold database holds over 200 million predicted structures.</figcaption>
+        </figure>
+        <p>Newer <strong>co-folding</strong> models (AlphaFold 3, and open alternatives such as Boltz and Chai) predict the protein <em>together with</em> a drug bound to it. That bound state is what drug design actually needs.</p>
+        <div class="caveat"><b>Don't overclaim</b>A predicted structure is one frozen snapshot. Real proteins flex, and pockets can open and close. Predictions are often not precise enough for the fine-grained energy calculations drug design relies on.</div>
+      </section>
+
+      <!-- 3.3 -->
+      <section id="s3-3">
+        <span class="num">3.3</span>
+        <h3>Virtual screening: testing molecules in software</h3>
+        <p>Instead of physically testing a million compounds with robots, test them on a computer first. <strong>Docking</strong> places each molecule into the pocket in many different poses and scores how well it fits. It is cheap per molecule. The catch is that docking scores track real binding strength only loosely, so many top-scoring molecules don't actually bind in the lab.</p>
+        <p>The modern twist is scale. Suppliers now offer catalogues of <strong>tens of billions</strong> of molecules that haven't been made yet but can be made to order. Docking every one is too slow, so teams use machine learning as a cheap first filter:</p>
+        <figure>
+          <p class="fig-title">Screening tens of billions of molecules, step by step</p>
+          <p class="fig-sub">Each step is more accurate and more expensive than the one before.</p>
+          <div id="fig-funnel"></div>
+          <figcaption>Orders of magnitude are illustrative. Real campaigns vary.</figcaption>
+        </figure>
+        <div class="ai">
+          <p class="ai-label"><span class="sw e"></span>Where AI comes in</p>
+          <p><strong>Surrogate models</strong> learn to imitate docking scores, then rank the whole catalogue in hours. <strong>ML scoring functions</strong> try to predict real binding strength from structure. <strong>Co-folding models</strong> (3.2) can stand in for docking altogether.</p>
+        </div>
+      </section>
+
+      <!-- 3.4 -->
+      <section id="s3-4">
+        <span class="num">3.4</span>
+        <h3>Generative design: inventing new molecules</h3>
+        <p>Instead of searching a catalogue, a model proposes molecules that have never existed. First, a model needs a way to "see" a molecule. Here are the four common ways to represent one, all for aspirin:</p>
+        <figure>
+          <div class="reps">
+            <div class="rep">
+              <span class="tag">1 · As text (SMILES)</span>
+              <p class="smiles" id="smiles"></p>
+              <p class="what">A line of text that spells out the atoms and bonds. Language models can read and write it, but one wrong character makes it an invalid molecule.</p>
+            </div>
+            <div class="rep">
+              <span class="tag">2 · As a drawing</span>
+              <div class="mol"><svg aria-hidden='true' version='1.1' baseProfile='full'
+              xmlns='http://www.w3.org/2000/svg'
+                      xmlns:rdkit='http://www.rdkit.org/xml'
+                      xmlns:xlink='http://www.w3.org/1999/xlink'
+                  xml:space='preserve'
+viewBox='0 0 360 220'>
+<!-- END OF HEADER -->
+<path class='bond-0 atom-0 atom-1' d='M 65.1,149.0 L 101.5,116.2' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-1 atom-1 atom-2' d='M 105.5,117.5 L 96.7,76.3' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-1 atom-1 atom-2' d='M 98.3,119.0 L 89.5,77.8' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-2 atom-1 atom-3' d='M 101.5,116.2 L 140.2,128.7' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-3 atom-3 atom-4' d='M 156.1,124.1 L 184.6,98.4' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-4 atom-4 atom-5' d='M 184.6,98.4 L 174.3,50.5' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-4 atom-4 atom-5' d='M 190.9,92.7 L 182.4,53.1' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-5 atom-5 atom-6' d='M 174.3,50.5 L 210.7,17.6' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-6 atom-6 atom-7' d='M 210.7,17.6 L 257.4,32.7' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-6 atom-6 atom-7' d='M 212.5,25.9 L 251.1,38.4' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-7 atom-7 atom-8' d='M 257.4,32.7 L 267.6,80.7' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-8 atom-8 atom-9' d='M 267.6,80.7 L 231.2,113.5' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-8 atom-8 atom-9' d='M 259.6,78.1 L 229.5,105.2' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-9 atom-9 atom-10' d='M 231.2,113.5 L 241.5,161.5' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-10 atom-10 atom-11' d='M 238.3,164.3 L 279.0,177.5' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-10 atom-10 atom-11' d='M 240.6,157.3 L 281.3,170.5' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-11 atom-10 atom-12' d='M 241.5,161.5 L 213.1,187.1' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-12 atom-9 atom-4' d='M 231.2,113.5 L 184.6,98.4' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path d='M 99.7,117.8 L 101.5,116.2 L 103.4,116.8' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 174.8,52.9 L 174.3,50.5 L 176.1,48.8' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 208.9,19.2 L 210.7,17.6 L 213.1,18.4' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 255.1,31.9 L 257.4,32.7 L 257.9,35.1' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 267.1,78.3 L 267.6,80.7 L 265.8,82.3' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 241.0,159.1 L 241.5,161.5 L 240.1,162.8' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path class='atom-2' d='M 84.9 68.3
+Q 84.9 64.9, 86.5 63.1
+Q 88.2 61.2, 91.2 61.2
+Q 94.3 61.2, 96.0 63.1
+Q 97.6 64.9, 97.6 68.3
+Q 97.6 71.6, 95.9 73.6
+Q 94.3 75.5, 91.2 75.5
+Q 88.2 75.5, 86.5 73.6
+Q 84.9 71.7, 84.9 68.3
+M 91.2 73.9
+Q 93.4 73.9, 94.5 72.5
+Q 95.6 71.0, 95.6 68.3
+Q 95.6 65.5, 94.5 64.2
+Q 93.4 62.8, 91.2 62.8
+Q 89.1 62.8, 88.0 64.1
+Q 86.8 65.5, 86.8 68.3
+Q 86.8 71.1, 88.0 72.5
+Q 89.1 73.9, 91.2 73.9
+' fill='currentColor'/>
+<path class='atom-3' d='M 141.8 131.3
+Q 141.8 128.0, 143.4 126.1
+Q 145.1 124.3, 148.2 124.3
+Q 151.2 124.3, 152.9 126.1
+Q 154.5 128.0, 154.5 131.3
+Q 154.5 134.7, 152.9 136.6
+Q 151.2 138.5, 148.2 138.5
+Q 145.1 138.5, 143.4 136.6
+Q 141.8 134.7, 141.8 131.3
+M 148.2 137.0
+Q 150.3 137.0, 151.4 135.5
+Q 152.6 134.1, 152.6 131.3
+Q 152.6 128.6, 151.4 127.2
+Q 150.3 125.8, 148.2 125.8
+Q 146.0 125.8, 144.9 127.2
+Q 143.7 128.6, 143.7 131.3
+Q 143.7 134.1, 144.9 135.5
+Q 146.0 137.0, 148.2 137.0
+' fill='currentColor'/>
+<path class='atom-11' d='M 281.8 176.6
+Q 281.8 173.3, 283.4 171.4
+Q 285.1 169.6, 288.2 169.6
+Q 291.2 169.6, 292.9 171.4
+Q 294.5 173.3, 294.5 176.6
+Q 294.5 180.0, 292.9 181.9
+Q 291.2 183.8, 288.2 183.8
+Q 285.1 183.8, 283.4 181.9
+Q 281.8 180.0, 281.8 176.6
+M 288.2 182.3
+Q 290.3 182.3, 291.4 180.9
+Q 292.6 179.4, 292.6 176.6
+Q 292.6 173.9, 291.4 172.5
+Q 290.3 171.1, 288.2 171.1
+Q 286.0 171.1, 284.9 172.5
+Q 283.7 173.9, 283.7 176.6
+Q 283.7 179.4, 284.9 180.9
+Q 286.0 182.3, 288.2 182.3
+' fill='currentColor'/>
+<path class='atom-12' d='M 185.0 187.5
+L 186.9 187.5
+L 186.9 193.4
+L 194.0 193.4
+L 194.0 187.5
+L 195.8 187.5
+L 195.8 201.4
+L 194.0 201.4
+L 194.0 195.0
+L 186.9 195.0
+L 186.9 201.4
+L 185.0 201.4
+L 185.0 187.5
+' fill='currentColor'/>
+<path class='atom-12' d='M 198.7 194.4
+Q 198.7 191.1, 200.3 189.2
+Q 202.0 187.3, 205.1 187.3
+Q 208.2 187.3, 209.8 189.2
+Q 211.4 191.1, 211.4 194.4
+Q 211.4 197.8, 209.8 199.7
+Q 208.1 201.6, 205.1 201.6
+Q 202.0 201.6, 200.3 199.7
+Q 198.7 197.8, 198.7 194.4
+M 205.1 200.0
+Q 207.2 200.0, 208.3 198.6
+Q 209.5 197.2, 209.5 194.4
+Q 209.5 191.7, 208.3 190.3
+Q 207.2 188.9, 205.1 188.9
+Q 203.0 188.9, 201.8 190.3
+Q 200.7 191.7, 200.7 194.4
+Q 200.7 197.2, 201.8 198.6
+Q 203.0 200.0, 205.1 200.0
+' fill='currentColor'/>
+</svg>
+</div>
+              <p class="what">The skeletal formula chemists draw. Each corner is a carbon atom; the hydrogens are left out.</p>
+            </div>
+            <div class="rep">
+              <span class="tag">3 · As a graph</span>
+              <div id="mol-graph"></div>
+              <p class="what">Atoms become nodes and bonds become edges. Graph neural networks learn from this form.</p>
+            </div>
+            <div class="rep">
+              <span class="tag">4 · As a fingerprint</span>
+              <div class="fp" id="fp" role="img"></div>
+              <p class="what" id="fp-note">A fixed-length list of on/off bits, each marking a small chemical pattern. Fast for similarity search and classic ML.</p>
+            </div>
+          </div>
+          <figcaption>All four generated from the same SMILES string with RDKit. Fingerprint: Morgan, radius 2, folded from 2,048 to 64 bits for display.</figcaption>
+        </figure>
+
+        <p>Generation is just the first step of a loop. The model proposes thousands of molecules, filters discard most of them, and the best survivors steer the next round. Only a shortlist ever goes to the lab.</p>
+        <figure>
+          <p class="fig-title">Two loops: a fast one in software, a slow one in the lab</p>
+          <svg viewBox="0 0 760 312" role="img" aria-label="Diagram: an in-software loop of generate, check valid, predict properties, score against target, keep the best, repeating in seconds. Its shortlist feeds a lab loop of make, test, analyze that takes weeks per lap and feeds results back.">
+            <defs><marker id="arrow3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--ink-2)"/></marker></defs>
+            <text class="lbl" x="28" y="14">IN SOFTWARE · SECONDS PER LAP</text>
+            <g id="loop-soft"></g>
+            <text class="lbl" x="28" y="214">IN THE LAB · WEEKS PER LAP</text>
+            <g id="loop-lab"></g>
+          </svg>
+        </figure>
+
+        <p>Two things make this harder than it sounds:</p>
+        <ul class="plain">
+          <li><strong>It optimizes many goals at once.</strong> Potency, selectivity, solubility, stability, no heart toxicity, and it has to be possible to make. Improving one usually makes another worse. A model that optimizes only binding strength produces molecules no one would take as a pill.</li>
+          <li><strong>It has to be makeable.</strong> Models happily propose molecules no chemist can actually make. Practical systems score how easy a molecule is to make, or only build molecules from known reactions.</li>
+        </ul>
+        <div class="ai">
+          <p class="ai-label"><span class="sw e"></span>Where AI comes in</p>
+          <p><strong>Generators</strong>: language models on SMILES, reinforcement learning (REINVENT), graph models, and diffusion models that build a molecule directly inside the 3D pocket. <strong>Retrosynthesis models</strong> work backwards from a molecule to a step-by-step recipe that starts from chemicals you can buy (AiZynthFinder, ASKCOS). <strong>LLM agents</strong> can run the whole loop, calling each tool in turn.</p>
+        </div>
+        <div class="caveat"><b>The honest limit</b>You can generate molecules in an afternoon. You can't prove any of them work without making them and testing them in a lab. Present generated molecules as leads to test, never as discoveries.</div>
+      </section>
+
+      <!-- 3.5 -->
+      <section id="s3-5">
+        <span class="num">3.5</span>
+        <h3>Property prediction: will it survive the body?</h3>
+        <p>A molecule that binds perfectly is useless if it never reaches its target, or if it damages the liver on the way. <strong>ADMET</strong> stands for the five questions every candidate has to pass:</p>
+        <figure>
+          <p class="fig-title">A drug's journey through the body</p>
+          <svg viewBox="0 0 760 210" role="img" aria-label="A drug's path: absorption in the gut, distribution through the blood, metabolism in the liver, excretion by the kidneys, with toxicity possible at any point.">
+            <line x1="60" y1="70" x2="700" y2="70" class="hema-s" stroke-width="2" opacity=".4"/>
+            <g id="admet"></g>
+            <rect x="40" y="158" width="680" height="40" rx="8" class="faint"/>
+            <text class="name" x="60" y="183">T · Toxicity</text>
+            <text class="body" x="168" y="183">can strike anywhere along the way. Classic killers: heart rhythm (hERG), liver damage.</text>
+          </svg>
+        </figure>
+        <p>The oldest rule of thumb is <strong>Lipinski's rule of five</strong>: molecules that break more than one of these limits tend to be poorly absorbed as pills. Here are two real drugs checked against it. Imatinib only just passes.</p>
+        <div class="scroll-x">
+        <table id="lipinski">
+          <thead><tr><th>Rule</th><th>Limit</th><th>Aspirin</th><th>Imatinib</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        </div>
+        <figure>
+          <p class="fig-title">Imatinib (Gleevec)</p>
+          <p class="fig-sub">A kinase inhibitor that turned one type of leukaemia from fatal to manageable. Approved in 2001.</p>
+          <div class="mol"><svg aria-hidden='true' version='1.1' baseProfile='full'
+              xmlns='http://www.w3.org/2000/svg'
+                      xmlns:rdkit='http://www.rdkit.org/xml'
+                      xmlns:xlink='http://www.w3.org/1999/xlink'
+                  xml:space='preserve'
+viewBox='0 0 560 220'>
+<!-- END OF HEADER -->
+<path class='bond-0 atom-0 atom-1' d='M 88.0,60.1 L 122.5,55.0' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-1 atom-1 atom-2' d='M 122.5,55.0 L 135.3,22.7' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-1 atom-1 atom-2' d='M 128.4,54.2 L 139.0,27.4' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-2 atom-2 atom-3' d='M 135.3,22.7 L 169.7,17.6' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-3 atom-3 atom-4' d='M 169.7,17.6 L 191.3,44.9' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-3 atom-3 atom-4' d='M 167.5,23.2 L 185.4,45.8' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-4 atom-4 atom-5' d='M 191.3,44.9 L 220.9,40.5' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-5 atom-5 atom-6' d='M 230.6,45.9 L 247.4,67.1' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-6 atom-6 atom-7' d='M 245.5,64.7 L 234.6,92.3' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-6 atom-6 atom-7' d='M 250.4,66.6 L 239.4,94.3' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-7 atom-6 atom-8' d='M 247.4,67.1 L 281.8,62.0' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-8 atom-8 atom-9' d='M 281.8,62.0 L 303.4,89.3' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-8 atom-8 atom-9' d='M 287.8,61.1 L 305.6,83.7' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-9 atom-9 atom-10' d='M 303.4,89.3 L 337.9,84.2' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-10 atom-10 atom-11' d='M 337.9,84.2 L 350.7,51.8' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-10 atom-10 atom-11' d='M 334.1,79.4 L 344.7,52.7' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-11 atom-11 atom-12' d='M 350.7,51.8 L 385.1,46.7' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-12 atom-12 atom-13' d='M 385.1,46.7 L 401.9,67.9' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-13 atom-13 atom-14' d='M 404.3,80.1 L 393.9,106.4' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-14 atom-14 atom-15' d='M 393.9,106.4 L 415.5,133.6' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-15 atom-15 atom-16' d='M 415.5,133.6 L 445.1,129.3' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-16 atom-16 atom-17' d='M 454.8,134.6 L 471.6,155.8' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-17 atom-16 atom-18' d='M 452.4,122.5 L 462.8,96.2' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-18 atom-18 atom-19' d='M 462.8,96.2 L 441.2,68.9' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-19 atom-11 atom-20' d='M 350.7,51.8 L 329.0,24.5' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-20 atom-20 atom-21' d='M 329.0,24.5 L 294.6,29.6' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-20 atom-20 atom-21' d='M 326.8,30.1 L 298.4,34.3' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-21 atom-4 atom-22' d='M 191.3,44.9 L 178.5,77.2' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-22 atom-22 atom-23' d='M 178.5,77.2 L 144.1,82.3' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-22 atom-22 atom-23' d='M 174.8,72.5 L 146.3,76.7' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-23 atom-23 atom-24' d='M 144.1,82.3 L 133.7,108.6' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-24 atom-24 atom-25' d='M 136.1,120.8 L 152.9,142.0' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-25 atom-25 atom-26' d='M 152.9,142.0 L 142.5,168.2' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-25 atom-25 atom-26' d='M 156.6,146.7 L 147.3,170.2' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-26 atom-26 atom-27' d='M 144.9,180.4 L 161.7,201.6' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-27 atom-27 atom-28' d='M 161.7,201.6 L 196.1,196.5' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-27 atom-27 atom-28' d='M 163.9,196.0 L 192.4,191.8' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-28 atom-28 atom-29' d='M 196.1,196.5 L 208.9,164.2' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-29 atom-29 atom-30' d='M 208.9,164.2 L 243.4,159.1' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-30 atom-30 atom-31' d='M 243.4,159.1 L 265.0,186.3' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-30 atom-30 atom-31' d='M 249.3,158.2 L 267.2,180.7' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-31 atom-31 atom-32' d='M 265.0,186.3 L 299.4,181.3' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-32 atom-32 atom-33' d='M 299.4,181.3 L 312.2,148.9' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-32 atom-32 atom-33' d='M 295.7,176.5 L 306.3,149.8' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-33 atom-33 atom-34' d='M 312.2,148.9 L 295.4,127.7' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-34 atom-34 atom-35' d='M 285.7,122.3 L 256.2,126.7' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-34 atom-34 atom-35' d='M 286.5,127.5 L 259.9,131.4' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-35 atom-29 atom-36' d='M 208.9,164.2 L 192.1,143.0' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-35 atom-29 atom-36' d='M 203.0,165.0 L 188.0,146.2' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-36 atom-23 atom-1' d='M 144.1,82.3 L 122.5,55.0' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-37 atom-36 atom-25' d='M 182.4,137.6 L 152.9,142.0' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-38 atom-21 atom-8' d='M 294.6,29.6 L 281.8,62.0' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-39 atom-35 atom-30' d='M 256.2,126.7 L 243.4,159.1' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path class='bond-40 atom-19 atom-13' d='M 441.2,68.9 L 411.6,73.3' style='fill:none;fill-rule:evenodd;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1' />
+<path d='M 134.6,24.3 L 135.3,22.7 L 137.0,22.4' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 168.0,17.9 L 169.7,17.6 L 170.8,19.0' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 246.5,66.0 L 247.4,67.1 L 249.1,66.8' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 302.3,87.9 L 303.4,89.3 L 305.1,89.0' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 336.1,84.4 L 337.9,84.2 L 338.5,82.6' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 383.4,47.0 L 385.1,46.7 L 385.9,47.8' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 394.4,105.0 L 393.9,106.4 L 395.0,107.7' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 414.4,132.3 L 415.5,133.6 L 417.0,133.4' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 462.3,97.5 L 462.8,96.2 L 461.7,94.8' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 442.2,70.3 L 441.2,68.9 L 439.7,69.1' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 330.1,25.9 L 329.0,24.5 L 327.3,24.8' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 296.3,29.4 L 294.6,29.6 L 294.0,31.2' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 179.1,75.6 L 178.5,77.2 L 176.8,77.5' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 160.9,200.5 L 161.7,201.6 L 163.4,201.3' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 194.4,196.8 L 196.1,196.5 L 196.8,194.9' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 263.9,185.0 L 265.0,186.3 L 266.7,186.1' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 297.7,181.5 L 299.4,181.3 L 300.1,179.6' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 311.6,150.5 L 312.2,148.9 L 311.4,147.8' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path d='M 257.7,126.5 L 256.2,126.7 L 255.5,128.3' style='fill:none;stroke:currentColor;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-opacity:1;' />
+<path class='atom-5' d='M 223.6 34.9
+L 226.8 40.1
+Q 227.1 40.6, 227.6 41.5
+Q 228.2 42.5, 228.2 42.5
+L 228.2 34.9
+L 229.5 34.9
+L 229.5 44.7
+L 228.1 44.7
+L 224.7 39.0
+Q 224.3 38.3, 223.8 37.6
+Q 223.4 36.8, 223.3 36.6
+L 223.3 44.7
+L 222.0 44.7
+L 222.0 34.9
+L 223.6 34.9
+' fill='currentColor'/>
+<path class='atom-5' d='M 231.4 34.9
+L 232.7 34.9
+L 232.7 39.1
+L 237.8 39.1
+L 237.8 34.9
+L 239.1 34.9
+L 239.1 44.7
+L 237.8 44.7
+L 237.8 40.2
+L 232.7 40.2
+L 232.7 44.7
+L 231.4 44.7
+L 231.4 34.9
+' fill='currentColor'/>
+<path class='atom-7' d='M 230.0 99.5
+Q 230.0 97.1, 231.2 95.8
+Q 232.4 94.4, 234.6 94.4
+Q 236.7 94.4, 237.9 95.8
+Q 239.1 97.1, 239.1 99.5
+Q 239.1 101.9, 237.9 103.2
+Q 236.7 104.6, 234.6 104.6
+Q 232.4 104.6, 231.2 103.2
+Q 230.0 101.9, 230.0 99.5
+M 234.6 103.5
+Q 236.1 103.5, 236.9 102.4
+Q 237.7 101.4, 237.7 99.5
+Q 237.7 97.5, 236.9 96.5
+Q 236.1 95.6, 234.6 95.6
+Q 233.1 95.6, 232.2 96.5
+Q 231.4 97.5, 231.4 99.5
+Q 231.4 101.4, 232.2 102.4
+Q 233.1 103.5, 234.6 103.5
+' fill='currentColor'/>
+<path class='atom-13' d='M 404.5 69.1
+L 407.8 74.3
+Q 408.1 74.8, 408.6 75.7
+Q 409.1 76.7, 409.1 76.7
+L 409.1 69.1
+L 410.5 69.1
+L 410.5 78.9
+L 409.1 78.9
+L 405.6 73.2
+Q 405.2 72.6, 404.8 71.8
+Q 404.4 71.0, 404.3 70.8
+L 404.3 78.9
+L 403.0 78.9
+L 403.0 69.1
+L 404.5 69.1
+' fill='currentColor'/>
+<path class='atom-16' d='M 447.8 123.6
+L 451.0 128.8
+Q 451.3 129.4, 451.8 130.3
+Q 452.4 131.2, 452.4 131.3
+L 452.4 123.6
+L 453.7 123.6
+L 453.7 133.5
+L 452.3 133.5
+L 448.9 127.8
+Q 448.5 127.1, 448.0 126.3
+Q 447.6 125.6, 447.5 125.3
+L 447.5 133.5
+L 446.2 133.5
+L 446.2 123.6
+L 447.8 123.6
+' fill='currentColor'/>
+<path class='atom-24' d='M 117.9 109.8
+L 119.2 109.8
+L 119.2 113.9
+L 124.2 113.9
+L 124.2 109.8
+L 125.6 109.8
+L 125.6 119.6
+L 124.2 119.6
+L 124.2 115.1
+L 119.2 115.1
+L 119.2 119.6
+L 117.9 119.6
+L 117.9 109.8
+' fill='currentColor'/>
+<path class='atom-24' d='M 129.1 109.8
+L 132.3 115.0
+Q 132.6 115.5, 133.1 116.4
+Q 133.7 117.4, 133.7 117.4
+L 133.7 109.8
+L 135.0 109.8
+L 135.0 119.6
+L 133.6 119.6
+L 130.2 113.9
+Q 129.8 113.2, 129.3 112.5
+Q 128.9 111.7, 128.8 111.5
+L 128.8 119.6
+L 127.5 119.6
+L 127.5 109.8
+L 129.1 109.8
+' fill='currentColor'/>
+<path class='atom-26' d='M 137.9 169.4
+L 141.1 174.6
+Q 141.4 175.1, 142.0 176.1
+Q 142.5 177.0, 142.5 177.1
+L 142.5 169.4
+L 143.8 169.4
+L 143.8 179.3
+L 142.5 179.3
+L 139.0 173.5
+Q 138.6 172.9, 138.2 172.1
+Q 137.7 171.3, 137.6 171.1
+L 137.6 179.3
+L 136.3 179.3
+L 136.3 169.4
+L 137.9 169.4
+' fill='currentColor'/>
+<path class='atom-34' d='M 288.4 116.7
+L 291.7 121.9
+Q 292.0 122.4, 292.5 123.4
+Q 293.0 124.3, 293.0 124.3
+L 293.0 116.7
+L 294.3 116.7
+L 294.3 126.5
+L 293.0 126.5
+L 289.5 120.8
+Q 289.1 120.2, 288.7 119.4
+Q 288.3 118.6, 288.2 118.4
+L 288.2 126.5
+L 286.9 126.5
+L 286.9 116.7
+L 288.4 116.7
+' fill='currentColor'/>
+<path class='atom-36' d='M 185.1 131.9
+L 188.4 137.2
+Q 188.7 137.7, 189.2 138.6
+Q 189.7 139.5, 189.7 139.6
+L 189.7 131.9
+L 191.1 131.9
+L 191.1 141.8
+L 189.7 141.8
+L 186.2 136.1
+Q 185.8 135.4, 185.4 134.7
+Q 185.0 133.9, 184.9 133.7
+L 184.9 141.8
+L 183.6 141.8
+L 183.6 131.9
+L 185.1 131.9
+' fill='currentColor'/>
+</svg>
+</div>
+          <figcaption>Drawn and measured with RDKit. logP (a measure of how oily or fat-soluble a molecule is) is RDKit's Crippen estimate.</figcaption>
+        </figure>
+        <div class="ai">
+          <p class="ai-label"><span class="sw e"></span>Where AI comes in</p>
+          <p>This is classic supervised learning: predict a number from a structure. People have done it since the 1960s under the name <strong>QSAR</strong>. Modern versions use graph neural networks and molecule transformers pretrained on millions of structures. Free pretrained options include <strong>ADMET-AI</strong> and the benchmark datasets in <strong>Therapeutics Data Commons</strong>. It works best for properties with plenty of training data, such as solubility, and worst for rare kinds of toxicity.</p>
+        </div>
+      </section>
+
+      <!-- 3.6 -->
+      <section id="s3-6">
+        <span class="num">3.6</span>
+        <h3>Protein and antibody design</h3>
+        <figure class="side" style="float:right;width:200px;margin:0 0 12px 24px">
+          <svg viewBox="0 0 200 200" role="img" aria-label="Antibody: a Y-shaped protein whose two arm tips bind the target.">
+            <path d="M100 196 L100 110 M100 110 L46 44 M100 110 L154 44" fill="none" class="hema-s" stroke-width="14" stroke-linecap="round"/>
+            <path d="M88 196 L88 116 M88 116 L38 54 M112 116 L162 54 M112 196 L112 116" fill="none" class="paper" style="stroke:var(--paper)" stroke-width="2" opacity=".0"/>
+            <circle cx="40" cy="36" r="12" class="eosin" opacity=".9"/>
+            <circle cx="160" cy="36" r="12" class="eosin" opacity=".9"/>
+            <text class="lbl" x="100" y="16" text-anchor="middle">BINDING TIPS</text>
+          </svg>
+        </figure>
+        <p>This is arguably where AI is furthest ahead of the alternatives. Tools from David Baker's lab (<strong>RFdiffusion</strong>, <strong>ProteinMPNN</strong>) design entirely new proteins that bind a chosen target. When these designs are made and tested, a useful share of them work. Protein language models (the <strong>ESM</strong> family) learn from protein sequences the way GPT-style models learn from text.</p>
+        <p>For antibodies, AI is used to redesign the binding tips so they grip harder, make antibodies from animals safer for humans, and predict whether an antibody can be manufactured at scale without clumping.</p>
+        <div style="clear:both"></div>
+      </section>
+
+      <!-- 3.7 -->
+      <section id="s3-7">
+        <span class="num">3.7</span>
+        <h3>Clinical trials: where the money actually goes</h3>
+        <p>Often overlooked, because this is where most of the time and cost goes. One big idea is <strong>patient stratification</strong>. Many trials fail because a drug works very well for a subgroup, and that effect gets diluted by everyone else.</p>
+        <figure>
+          <p class="fig-title">The same drug, two trial designs</p>
+          <p class="fig-sub">Each dot is a patient. Filled dots responded to treatment.</p>
+          <div id="fig-strat"></div>
+          <figcaption>Illustrative numbers.</figcaption>
+        </figure>
+        <div class="ai">
+          <p class="ai-label"><span class="sw e"></span>Where AI comes in</p>
+          <ul class="plain">
+            <li><strong>Biomarker discovery:</strong> find the signal, such as a gene, a scan feature or a blood marker, that predicts who will respond.</li>
+            <li><strong>Trial design and recruitment:</strong> predict which hospitals will enroll patients fastest, and simulate outcomes before the trial starts.</li>
+            <li><strong>External control arms:</strong> use real-world health records as a comparison group, so fewer patients have to get a placebo.</li>
+            <li><strong>Imaging and pathology:</strong> read scans and tissue slides automatically to measure outcomes.</li>
+            <li><strong>Documents:</strong> draft trial protocols and regulatory submissions. Unglamorous, but a big job and a natural fit for LLMs.</li>
+            <li><strong>Safety monitoring:</strong> mine adverse-event reports for side effects nobody has noticed yet.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- 3.8 -->
+      <section id="s3-8">
+        <span class="num">3.8</span>
+        <h3>Drug repurposing: new uses for old drugs</h3>
+        <p>An approved drug has already passed human safety testing. If it turns out to work for a second disease, you can skip years of development. AI approaches this in two main ways.</p>
+        <h4>1. Knowledge graph reasoning</h4>
+        <p>In early 2020, BenevolentAI searched its knowledge graph for approved drugs that might block the coronavirus from entering cells and also calm the immune overreaction. It picked out <strong>baricitinib</strong>, a rheumatoid arthritis drug. Trials confirmed a benefit. It received emergency authorization for COVID-19 in late 2020 and full FDA approval in 2022.</p>
+        <figure>
+          <p class="fig-title">The chain of links the system found</p>
+          <div id="fig-kg"></div>
+          <figcaption>Simplified from Richardson et al., The Lancet, February 2020.</figcaption>
+        </figure>
+        <h4>2. Signature matching</h4>
+        <p>A disease pushes some genes up and others down; this pattern is its "signature." Databases such as LINCS/CMap record how thousands of drugs shift gene activity in cells. Look for a drug whose signature is the <em>mirror image</em> of the disease's.</p>
+        <figure>
+          <p class="fig-title">Looking for a drug that reverses the disease</p>
+          <p class="fig-sub">Gene activity compared with healthy cells. Bars above the line mean more active, bars below mean less.</p>
+          <div id="fig-sig"></div>
+          <figcaption>Illustrative values for eight genes. Real signatures cover hundreds to thousands of genes.</figcaption>
+        </figure>
+      </section>
+    </section>
+
+    <!-- ================= 4 ================= -->
+    <section id="s4">
+      <span class="num">Section 4</span>
+      <h2>Hype and reality</h2>
+      <p class="lede">Knowing what works and what doesn't is what makes a pitch sound credible.</p>
+      <div class="scroll-x">
+      <table>
+        <thead><tr><th style="width:34%">Area</th><th style="width:26%">Maturity</th><th>Why</th></tr></thead>
+        <tbody id="maturity"></tbody>
+      </table>
+      </div>
+
+      <h4>Track record so far</h4>
+      <p>Dozens of AI-discovered molecules have entered clinical trials, which is a real milestone. A few have reported encouraging mid-stage results. Some of the best-known AI drug companies have also had major setbacks, cut programs, or merged (Recursion and Exscientia combined in 2024).</p>
+      <p>The fair summary: AI has clearly sped up <strong>early discovery</strong>, in some reported cases cutting the time from target to candidate molecule from four or five years to one or two. There is <strong>not yet evidence</strong> that it improves clinical success rates, because too few AI-discovered drugs have finished late-stage trials to tell.</p>
+
+      <figure>
+        <p class="fig-title">AI mostly speeds up the shorter, cheaper part</p>
+        <p class="fig-sub">Using the illustrative program from 1.2. Most AI tools work in the first segment. Most of the time and cost sits in the second.</p>
+        <div id="fig-split"></div>
+      </figure>
+      <p>This is the main structural criticism. Finding hits ten times faster doesn't fix 90% clinical failure, unless the candidates are actually <em>better</em> (more likely to work in people), not just found sooner. Whether AI can do that is the open question in the field. It's also the strongest framing for a project: <strong>use AI to make better decisions earlier</strong>, not just to go faster.</p>
+    </section>
+
+    <!-- ================= 5 ================= -->
+    <section id="s5">
+      <span class="num">Section 5</span>
+      <h2>Data and tools</h2>
+      <p class="lede">Almost all of this is free and public, which makes the field unusually open to newcomers. The databases link up into one connected map:</p>
+      <figure>
+        <p class="fig-title">How the main public databases connect</p>
+        <p class="fig-sub">Boxes are the things you look up. Lines show which database links them.</p>
+        <div id="fig-data"></div>
+      </figure>
+      <div class="scroll-x">
+      <table>
+        <thead><tr><th style="width:24%">Resource</th><th>What you get</th><th style="width:16%">Access</th></tr></thead>
+        <tbody>
+          <tr><td><a href="https://platform.opentargets.org">Open Targets</a></td><td>Which targets are linked to which diseases, with evidence scores</td><td class="mono">GraphQL API</td></tr>
+          <tr><td><a href="https://www.ebi.ac.uk/chembl/">ChEMBL</a></td><td>Measured activity of millions of compounds against their targets</td><td class="mono">REST API</td></tr>
+          <tr><td><a href="https://pubchem.ncbi.nlm.nih.gov">PubChem</a></td><td>Over 100 million compounds, their properties and test results</td><td class="mono">REST API</td></tr>
+          <tr><td><a href="https://www.bindingdb.org">BindingDB</a></td><td>Measured binding strengths between proteins and molecules</td><td class="mono">download</td></tr>
+          <tr><td><a href="https://www.uniprot.org">UniProt</a></td><td>Protein sequences and what each protein does</td><td class="mono">REST API</td></tr>
+          <tr><td><a href="https://www.rcsb.org">RCSB PDB</a></td><td>Protein 3D structures measured in the lab</td><td class="mono">REST API</td></tr>
+          <tr><td><a href="https://alphafold.ebi.ac.uk">AlphaFold DB</a></td><td>Over 200 million predicted protein structures</td><td class="mono">REST API</td></tr>
+          <tr><td><a href="https://depmap.org">DepMap</a></td><td>Which genes each cancer cell line can't survive without</td><td class="mono">download</td></tr>
+          <tr><td><a href="https://clue.io">LINCS / CMap</a></td><td>How gene activity in cells changes after each drug</td><td class="mono">API, download</td></tr>
+          <tr><td><a href="https://clinicaltrials.gov">ClinicalTrials.gov</a></td><td>Every registered trial: drug, disease, phase, status</td><td class="mono">REST API</td></tr>
+          <tr><td><a href="https://europepmc.org">Europe PMC</a></td><td>Search across biomedical papers, with full text where available</td><td class="mono">REST API</td></tr>
+          <tr><td><a href="https://zinc.docking.org">ZINC</a> / <a href="https://enamine.net">Enamine REAL</a></td><td>Purchasable and make-to-order molecule catalogues</td><td class="mono">download</td></tr>
+          <tr><td><a href="https://tdcommons.ai">Therapeutics Data Commons</a></td><td>Datasets prepared for ML, with standard benchmarks</td><td class="mono">Python</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <h4>Software you'll touch</h4>
+      <ul class="plain">
+        <li><a href="https://www.rdkit.org">RDKit</a>: the standard open-source chemistry toolkit (Python). Reads SMILES, calculates properties, draws molecules. Every drawing on this page came from it.</li>
+        <li><a href="https://github.com/swansonk14/admet_ai">ADMET-AI</a>: pretrained models that predict ADMET properties, and run on a laptop.</li>
+        <li><a href="https://vina.scripps.edu">AutoDock Vina</a>: open-source docking.</li>
+        <li><a href="https://molstar.org">Mol*</a> or 3Dmol.js: show proteins and molecules in 3D in the browser.</li>
+        <li><a href="https://deepchem.io">DeepChem</a>: ML models and helpers for chemistry and biology.</li>
+      </ul>
+    </section>
+
+    <!-- ================= 6 ================= -->
+    <section id="s6">
+      <span class="num">Section 6</span>
+      <h2>What fits in 24 hours</h2>
+      <p class="lede">A rough guide to which areas are realistic at OxHack. This isn't a recommendation yet.</p>
+      <div class="scroll-x">
+      <table>
+        <thead><tr><th style="width:32%">Area</th><th style="width:22%">Feasible?</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Target identification from public data</td><td class="verdict"><span class="pips"><i class="on"></i><i class="on"></i><i class="on"></i></span>Yes</td><td>It's API calls plus reasoning over evidence that already exists</td></tr>
+          <tr><td>Literature and evidence synthesis</td><td class="verdict"><span class="pips"><i class="on"></i><i class="on"></i><i class="on"></i></span>Yes</td><td>Pure LLM work, and easy to demo</td></tr>
+          <tr><td>Property and toxicity prediction</td><td class="verdict"><span class="pips"><i class="on"></i><i class="on"></i><i class="on"></i></span>Yes</td><td>Pretrained models you can just call</td></tr>
+          <tr><td>Repurposing and candidate ranking</td><td class="verdict"><span class="pips"><i class="on"></i><i class="on"></i><i class="on"></i></span>Yes</td><td>Public data, and you can check results against known answers</td></tr>
+          <tr><td>Generative molecule design</td><td class="verdict"><span class="pips"><i class="on"></i><i class="on"></i><i></i></span>Half</td><td>Generating is easy, on one GPU. Nothing in 24 hours can confirm the results</td></tr>
+          <tr><td>Docking</td><td class="verdict"><span class="pips"><i class="on"></i><i></i><i></i></span>Partly</td><td>The software runs, but the scores need careful interpretation</td></tr>
+          <tr><td>Training chemistry models from scratch</td><td class="verdict"><span class="pips"><i></i><i></i><i></i></span>No</td><td>Takes days of compute, and an off-the-shelf model would still do better</td></tr>
+          <tr><td>Anything clinical</td><td class="verdict"><span class="pips"><i></i><i></i><i></i></span>No</td><td>Patient data isn't available</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <div class="next">
+        <h4>Next: pick what to dig into</h4>
+        <p>Name a section number and we'll go deeper. Good candidates: <a href="#s3-1">3.1</a> (where the real leverage is), <a href="#s3-4">3.4</a> (making new molecules), <a href="#s3-5">3.5</a> (the most buildable), or <a href="#s5">5</a> (to get hands-on with the data).</p>
+      </div>
+    </section>
+
+    <!-- ================= glossary ================= -->
+    <section id="gloss">
+      <span class="num">Appendix A</span>
+      <h2>Glossary</h2>
+      <dl class="gloss">
+        <dt>Target</dt><dd>The protein (usually) that a drug is meant to act on.</dd>
+        <dt>Ligand</dt><dd>Any molecule that binds a protein. A drug is a ligand.</dd>
+        <dt>Binding pocket</dt><dd>A groove on the protein's surface where a ligand can sit.</dd>
+        <dt>Potency / IC50</dt><dd>How little drug you need for an effect. IC50 is the concentration that cuts the target's activity in half. Lower is more potent.</dd>
+        <dt>Selectivity</dt><dd>How well a drug hits its target without hitting others.</dd>
+        <dt>Hit</dt><dd>A molecule that shows any real activity against the target in a screen.</dd>
+        <dt>Lead</dt><dd>An improved hit that is promising enough to optimize seriously.</dd>
+        <dt>DMTA cycle</dt><dd>Design, make, test, analyze: the lab loop of lead optimization.</dd>
+        <dt>ADMET</dt><dd>Absorption, distribution, metabolism, excretion, toxicity: what the body does to the drug, and what harm the drug might do.</dd>
+        <dt>hERG</dt><dd>A heart ion channel. Drugs that block it by accident can cause dangerous heart rhythms.</dd>
+        <dt>QSAR</dt><dd>Quantitative structure-activity relationship: predicting a molecule's properties from its structure. The original "ML for chemistry".</dd>
+        <dt>SMILES</dt><dd>A way to write a molecule as a line of text, e.g. aspirin is <code>CC(=O)Oc1ccccc1C(=O)O</code>.</dd>
+        <dt>Fingerprint</dt><dd>A fixed-length list of bits marking which small chemical patterns a molecule contains.</dd>
+        <dt>Docking</dt><dd>Software that fits a molecule into a protein pocket and scores the fit.</dd>
+        <dt>Druggable</dt><dd>Possible to target with a drug, usually meaning the protein has a suitable pocket.</dd>
+        <dt>GWAS</dt><dd>Genome-wide association study: finding genetic variants that are more common in people with a disease.</dd>
+        <dt>Biomarker</dt><dd>Something you can measure, such as a gene, a protein level or a scan feature, that shows disease state or drug response.</dd>
+        <dt>Modality</dt><dd>The kind of drug: small molecule, antibody, peptide, nucleic acid, cell therapy.</dd>
+        <dt>Repurposing</dt><dd>Finding a new disease for an already approved drug.</dd>
+        <dt>Phase 1 / 2 / 3</dt><dd>Clinical trial stages: safety in a small group, then whether it works and at what dose, then large confirmatory trials.</dd>
+      </dl>
+    </section>
+
+    <section id="sources">
+      <span class="num">Appendix B</span>
+      <h2>Sources</h2>
+      <ol class="sources">
+        <li>PhRMA. <em>Biopharmaceutical Research &amp; Development: The Process Behind New Medicines</em> (2015). Source of the 10,000 → 250 → 5 → 1 rule of thumb.</li>
+        <li>US FDA. <a href="https://www.fda.gov/patients/drug-development-process/step-3-clinical-research">The Drug Development Process, Step 3: Clinical Research</a>. Trial phase sizes.</li>
+        <li>BIO, Informa, QLS. <a href="https://www.bio.org/clinical-development-success-rates-and-contributing-factors-2011-2020">Clinical Development Success Rates and Contributing Factors 2011-2020</a> (2021).</li>
+        <li>DiMasi, Grabowski, Hansen. Innovation in the pharmaceutical industry: new estimates of R&amp;D costs. <em>J Health Econ</em> 47 (2016). <a href="https://doi.org/10.1016/j.jhealeco.2016.01.012">doi</a></li>
+        <li>Scannell et al. Diagnosing the decline in pharmaceutical R&amp;D efficiency. <em>Nat Rev Drug Discov</em> 11 (2012). <a href="https://doi.org/10.1038/nrd3681">doi</a></li>
+        <li>Sun et al. Why 90% of clinical drug development fails and how to improve it? <em>Acta Pharm Sin B</em> 12(7) (2022). <a href="https://doi.org/10.1016/j.apsb.2022.02.002">doi</a></li>
+        <li>Santos et al. A comprehensive map of molecular drug targets. <em>Nat Rev Drug Discov</em> 16 (2017). <a href="https://doi.org/10.1038/nrd.2016.230">doi</a></li>
+        <li>Finan et al. The druggable genome and support for target identification and validation in drug development. <em>Sci Transl Med</em> 9 (2017). <a href="https://doi.org/10.1126/scitranslmed.aag1166">doi</a></li>
+        <li>Hauser et al. Trends in GPCR drug discovery: new agents, targets and indications. <em>Nat Rev Drug Discov</em> 16 (2017). <a href="https://doi.org/10.1038/nrd.2017.178">doi</a></li>
+        <li>Minikel et al. Refining the impact of genetic evidence on clinical success. <em>Nature</em> 629 (2024). <a href="https://doi.org/10.1038/s41586-024-07316-0">doi</a></li>
+        <li>Cohen et al. Sequence variations in PCSK9, low LDL, and protection against coronary heart disease. <em>N Engl J Med</em> 354 (2006). <a href="https://doi.org/10.1056/NEJMoa054013">doi</a></li>
+        <li>Jumper et al. Highly accurate protein structure prediction with AlphaFold. <em>Nature</em> 596 (2021). <a href="https://doi.org/10.1038/s41586-021-03819-2">doi</a></li>
+        <li><a href="https://www.nobelprize.org/prizes/chemistry/2024/summary/">The Nobel Prize in Chemistry 2024</a>.</li>
+        <li>Richardson et al. Baricitinib as potential treatment for 2019-nCoV acute respiratory disease. <em>Lancet</em> 395 (2020). <a href="https://doi.org/10.1016/S0140-6736(20)30304-4">doi</a></li>
+        <li>Lipinski et al. Experimental and computational approaches to estimate solubility and permeability in drug discovery. <em>Adv Drug Deliv Rev</em> 46 (2001). <a href="https://doi.org/10.1016/S0169-409X(00)00129-0">doi</a></li>
+      </ol>
+    </section>
+  </main>
+</div>
+
+<div id="tip" role="tooltip"></div>
+
+<script>
+const MOLS = {"aspirin":{"smiles":"CC(=O)Oc1ccccc1C(=O)O","atoms":[{"i":0,"el":"C","x":-3.8122819696065102,"y":-1.2868004105684545},{"i":1,"el":"C","x":-2.6987016114119524,"y":-0.2818433040990891},{"i":2,"el":"O","x":-3.012229816230846,"y":1.1850241284874572},{"i":3,"el":"O","x":-1.2715930483984996,"y":-0.7437536302162681},{"i":4,"el":"C","x":-0.1580126902039418,"y":0.2612034762530975},{"i":5,"el":"C","x":-0.47154089502283564,"y":1.7280709088396433},{"i":6,"el":"C","x":0.6420394631717228,"y":2.7330280153090083},{"i":7,"el":"C","x":2.069148026185175,"y":2.2711176891918288},{"i":8,"el":"C","x":2.382676231004069,"y":0.8042502566052835},{"i":9,"el":"C","x":1.2690958728095107,"y":-0.20070684986408188},{"i":10,"el":"C","x":1.5826240776284048,"y":-1.6675742824506268},{"i":11,"el":"O","x":3.009732640641857,"y":-2.129484608567806},{"i":12,"el":"O","x":0.4690437194338466,"y":-2.6725313889199915}],"bonds":[{"a":0,"b":1,"order":1.0},{"a":1,"b":2,"order":2.0},{"a":1,"b":3,"order":1.0},{"a":3,"b":4,"order":1.0},{"a":4,"b":5,"order":1.5},{"a":5,"b":6,"order":1.5},{"a":6,"b":7,"order":1.5},{"a":7,"b":8,"order":1.5},{"a":8,"b":9,"order":1.5},{"a":9,"b":10,"order":1.0},{"a":10,"b":11,"order":2.0},{"a":10,"b":12,"order":1.0},{"a":9,"b":4,"order":1.5}],"fp64":[1,1,1,0,0,1,0,1,1,0,1,1,0,1,0,0,1,1,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,1,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,1,0,1,0,0,1,1,0,0],"fp_on_2048":24,"mw":180.2,"logp":1.31,"hbd":1,"hba":3,"qed":0.55,"heavy":13},"imatinib":{"smiles":"Cc1ccc(NC(=O)c2ccc(CN3CCN(C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1","atoms":[{"i":0,"el":"C","x":-7.745039606857252,"y":1.8016936430660153},{"i":1,"el":"C","x":-6.261139221535185,"y":2.020873127601001},{"i":2,"el":"C","x":-5.709004030469827,"y":3.415558300242921},{"i":3,"el":"C","x":-4.22510364514776,"y":3.634737784777906},{"i":4,"el":"C","x":-3.2933384508910515,"y":2.459232096670972},{"i":5,"el":"N","x":-1.8094380655689846,"y":2.6784115812059577},{"i":6,"el":"C","x":-0.8776728713122757,"y":1.502905893099023},{"i":7,"el":"O","x":-1.4298080623776335,"y":0.10822072045710388},{"i":8,"el":"C","x":0.6062275140097915,"y":1.7220853776340084},{"i":9,"el":"C","x":1.537992708266502,"y":0.5465796895270737},{"i":10,"el":"C","x":3.0218930935885684,"y":0.7657591740620597},{"i":11,"el":"C","x":3.574028284653927,"y":2.16044434670398},{"i":12,"el":"C","x":5.057928669975993,"y":2.3796238312389666},{"i":13,"el":"N","x":5.989693864232702,"y":1.204118143132033},{"i":14,"el":"C","x":5.437558673167344,"y":-0.19056702950988927},{"i":15,"el":"C","x":6.369323867424053,"y":-1.3660727176168235},{"i":16,"el":"N","x":7.85322425274612,"y":-1.1468932330818378},{"i":17,"el":"C","x":8.784989447002829,"y":-2.3223989211887717},{"i":18,"el":"C","x":8.405359443811477,"y":0.24779193956008205},{"i":19,"el":"C","x":7.473594249554768,"y":1.4232976276670162},{"i":20,"el":"C","x":2.642263090397216,"y":3.335950034810914},{"i":21,"el":"C","x":1.1583627050751497,"y":3.1167705502759286},{"i":22,"el":"C","x":-3.8454736419564086,"y":1.0645469240290522},{"i":23,"el":"C","x":-5.329374027278475,"y":0.8453674394940667},{"i":24,"el":"N","x":-5.881509218343832,"y":-0.5493177331478529},{"i":25,"el":"C","x":-4.949744024087123,"y":-1.724823421254787},{"i":26,"el":"N","x":-5.501879215152482,"y":-3.119508593896709},{"i":27,"el":"C","x":-4.5701140208957725,"y":-4.295014282003643},{"i":28,"el":"C","x":-3.0862136355737055,"y":-4.075834797468657},{"i":29,"el":"C","x":-2.5340784445083475,"y":-2.6811496248267375},{"i":30,"el":"C","x":-1.0501780591862815,"y":-2.461970140291752},{"i":31,"el":"C","x":-0.11841286492956998,"y":-3.6374758283986877},{"i":32,"el":"C","x":1.365487520392496,"y":-3.418296343863701},{"i":33,"el":"C","x":1.9176227114578535,"y":-2.0236111712217815},{"i":34,"el":"N","x":0.9858575172011439,"y":-0.8481054831148471},{"i":35,"el":"C","x":-0.4980428681209228,"y":-1.0672849676498324},{"i":36,"el":"N","x":-3.465843638765057,"y":-1.5056439367198033}],"bonds":[{"a":0,"b":1,"order":1.0},{"a":1,"b":2,"order":1.5},{"a":2,"b":3,"order":1.5},{"a":3,"b":4,"order":1.5},{"a":4,"b":5,"order":1.0},{"a":5,"b":6,"order":1.0},{"a":6,"b":7,"order":2.0},{"a":6,"b":8,"order":1.0},{"a":8,"b":9,"order":1.5},{"a":9,"b":10,"order":1.5},{"a":10,"b":11,"order":1.5},{"a":11,"b":12,"order":1.0},{"a":12,"b":13,"order":1.0},{"a":13,"b":14,"order":1.0},{"a":14,"b":15,"order":1.0},{"a":15,"b":16,"order":1.0},{"a":16,"b":17,"order":1.0},{"a":16,"b":18,"order":1.0},{"a":18,"b":19,"order":1.0},{"a":11,"b":20,"order":1.5},{"a":20,"b":21,"order":1.5},{"a":4,"b":22,"order":1.5},{"a":22,"b":23,"order":1.5},{"a":23,"b":24,"order":1.0},{"a":24,"b":25,"order":1.0},{"a":25,"b":26,"order":1.5},{"a":26,"b":27,"order":1.5},{"a":27,"b":28,"order":1.5},{"a":28,"b":29,"order":1.5},{"a":29,"b":30,"order":1.0},{"a":30,"b":31,"order":1.5},{"a":31,"b":32,"order":1.5},{"a":32,"b":33,"order":1.5},{"a":33,"b":34,"order":1.5},{"a":34,"b":35,"order":1.5},{"a":29,"b":36,"order":1.5},{"a":23,"b":1,"order":1.5},{"a":36,"b":25,"order":1.5},{"a":21,"b":8,"order":1.5},{"a":35,"b":30,"order":1.5},{"a":19,"b":13,"order":1.0}],"fp64":[1,1,0,1,0,0,0,0,1,0,1,1,0,0,1,1,1,1,1,1,1,0,1,0,1,0,1,1,0,1,1,0,1,1,0,0,1,1,1,1,0,1,0,1,1,0,1,1,0,0,1,0,1,1,1,0,1,1,1,0,0,1,0,1],"fp_on_2048":65,"mw":493.6,"logp":4.59,"hbd":2,"hba":7,"qed":0.39,"heavy":37}};
+</script>
+<script>
+(() => {
+  const NS = "http://www.w3.org/2000/svg";
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const fmt = n => n.toLocaleString("en-GB");
+
+  function el(tag, attrs = {}, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "text") e.textContent = v; else e.setAttribute(k, v);
+    }
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function svgRoot(host, w, h, label) {
+    const s = el("svg", { viewBox: `0 0 ${w} ${h}`, role: "img", "aria-label": label });
+    document.getElementById(host).appendChild(s);
+    return s;
+  }
+  function table(host, head, rows) {
+    const t = document.createElement("table");
+    t.innerHTML = `<thead><tr>${head.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody>`;
+    document.getElementById(host).appendChild(t);
+  }
+
+  /* ---------- tooltip ---------- */
+  const tip = document.getElementById("tip");
+  function showTip(html, x, y) {
+    tip.innerHTML = html;
+    tip.classList.add("on");
+    const r = tip.getBoundingClientRect();
+    let left = x + 14, top = y + 14;
+    if (left + r.width > innerWidth - 8) left = x - r.width - 14;
+    if (top + r.height > innerHeight - 8) top = y - r.height - 14;
+    tip.style.left = left + "px"; tip.style.top = top + "px";
+  }
+  function hideTip() { tip.classList.remove("on"); }
+  document.addEventListener("pointermove", e => {
+    const t = e.target.closest && e.target.closest("[data-tip]");
+    if (t) showTip(t.getAttribute("data-tip"), e.clientX, e.clientY);
+    else if (!e.target.closest || !e.target.closest("[data-crosshair]")) hideTip();
+  });
+  document.addEventListener("scroll", hideTip, { passive: true });
+
+  /* ---------- hero plate ---------- */
+  (function plate() {
+    const canvas = document.getElementById("plate-canvas");
+    const ctx = canvas.getContext("2d");
+    const N = 100;
+    let seed = 20261024;
+    const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const pick = (arr, k) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a.slice(0, k); };
+    const all = [...Array(N * N).keys()];
+    const s1 = pick(all, 250), s2 = pick(s1, 5), s3 = pick(s2, 1);
+    const level = new Uint8Array(N * N);
+    s1.forEach(i => level[i] = 1); s2.forEach(i => level[i] = 2); s3.forEach(i => level[i] = 3);
+    const alpha = new Float32Array(N * N).fill(1), target = new Float32Array(N * N).fill(1);
+    const copy = [
+      ["10,000", "compounds screened against a disease target. Each dot is one."],
+      ["~250", "look good enough for preclinical testing: lab and animal safety studies."],
+      ["~5", "are safe enough to enter human clinical trials."],
+      ["1", "is approved as a medicine, more than a decade after the screen."],
+    ];
+    let stage = 0, size = 440, dpr = 1, raf = 0, colors = {};
+    function readColors() { colors = { hema: css("--hema"), faint: css("--faint"), ink: css("--ink") }; }
+    function resize() {
+      size = canvas.getBoundingClientRect().width || 440;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(size * dpr); canvas.height = Math.round(size * dpr);
+      draw();
+    }
+    function draw() {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, size, size);
+      const step = size / N, r = Math.max(step * 0.32, 0.9);
+      ctx.fillStyle = colors.faint;
+      for (let i = 0; i < N * N; i++) {
+        if (alpha[i] > 0.999) continue;
+        const x = (i % N + 0.5) * step, y = (Math.floor(i / N) + 0.5) * step;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
+      }
+      ctx.fillStyle = colors.hema;
+      for (let i = 0; i < N * N; i++) {
+        const a = alpha[i]; if (a < 0.01) continue;
+        ctx.globalAlpha = a * (stage === 0 ? 0.62 : 1);
+        const x = (i % N + 0.5) * step, y = (Math.floor(i / N) + 0.5) * step;
+        const rr = level[i] >= stage && stage >= 2 ? r * 1.9 : r;
+        ctx.beginPath(); ctx.arc(x, y, rr, 0, 6.2832); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      if (stage === 3) {
+        const i = s3[0], x = (i % N + 0.5) * step, y = (Math.floor(i / N) + 0.5) * step;
+        ctx.strokeStyle = colors.hema; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(x, y, step * 3.2, 0, 6.2832); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, step * 5.6, 0, 6.2832); ctx.globalAlpha = 0.4; ctx.stroke(); ctx.globalAlpha = 1;
+      }
+    }
+    function setStage(s, animate = !reduce) {
+      stage = s;
+      for (let i = 0; i < N * N; i++) target[i] = level[i] >= s ? 1 : 0;
+      document.getElementById("plate-count").textContent = copy[s][0];
+      document.getElementById("plate-label").textContent = copy[s][1];
+      document.querySelectorAll(".stages button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.stage === s)));
+      cancelAnimationFrame(raf);
+      if (!animate) { alpha.set(target); draw(); return; }
+      const from = alpha.slice(), t0 = performance.now(), dur = 520;
+      const tick = now => {
+        const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+        for (let i = 0; i < N * N; i++) alpha[i] = from[i] + (target[i] - from[i]) * e;
+        draw();
+        if (k < 1) raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    }
+    let auto = null;
+    document.querySelectorAll(".stages button").forEach(b => b.addEventListener("click", () => { clearTimeout(auto); auto = "stopped"; setStage(+b.dataset.stage); }));
+    readColors(); resize();
+    addEventListener("resize", resize);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { readColors(); draw(); });
+    if (!reduce) {
+      let s = 0;
+      const next = () => { if (auto === "stopped") return; s += 1; if (s > 3) return; setStage(s); auto = setTimeout(next, s === 3 ? 0 : 1700); };
+      auto = setTimeout(next, 1400);
+    }
+  })();
+
+  /* ---------- 1.2 timeline ---------- */
+  (function timeline() {
+    const rows = [
+      ["Target identification and validation", 0, 2, ""],
+      ["Hit identification", 1.5, 3, "~10,000 compounds tested"],
+      ["Hit-to-lead and lead optimization", 2.5, 5, ""],
+      ["Preclinical: lab and animal safety", 4.5, 6, "~250 candidates"],
+      ["Phase 1: safety, 20-100 people", 6, 7.5, "~5 enter trials"],
+      ["Phase 2: does it work? 100s of people", 7, 9.5, ""],
+      ["Phase 3: confirm, 300-3,000 people", 9, 12.5, ""],
+      ["Regulatory review", 12.5, 13.5, "1 approved"],
+    ];
+    const W = 760, L = 268, R = 576, top = 26, rh = 44, H = top + rows.length * rh + 30;
+    const s = svgRoot("fig-timeline", W, H, "Timeline of a typical drug program across about 13.5 years, from target identification to regulatory review.");
+    const x = v => L + (v / 14) * (R - L);
+    for (let t = 0; t <= 14; t += 2) {
+      el("line", { x1: x(t), x2: x(t), y1: top - 8, y2: H - 26, class: "grid" }, s);
+      el("text", { x: x(t), y: H - 8, "text-anchor": "middle", class: "lbl", text: t === 14 ? "14 yrs" : t }, s);
+    }
+    rows.forEach(([name, a, b, note], i) => {
+      const y = top + i * rh;
+      el("text", { x: 0, y: y + 13, class: "body", style: "fill:var(--ink);font-size:13.5px", text: name }, s);
+      const bar = el("rect", { x: x(a), y: y + 2, width: x(b) - x(a), height: 14, rx: 4, class: "hema", "data-tip": `<b>${name}</b>about year ${a} to ${b}${note ? " · " + note : ""}` }, s);
+      if (note) el("text", { x: R + 16, y: y + 13, class: "lbl-ink", text: note }, s);
+    });
+    el("line", { x1: x(6), x2: x(6), y1: top - 14, y2: H - 26, class: "muted-s", "stroke-width": 1 }, s);
+    el("text", { x: x(6) + 6, y: top - 14, class: "lbl", text: "PEOPLE FROM HERE →" }, s);
+    table("tbl-timeline", ["Stage", "Approx. years", "Candidates left"], rows.map(r => [r[0], `${r[1]}-${r[2]}`, r[3] || "-"]));
+  })();
+
+  /* ---------- 1.3 Eroom ---------- */
+  (function eroom() {
+    const W = 760, H = 260, L = 56, R = 730, T = 16, B = 220;
+    const s = svgRoot("fig-eroom", W, H, "Line falling on a log scale from 100 in 1950 to about 1 in 2010.");
+    const f = y => 100 * Math.pow(80, -(y - 1950) / 60);
+    const x = y => L + (y - 1950) / 60 * (R - L);
+    const yv = v => T + (2 - Math.log10(v)) / 2.1 * (B - T);
+    [100, 10, 1].forEach(v => {
+      el("line", { x1: L, x2: R, y1: yv(v), y2: yv(v), class: "grid" }, s);
+      el("text", { x: L - 10, y: yv(v) + 4, "text-anchor": "end", class: "lbl", text: v }, s);
+    });
+    for (let y = 1950; y <= 2010; y += 10) el("text", { x: x(y), y: B + 22, "text-anchor": "middle", class: "lbl", text: y }, s);
+    el("line", { x1: L, x2: R, y1: B, y2: B, class: "axis" }, s);
+    let d = ""; for (let y = 1950; y <= 2010; y += 1) d += (y === 1950 ? "M" : "L") + x(y).toFixed(1) + " " + yv(f(y)).toFixed(1);
+    el("path", { d, fill: "none", class: "hema-s", "stroke-width": 2, "stroke-linecap": "round" }, s);
+    el("circle", { cx: x(2010), cy: yv(f(2010)), r: 4, class: "hema" }, s);
+    el("text", { x: x(2010), y: yv(10) + 22, "text-anchor": "end", class: "lbl-ink", text: "about an 80-fold drop by 2010" }, s);
+    const cross = el("line", { y1: T, y2: B, class: "muted-s", "stroke-width": 1, opacity: 0 }, s);
+    const dot = el("circle", { r: 4.5, class: "hema", stroke: "var(--paper)", "stroke-width": 2, opacity: 0 }, s);
+    const hit = el("rect", { x: L, y: T, width: R - L, height: B - T, fill: "transparent", "data-crosshair": "" }, s);
+    hit.addEventListener("pointermove", e => {
+      const p = s.createSVGPoint(); p.x = e.clientX; p.y = e.clientY;
+      const q = p.matrixTransform(s.getScreenCTM().inverse());
+      const yr = Math.round(1950 + (q.x - L) / (R - L) * 60);
+      const v = f(yr);
+      cross.setAttribute("x1", x(yr)); cross.setAttribute("x2", x(yr)); cross.setAttribute("opacity", 1);
+      dot.setAttribute("cx", x(yr)); dot.setAttribute("cy", yv(v)); dot.setAttribute("opacity", 1);
+      showTip(`<b>${yr}</b>index ${v >= 10 ? v.toFixed(0) : v.toFixed(1)} (1950 = 100)`, e.clientX, e.clientY);
+    });
+    hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); dot.setAttribute("opacity", 0); hideTip(); });
+  })();
+
+  /* ---------- 1.3 failure reasons ---------- */
+  (function fail() {
+    const rows = [["Not effective enough", 40, 50], ["Unmanageable toxicity", 30, 30], ["Poor drug-like properties", 10, 15], ["Commercial or strategic", 10, 10]];
+    const W = 760, L = 210, R = 690, rh = 40, H = rows.length * rh + 30;
+    const s = svgRoot("fig-fail", W, H, "Bar chart: lack of efficacy 40-50%, toxicity about 30%, poor drug-like properties 10-15%, commercial reasons about 10%.");
+    const x = v => L + v / 60 * (R - L);
+    [0, 20, 40, 60].forEach(v => { el("line", { x1: x(v), x2: x(v), y1: 0, y2: H - 24, class: "grid" }, s); el("text", { x: x(v), y: H - 6, "text-anchor": "middle", class: "lbl", text: v + "%" }, s); });
+    rows.forEach(([n, a, b], i) => {
+      const y = i * rh + 8;
+      el("text", { x: 0, y: y + 14, class: "body", style: "fill:var(--ink);font-size:13.5px", text: n }, s);
+      const label = a === b ? `~${a}%` : `${a}-${b}%`;
+      const tipTxt = `<b>${n}</b>${label} of clinical failures`;
+      el("rect", { x: L, y, width: x(a) - L, height: 20, rx: 4, class: "hema", "data-tip": tipTxt }, s);
+      if (b > a) el("rect", { x: x(a) + 2, y, width: x(b) - x(a) - 2, height: 20, rx: 4, class: "hema", opacity: 0.32, "data-tip": tipTxt }, s);
+      el("text", { x: x(b) + 8, y: y + 14, class: "lbl-ink", text: label }, s);
+    });
+    el("line", { x1: L, x2: L, y1: 0, y2: H - 24, class: "axis" }, s);
+    table("tbl-fail", ["Cause", "Share of clinical failures"], rows.map(r => [r[0], r[1] === r[2] ? `~${r[1]}%` : `${r[1]}-${r[2]}%`]));
+  })();
+
+  /* ---------- 2 size strip ---------- */
+  (function size() {
+    const pts = [
+      ["Aspirin", MOLS.aspirin.mw, MOLS.aspirin.mw + " Da", 1],
+      ["Imatinib", MOLS.imatinib.mw, MOLS.imatinib.mw + " Da", -1],
+      ["Semaglutide", 4114, "4.1 kDa", 2],
+      ["Insulin", 5808, "5.8 kDa", -1],
+      ["siRNA", 13000, "~13 kDa", 1],
+      ["Antibody (IgG)", 150000, "~150 kDa", -1],
+      ["AAV gene-therapy shell", 3.9e6, "~3.9 MDa", 1],
+    ];
+    const W = 760, L = 20, R = 740, base = 140, H = 260;
+    const s = svgRoot("fig-size", W, H, "Log-scale strip of drug sizes from aspirin at 180 daltons to an AAV capsid at about 3.9 million daltons.");
+    const x = v => L + (Math.log10(v) - 2) / 5 * (R - L);
+    el("rect", { x: x(100), y: base - 22, width: x(500) - x(100), height: 44, rx: 4, class: "wash" }, s);
+    el("text", { x: x(100) + 4, y: base + 38, class: "lbl", text: "< 500 Da" }, s);
+    el("line", { x1: L, x2: R, y1: base, y2: base, class: "axis" }, s);
+    [2, 3, 4, 5, 6, 7].forEach(p => {
+      el("line", { x1: x(10 ** p), x2: x(10 ** p), y1: base - 4, y2: base + 4, class: "muted-s" }, s);
+      el("text", { x: x(10 ** p), y: H - 6, "text-anchor": "middle", class: "lbl", text: ["100 Da", "1 kDa", "10 kDa", "100 kDa", "1 MDa", "10 MDa"][p - 2] }, s);
+    });
+    pts.forEach(([n, v, lab, tier]) => {
+      const cx = x(v);
+      const ly = tier === 2 ? base - 92 : tier === 1 ? base - 50 : base + 54;
+      el("line", { x1: cx, x2: cx, y1: base, y2: tier > 0 ? ly + 8 : ly - 22, class: "rule-s", "stroke-width": 1 }, s);
+      el("circle", { cx, cy: base, r: 5.5, class: "hema", stroke: "var(--paper)", "stroke-width": 2, "data-tip": `<b>${n}</b>${lab}` }, s);
+      const anchor = cx > R - 80 ? "end" : cx < L + 60 ? "start" : "middle";
+      el("text", { x: cx, y: tier > 0 ? ly - 14 : ly, "text-anchor": anchor, class: "name", style: "font-size:13px", text: n }, s);
+      el("text", { x: cx, y: tier > 0 ? ly + 2 : ly + 16, "text-anchor": anchor, class: "lbl", text: lab }, s);
+    });
+    table("tbl-size", ["Drug", "Approx. mass"], pts.map(p => [p[0], p[2]]));
+  })();
+
+  /* ---------- 3.1 nested squares ---------- */
+  (function genome() {
+    const data = [["Protein-coding genes", 20000, "paper"], ["Druggable genome", 4479, "wash"], ["Targeted by an approved drug", 667, "hema"]];
+    const W = 760, H = 300, side = 270, x0 = 10, y0 = 10;
+    const s = svgRoot("fig-genome", W, H, "Nested squares: 20,000 protein-coding genes, 4,479 in the druggable genome, 667 targeted by approved drugs.");
+    const notes = ["every human protein", "have a shape or family that a drug could plausibly reach", "proteins with at least one approved drug (about 3%)"];
+    data.forEach(([n, v, cls], i) => {
+      const a = side * Math.sqrt(v / 20000);
+      const y = y0 + side - a;
+      el("rect", { x: x0, y, width: a, height: a, rx: 4, class: cls, "data-tip": `<b>${n}</b>${fmt(v)}` }, s);
+      if (i === 0) el("rect", { x: x0, y, width: a, height: a, rx: 4, fill: "none", class: "rule-s" }, s);
+      const ly = [y0 + 22, y0 + side - a + 14, y0 + side - a + 6][i] + (i === 2 ? 0 : 0);
+      const tx = 330, ty = [40, 140, 236][i];
+      el("line", { x1: x0 + a - 2, y1: i === 0 ? y0 + 24 : y + Math.min(14, a / 2), x2: tx - 10, y2: ty - 5, class: "ink-s", "stroke-width": 1 }, s);
+      el("text", { x: tx, y: ty - 20, class: "name", style: "font-size:24px;font-variation-settings:'wdth' 80;font-weight:700;fill:var(--hema)", text: fmt(v) }, s);
+      el("text", { x: tx, y: ty, class: "name", text: n }, s);
+      el("text", { x: tx, y: ty + 18, class: "body", text: notes[i] }, s);
+    });
+    table("tbl-genome", ["Set", "Number of genes / proteins"], data.map(d => [d[0], fmt(d[1])]));
+  })();
+
+  /* ---------- 3.3 funnel ---------- */
+  (function funnel() {
+    const rows = [["Make-to-order catalogue", 3e10, "tens of billions", false], ["Scored by a cheap ML model", 3e10, "all of them, in hours", true], ["Docked properly", 3e6, "~millions", false], ["Bought and tested in the lab", 300, "~hundreds", false], ["Confirmed binders", 20, "~tens", false]];
+    const W = 760, rh = 46, H = rows.length * rh, L = 250, R = 750;
+    const s = svgRoot("fig-funnel", W, H, "Funnel from tens of billions of catalogue molecules to tens of confirmed binders.");
+    const w = v => (Math.log10(v) / Math.log10(3e10)) * (R - L);
+    rows.forEach(([n, v, lab, ai], i) => {
+      const y = i * rh + 6, bw = Math.max(w(v), 8);
+      el("text", { x: 0, y: y + 15, class: "body", style: "fill:var(--ink);font-size:13.5px", text: n }, s);
+      el("text", { x: 0, y: y + 31, class: "lbl", text: lab }, s);
+      const cx = L + (R - L) / 2;
+      el("rect", { x: cx - bw / 2, y, width: bw, height: 30, rx: 4, class: ai ? "eosin" : "hema", opacity: ai ? 0.9 : 1, "data-tip": `<b>${n}</b>${lab}` }, s);
+      if (ai) el("text", { x: cx, y: y + 20, "text-anchor": "middle", style: "font-family:var(--mono);font-size:11px;fill:#fff", text: "AI STEP" }, s);
+    });
+  })();
+
+  /* ---------- 3.4 representations ---------- */
+  (function reps() {
+    const m = MOLS.aspirin;
+    document.getElementById("smiles").innerHTML = m.smiles.replace("c1ccccc1", "<span>c1ccccc1</span>") + `<br><span style="border:0;font-size:.72rem;color:var(--muted)">underlined: the six-carbon ring</span>`;
+    const fp = document.getElementById("fp");
+    fp.setAttribute("aria-label", `${m.fp64.filter(Boolean).length} of 64 bits on`);
+    m.fp64.forEach(b => { const i = document.createElement("i"); if (b) i.className = "on"; fp.appendChild(i); });
+    document.getElementById("fp-note").textContent = `A fixed-length list of on/off bits, each marking a small chemical pattern. Aspirin turns on ${m.fp_on_2048} of 2,048. Fast for similarity search and classic ML.`;
+    const xs = m.atoms.map(a => a.x), ys = m.atoms.map(a => a.y);
+    const minx = Math.min(...xs), maxx = Math.max(...xs), miny = Math.min(...ys), maxy = Math.max(...ys);
+    const W = 340, H = 190, pad = 22, k = Math.min((W - 2 * pad) / (maxx - minx), (H - 2 * pad) / (maxy - miny));
+    const ox = (W - (maxx - minx) * k) / 2, oy = (H - (maxy - miny) * k) / 2;
+    const px = a => ox + (a.x - minx) * k, py = a => oy + (maxy - a.y) * k;
+    const s = svgRoot("mol-graph", W, H, "Aspirin drawn as a graph: 13 atoms as nodes and their bonds as edges.");
+    m.bonds.forEach(b => {
+      const A = m.atoms[b.a], B = m.atoms[b.b];
+      el("line", { x1: px(A), y1: py(A), x2: px(B), y2: py(B), class: "muted-s", "stroke-width": b.order > 1 ? 3 : 1.5 }, s);
+    });
+    m.atoms.forEach(a => {
+      const het = a.el !== "C";
+      el("circle", { cx: px(a), cy: py(a), r: 11, class: het ? "hema" : "paper", stroke: "var(--hema)", "stroke-width": 1.5, "data-tip": `<b>Atom ${a.i}</b>${a.el === "O" ? "oxygen" : "carbon"}` }, s);
+      el("text", { x: px(a), y: py(a) + 4, "text-anchor": "middle", style: `font-family:var(--mono);font-size:11px;fill:${het ? "var(--paper)" : "var(--ink)"}`, text: a.el }, s);
+    });
+  })();
+
+  /* ---------- 3.4 loops ---------- */
+  (function loops() {
+    const soft = document.getElementById("loop-soft"), lab = document.getElementById("loop-lab");
+    const X0 = 28, SPAN = 760 - X0, gap = 16;
+    // steps are given in flow order; rtl lays them out right-to-left
+    function row(g, y, steps, ai, rtl) {
+      const n = steps.length, w = (SPAN - gap * (n - 1)) / n;
+      const pos = i => X0 + (rtl ? n - 1 - i : i) * (w + gap);
+      steps.forEach(([a, b], i) => {
+        const x = pos(i);
+        el("rect", { x, y, width: w, height: 54, rx: 10, class: ai[i] ? "eosin" : "panel", opacity: ai[i] ? 0.14 : 1 }, g);
+        el("rect", { x, y, width: w, height: 54, rx: 10, fill: "none", class: ai[i] ? "eosin-s" : "rule-s", "stroke-width": 1.5 }, g);
+        el("text", { x: x + w / 2, y: y + 24, "text-anchor": "middle", class: "name", style: "font-size:13.5px", text: a }, g);
+        el("text", { x: x + w / 2, y: y + 41, "text-anchor": "middle", class: "lbl", text: b }, g);
+        if (i < n - 1) {
+          const x1 = rtl ? x - 2 : x + w + 2, x2 = rtl ? x - gap + 2 : x + w + gap - 2;
+          el("path", { d: `M${x1} ${y + 27} L ${x2} ${y + 27}`, class: "ink-s", "stroke-width": 1.5, "marker-end": "url(#arrow3)" }, g);
+        }
+      });
+      return { w, pos };
+    }
+    const top = row(soft, 28, [["Generate", "thousands"], ["Check valid", "RDKit"], ["Predict ADMET", "ML models"], ["Score vs target", "dock / affinity"], ["Keep the best", "top 1%"]], [1, 0, 1, 1, 1], false);
+    const cFirst = top.pos(0) + top.w / 2, cLast = top.pos(4) + top.w / 2;
+    el("path", { d: `M ${cLast} 84 C ${cLast} 126, ${cFirst} 126, ${cFirst} 86`, fill: "none", class: "ink-s", "stroke-width": 1.5, "marker-end": "url(#arrow3)" }, soft);
+    el("text", { x: (cFirst + cLast) / 2, y: 136, "text-anchor": "middle", class: "lbl-ink", text: "learn from the survivors, generate again" }, soft);
+    el("path", { d: `M ${cLast} 148 L ${cLast} 222`, fill: "none", class: "ink-s", "stroke-width": 1.5, "marker-end": "url(#arrow3)" }, soft);
+    el("text", { x: cLast - 10, y: 190, "text-anchor": "end", class: "lbl-ink", text: "shortlist of ~10-100 molecules" }, soft);
+    const bot = row(lab, 228, [["Synthesize", "chemists make it"], ["Test", "lab assays"], ["Analyze", "what worked?"]], [0, 0, 0], true);
+    // results flow back up the left edge into the generator
+    const ax = bot.pos(2);
+    el("path", { d: `M ${ax} 255 L 10 255 L 10 55 L ${X0 - 2} 55`, fill: "none", class: "ink-s", "stroke-width": 1.5, "stroke-linejoin": "round", "marker-end": "url(#arrow3)" }, lab);
+    el("text", { x: X0 + SPAN / 2, y: 304, "text-anchor": "middle", class: "lbl-ink", text: "real lab results flow back and retrain the models" }, lab);
+  })();
+
+  /* ---------- 3.5 ADMET + Lipinski ---------- */
+  (function admet() {
+    const g = document.getElementById("admet");
+    const st = [["A", "Absorption", "gets from the gut", "into the blood"], ["D", "Distribution", "reaches the right", "tissue, and enough"], ["M", "Metabolism", "the liver breaks it", "down, not too fast"], ["E", "Excretion", "kidneys and liver", "clear it out"]];
+    st.forEach(([k, n, a, b], i) => {
+      const x = 100 + i * 186;
+      el("circle", { cx: x, cy: 70, r: 26, class: "paper hema-s", "stroke-width": 2 }, g);
+      el("text", { x, y: 78, "text-anchor": "middle", style: "font-family:var(--display);font-weight:700;font-size:22px;fill:var(--hema)", text: k }, g);
+      el("text", { x, y: 20, "text-anchor": "middle", class: "name", text: n }, g);
+      el("text", { x, y: 116, "text-anchor": "middle", class: "body", text: a }, g);
+      el("text", { x, y: 132, "text-anchor": "middle", class: "body", text: b }, g);
+    });
+    const a = MOLS.aspirin, im = MOLS.imatinib;
+    const rules = [["Molecular weight", "≤ 500 Da", a.mw, im.mw, v => v <= 500, " Da"], ["logP (oiliness)", "≤ 5", a.logp, im.logp, v => v <= 5, ""], ["H-bond donors", "≤ 5", a.hbd, im.hbd, v => v <= 5, ""], ["H-bond acceptors", "≤ 10", a.hba, im.hba, v => v <= 10, ""]];
+    const tb = document.querySelector("#lipinski tbody");
+    rules.forEach(([n, lim, x1, x2, ok, u]) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${n}</td><td class="mono">${lim}</td><td><span class="pass ${ok(x1) ? "y" : "n"}">${x1}${u}</span></td><td><span class="pass ${ok(x2) ? "y" : "n"}">${x2}${u}</span></td>`;
+      tb.appendChild(tr);
+    });
+  })();
+
+  /* ---------- 3.7 stratification ---------- */
+  (function strat() {
+    const W = 760, H = 250;
+    const s = svgRoot("fig-strat", W, H, "Left: 100 enrolled patients, 20 respond. Right: 20 biomarker-positive patients, 16 respond.");
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    function grid(x0, cols, n, resp, title, sub) {
+      const idx = [...Array(n).keys()].sort(() => rnd() - 0.5).slice(0, resp); const on = new Set(idx);
+      for (let i = 0; i < n; i++) {
+        const cx = x0 + (i % cols) * 18 + 8, cy = 64 + Math.floor(i / cols) * 18;
+        el("circle", { cx, cy, r: 6, class: on.has(i) ? "hema" : "paper", stroke: on.has(i) ? "none" : "var(--rule)", "stroke-width": 1.5 }, s);
+      }
+      el("text", { x: x0, y: 16, class: "name", text: title }, s);
+      el("text", { x: x0, y: 36, class: "lbl-ink", text: sub }, s);
+    }
+    grid(0, 10, 100, 20, "Everyone with the disease", "20 of 100 respond · 20% · trial fails");
+    grid(420, 5, 20, 16, "Only biomarker-positive patients", "16 of 20 respond · 80% · trial succeeds");
+    el("path", { d: "M 220 140 L 400 140", class: "ink-s", "stroke-width": 1.5, "marker-end": "url(#arrow3)" }, s);
+    el("text", { x: 310, y: 130, "text-anchor": "middle", class: "lbl-ink", text: "select by biomarker" }, s);
+  })();
+
+  /* ---------- node graphs (3.8 and 5) ---------- */
+  // nodes: {id: [x, y, title, subtitle?]}; edges: [from, to, label]. Labels sit midway between box edges.
+  function nodeGraph(s, nodes, edges, opt) {
+    const box = {};
+    for (const [id, [x, y, n, sub]] of Object.entries(nodes)) {
+      const w = Math.max(n.length * 8.2, (sub || "").length * 6.7) + 28, h = sub ? 44 : 38;
+      box[id] = { x, y, w, h, n, sub };
+    }
+    const exit = (A, B) => { // point where the segment A->B leaves box A
+      const dx = B.x - A.x, dy = B.y - A.y;
+      const k = Math.min(dx ? (A.w / 2) / Math.abs(dx) : Infinity, dy ? (A.h / 2) / Math.abs(dy) : Infinity);
+      return [A.x + dx * k, A.y + dy * k];
+    };
+    edges.forEach(([a, b, label]) => {
+      const A = box[a], B = box[b];
+      el("line", { x1: A.x, y1: A.y, x2: B.x, y2: B.y, class: opt.edgeClass, "stroke-width": 1.5, opacity: 0.7 }, s);
+      if (!label) return;
+      const [ax, ay] = exit(A, B), [bx, by] = exit(B, A);
+      const mx = (ax + bx) / 2, my = (ay + by) / 2, w = label.length * 6.6 + 16;
+      el("rect", { x: mx - w / 2, y: my - 10, width: w, height: 20, rx: 10, class: "paper", stroke: opt.pillStroke, "stroke-width": 1 }, s);
+      el("text", { x: mx, y: my + 4, "text-anchor": "middle", style: `font-family:var(--mono);font-size:10.5px;fill:${opt.pillInk}`, text: label }, s);
+    });
+    for (const [id, B] of Object.entries(box)) {
+      const hero = opt.hero === id;
+      el("rect", { x: B.x - B.w / 2, y: B.y - B.h / 2, width: B.w, height: B.h, rx: 10, class: hero ? "hema" : opt.nodeFill, stroke: "var(--hema)", "stroke-width": 1.5 }, s);
+      el("text", { x: B.x, y: B.sub ? B.y - 3 : B.y + 5, "text-anchor": "middle", class: "name", style: `font-size:13.5px;${hero ? "fill:var(--paper)" : ""}`, text: B.n }, s);
+      if (B.sub) el("text", { x: B.x, y: B.y + 13, "text-anchor": "middle", class: "lbl", style: hero ? "fill:var(--paper);opacity:.85" : "", text: B.sub }, s);
+    }
+  }
+
+  (function kg() {
+    const s = svgRoot("fig-kg", 760, 220, "Graph: baricitinib inhibits AAK1, which regulates endocytosis, which the virus uses to enter cells. Baricitinib also inhibits JAK1 and JAK2, which drive inflammation.");
+    nodeGraph(s, {
+      bar: [92, 110, "Baricitinib", "approved for arthritis"],
+      aak: [300, 40, "AAK1", "a kinase"],
+      endo: [500, 40, "Endocytosis", "how cells take things in"],
+      virus: [684, 110, "Virus entry", "SARS-CoV-2"],
+      jak: [300, 180, "JAK1 / JAK2", "kinases"],
+      inf: [520, 180, "Inflammation", "cytokine storm"],
+    }, [["bar", "aak", "inhibits"], ["aak", "endo", "regulates"], ["endo", "virus", "used for"], ["bar", "jak", "inhibits"], ["jak", "inf", "drives"]],
+    { edgeClass: "eosin-s", pillStroke: "none", pillInk: "var(--eosin-ink)", nodeFill: "paper", hero: "bar" });
+  })();
+
+  /* ---------- 3.8 signatures ---------- */
+  (function sig() {
+    const genes = "ABCDEFGH".split("");
+    const dis = [2.1, 1.6, 1.2, 0.8, -0.7, -1.1, -1.5, -1.9], drug = [-1.8, -1.4, -1.3, -0.6, 0.8, 0.9, 1.6, 1.7];
+    const W = 760, H = 220, mid = 110, k = 40;
+    const s = svgRoot("fig-sig", W, H, "Two bar charts. The disease pushes genes A to D up and E to H down. The drug pushes A to D down and E to H up, the mirror image.");
+    function panel(x0, vals, title) {
+      el("text", { x: x0, y: 14, class: "name", text: title }, s);
+      el("line", { x1: x0, x2: x0 + 320, y1: mid, y2: mid, class: "axis" }, s);
+      vals.forEach((v, i) => {
+        const x = x0 + 8 + i * 39, h = Math.abs(v) * k;
+        el("rect", { x, y: v > 0 ? mid - h : mid, width: 24, height: h, rx: 3, class: "hema", "data-tip": `<b>Gene ${genes[i]}</b>${v > 0 ? "up" : "down"} ${Math.abs(v)}x (log scale)` }, s);
+        el("text", { x: x + 12, y: H - 4, "text-anchor": "middle", class: "lbl", text: genes[i] }, s);
+      });
+    }
+    panel(0, dis, "Disease signature");
+    panel(420, drug, "Drug signature: a mirror image");
+    el("text", { x: 380, y: mid + 4, "text-anchor": "middle", style: "font-family:var(--display);font-size:22px;fill:var(--muted)", text: "≈ −1×" }, s);
+  })();
+
+  /* ---------- 4 maturity ---------- */
+  (function maturity() {
+    const rows = [
+      ["Protein structure prediction", 4, "Proven", "Accuracy close to experiment for many proteins; Nobel Prize 2024"],
+      ["Protein and antibody binder design", 4, "Proven", "Designed binders work in the lab at useful rates"],
+      ["Retrosynthesis planning", 3, "Useful", "Suggests workable recipes for making molecules; chemists still check them"],
+      ["Literature and knowledge synthesis", 3, "Useful", "Scales reading enormously; hallucination needs guarding against"],
+      ["Property prediction (data-rich)", 3, "Useful", "Good when there are lots of training examples, e.g. solubility"],
+      ["Generative small-molecule design", 2, "Promising", "Molecules reach trials; not yet proven better than human design"],
+      ["Binding strength prediction", 1, "Weak", "Still not accurate enough to change most decisions. The field's central problem"],
+      ["Predicting whether it works in people", 1, "Open problem", "Needs a model of human biology, not just chemistry"],
+      ["Predicting new kinds of toxicity", 1, "Open problem", "Models catch known toxic effects; the ones that kill programs are often new"],
+    ];
+    const tb = document.getElementById("maturity");
+    rows.forEach(([a, n, w, why]) => {
+      const pips = [1, 2, 3, 4].map(i => `<i class="${i <= n ? "on" : ""}"></i>`).join("");
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${a}</td><td class="verdict"><span class="pips" aria-hidden="true">${pips}</span>${w}</td><td>${why}</td>`;
+      tb.appendChild(tr);
+    });
+  })();
+
+  /* ---------- 4 split ---------- */
+  (function split() {
+    const W = 760, H = 112, L = 0, R = 760, x = v => L + v / 13.5 * (R - L);
+    const s = svgRoot("fig-split", W, H, "Bar of 13.5 years: discovery and preclinical take the first 6 years, where most AI tools work. Clinical trials and review take the remaining 7.5 years.");
+    el("rect", { x: x(0), y: 26, width: x(6) - x(0) - 1, height: 34, rx: 4, class: "eosin", opacity: 0.85, "data-tip": "<b>Discovery and preclinical</b>about years 0-6" }, s);
+    el("rect", { x: x(6) + 1, y: 26, width: x(13.5) - x(6) - 1, height: 34, rx: 4, class: "hema", "data-tip": "<b>Clinical trials and review</b>about years 6-13.5" }, s);
+    el("text", { x: x(0), y: 16, class: "lbl-ink", text: "DISCOVERY + PRECLINICAL · ~6 YRS" }, s);
+    el("text", { x: x(13.5), y: 16, "text-anchor": "end", class: "lbl-ink", text: "CLINICAL TRIALS + REVIEW · ~7.5 YRS" }, s);
+    el("text", { x: x(0), y: 84, class: "body", style: "fill:var(--eosin-ink)", text: "most AI tools work here" }, s);
+    el("text", { x: x(13.5), y: 84, "text-anchor": "end", class: "body", text: "~90% of candidates fail here, and most of the cost is spent here" }, s);
+  })();
+
+  /* ---------- 5 data map ---------- */
+  (function data() {
+    const s = svgRoot("fig-data", 760, 330, "Map: Disease links to Target protein via Open Targets. Target links to 3D structure via PDB and AlphaFold, and to Compound via ChEMBL and BindingDB. Compound links to Clinical trial via ClinicalTrials.gov and to Catalogue via PubChem and ZINC. Papers link to Disease via Europe PMC. UniProt describes each protein.");
+    nodeGraph(s, {
+      pap: [62, 40, "Papers"], dis: [62, 170, "Disease"], tgt: [330, 170, "Target protein"], uni: [330, 40, "What it does"],
+      str: [330, 296, "3D structure"], cmp: [650, 170, "Compound"], trial: [650, 40, "Clinical trial"], cat: [650, 296, "Catalogue"],
+    }, [["pap", "dis", "Europe PMC"], ["dis", "tgt", "Open Targets"], ["tgt", "uni", "UniProt"], ["tgt", "str", "PDB · AlphaFold"],
+        ["tgt", "cmp", "ChEMBL · BindingDB"], ["cmp", "trial", "ClinicalTrials.gov"], ["cmp", "cat", "PubChem · ZINC"]],
+    { edgeClass: "hema-s", pillStroke: "var(--rule)", pillInk: "var(--ink-2)", nodeFill: "wash" });
+  })();
+
+  /* ---------- TOC active state ---------- */
+  (function toc() {
+    const links = [...document.querySelectorAll(".toc a")];
+    const map = new Map(links.map(a => [a.getAttribute("href").slice(1), a]));
+    const targets = [...map.keys()].map(id => document.getElementById(id)).filter(Boolean);
+    function update() {
+      let cur = targets[0];
+      for (const t of targets) if (t.getBoundingClientRect().top < 140) cur = t;
+      links.forEach(a => a.classList.remove("active"));
+      const a = map.get(cur.id); if (a) a.classList.add("active");
+      const parent = cur.id.startsWith("s3-") ? map.get("s3") : null; if (parent) parent.classList.add("active");
+    }
+    addEventListener("scroll", update, { passive: true }); update();
+  })();
+})();
+</script>
+</body>
+</html>

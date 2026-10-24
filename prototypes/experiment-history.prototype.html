@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prototype: compare candidates and save history</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f6f8;color:#192538;font:16px/1.5 system-ui,sans-serif}main{max-width:1120px;margin:36px auto;padding:0 24px}h1{font-size:30px;margin:4px 0 12px;letter-spacing:-.7px}h2{font-size:19px;margin:0 0 14px}h3{font-size:16px;margin:0 0 10px}p{margin:8px 0}.muted{color:#5c6878}.tag{font-size:12px;font-weight:700;letter-spacing:1px;color:#3659b8}.panel{background:white;border:1px solid #dbe0e8;border-radius:12px;padding:22px;margin:20px 0}.grid{display:grid;grid-template-columns:2fr 1fr;gap:20px}.grid .panel{margin:0}button,input,select{font:inherit;border:1px solid #b7c1d2;border-radius:6px;padding:8px 12px;background:white;color:inherit}button{cursor:pointer}button:hover{border-color:#3659b8}button:disabled{opacity:.45;cursor:default}.primary{background:#3659b8;color:white;border-color:#3659b8}.controls{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.notice{padding:10px 14px;background:#edf2ff;border-radius:6px}.row{padding:12px 0;border-bottom:1px solid #e4e8ef}.row:last-child{border-bottom:0}.row small{display:block;color:#5c6878}table{border-collapse:collapse;width:100%;font-size:14px;margin:12px 0}th,td{text-align:left;vertical-align:top;padding:12px 8px;border-bottom:1px solid #e4e8ef}th{background:#f6f8fc}.tabs button[aria-selected=true]{background:#edf2ff;border-color:#3659b8}dl{display:grid;grid-template-columns:180px 1fr;gap:6px;margin:0;font-size:14px}dt{color:#5c6878}dd{margin:0;overflow-wrap:anywhere}label{display:block}input[type=checkbox]{margin-right:8px}#steps button{display:block;margin:10px 0}.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.candidate{border:1px solid #dbe0e8;padding:14px;border-radius:8px}summary{cursor:pointer;font-weight:600}@media(max-width:760px){.grid,.two{grid-template-columns:1fr}main{padding:0 14px;margin-top:22px}dl{grid-template-columns:1fr}dd{margin-bottom:8px}table{font-size:12px}}
+</style>
+<main>
+<div class="tag">THROWAWAY LOGIC PROTOTYPE</div>
+<h1>Compare drugs, keep your history</h1>
+<p>Question: can a learner compare candidate drugs within one experiment, request docking, return later and recover archived work - without creating another experiment just to compare drugs?</p>
+<p class="muted">Fictional candidates and simulated calculations. No real scientific predictions, accounts or GPU calls. History is kept in memory for this demonstration and resets when the page reloads. This checks behavior, not the final visual design.</p>
+<section class="panel" aria-label="Current state">
+<h2>Current state</h2><div id="state"></div><p id="message" class="notice" aria-live="polite"></p>
+</section>
+<div class="grid">
+<section class="panel"><h2>Free play</h2>
+<label>Disease <select id="disease"><option>COVID-19</option><option>Multiple myeloma</option></select></label>
+<div class="controls"><button class="primary" id="start">Start one experiment</button><button id="finish">Simulate candidates ready</button><button id="fail">Simulate evidence unavailable</button></div>
+<div id="workspace"></div>
+</section>
+<section class="panel"><h2>Automatically saved history</h2><div id="history"></div><h3 style="margin-top:24px">Archive</h3><div id="archive"></div></section>
+</div>
+<section class="panel"><h2>Guided walkthroughs</h2><div id="tabs" class="tabs controls" role="tablist"></div><p id="scenario"></p><div id="steps"></div><button id="reset">Reset all sample history</button></section>
+<section class="panel"><details><summary>Proposed storage behavior</summary><p>Each experiment saves its evidence, candidates and docking results in a shared database using an experiment identifier. Candidate selection does not create a new experiment. Database forks and experiment branching are excluded from the MVP.</p><p>The archive-during-docking walkthrough is an earlier exploratory behavior, not an MVP requirement. The first version may disable archiving while docking is active. Completed experiments can be archived and restored with their results retained.</p></details></section>
+</main>
+<script>
+// Pure state model. All values are fixture data; nothing persists or calls a service.
+const fixtures=[
+ {id:'a',name:'Candidate A',target:'Sample protein 1',evidence:'Example evidence explanation A',warning:'Serious warning shown here; fixture only'},
+ {id:'b',name:'Candidate B',target:'Sample protein 1',evidence:'Example evidence explanation B',warning:'Safety information unknown'},
+ {id:'c',name:'Candidate C',target:'Sample protein 2',evidence:'Example evidence explanation C',warning:'Example sourced warning placeholder'}
+];
+const initial=()=>({experiments:[],activeId:null,comparison:[],message:'Start one experiment or choose a walkthrough.'});
+function transition(before,action){
+ const s=structuredClone(before);let e=s.experiments.find(x=>x.id===s.activeId);const say=t=>(s.message=t,s);
+ if(action.type==='reset')return initial();
+ if(action.type==='start'){
+  const id=s.experiments.length+1;s.experiments.push({id,disease:action.disease||'COVID-19',status:'Preparing evidence',archived:false,candidates:[],docking:{}});s.activeId=id;s.comparison=[];
+  return say('One experiment started and automatically added to history.');
+ }
+ if(action.type==='open'){
+  e=s.experiments.find(x=>x.id===action.id);if(!e||e.archived)return say('Restore an archived experiment before opening it.');s.activeId=e.id;s.comparison=[];return say('Opened saved experiment '+e.id+'. No new experiment was created.');
+ }
+ if(action.type==='restore'){
+  e=s.experiments.find(x=>x.id===action.id);if(!e)return say('That experiment does not exist.');e.archived=false;s.activeId=e.id;s.comparison=[];return say('Experiment restored with its saved candidates and docking results.');
+ }
+ if(!e)return say('Start or open an experiment first.');
+ if(action.type==='ready'){
+  if(e.status!=='Preparing evidence')return say('The current experiment is not preparing evidence.');e.status='Candidates ready';e.candidates=structuredClone(fixtures);return say('Candidates are ready and saved automatically. Select drugs to compare within this experiment.');
+ }
+ if(action.type==='fail'){
+  if(e.status!=='Preparing evidence')return say('Only a preparing experiment can take this sample failure.');e.status='Evidence unavailable';return say('No evidence was returned. The unsuccessful experiment remains in history; no candidates were invented.');
+ }
+ if(action.type==='select'){
+  if(!e.candidates.some(c=>c.id===action.candidate))return say('Candidate results must be ready before selecting drugs.');
+  s.comparison=s.comparison.includes(action.candidate)?s.comparison.filter(x=>x!==action.candidate):[...s.comparison,action.candidate];return say('Comparison changed. You are still in experiment '+e.id+'.');
+ }
+ if(action.type==='dock'){
+  if(!e.candidates.some(c=>c.id===action.candidate))return say('Choose a candidate from this experiment.');
+  if(e.docking[action.candidate]?.status==='Generating')return say('Docking is already running for that candidate.');e.docking[action.candidate]={status:'Generating',poses:0,method:'Simulated pose prediction'};return say('Sample docking started for '+fixtures.find(c=>c.id===action.candidate).name+'. The request is saved with this experiment.');
+ }
+ if(action.type==='docked'){
+  const waiting=Object.values(e.docking).filter(d=>d.status==='Generating');if(!waiting.length)return say('Start a docking request before simulating its completion.');waiting.forEach(d=>{d.status='Ready';d.poses=5;});return say('Five fictional poses are now recorded for each pending request, including in archived history.');
+ }
+ if(action.type==='archive'){
+  e.archived=true;s.comparison=[];return say('Experiment archived, not deleted. This prototype keeps existing docking requests running. Restore it to reopen.');
+ }
+ return s;
+}
+</script>
+<script>
+let state=initial(),scenarioIndex=0,stepIndex=0;
+const $=id=>document.getElementById(id);
+const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const current=()=>state.experiments.find(e=>e.id===state.activeId);
+function send(action){state=transition(state,action);render();}
+function render(){
+ const e=current();$('state').innerHTML='<dl><dt>Experiments saved</dt><dd>'+state.experiments.length+'</dd><dt>Current experiment</dt><dd>'+(e?'#'+e.id+' - '+escape(e.disease):'None')+'</dd><dt>Progress</dt><dd>'+(e?e.status:'Not started')+'</dd><dt>Visibility</dt><dd>'+(e?(e.archived?'Archived and recoverable':'In history'):'-')+'</dd><dt>Candidate results</dt><dd>'+(e?e.candidates.length:0)+'</dd><dt>Selected for comparison</dt><dd>'+state.comparison.map(id=>fixtures.find(c=>c.id===id).name).join(', ')+'</dd><dt>Docking saved</dt><dd>'+(e?Object.entries(e.docking).map(([id,d])=>fixtures.find(c=>c.id===id).name+': '+d.status+', '+d.poses+' sample poses').join('; ')||'None':'None')+'</dd></dl>';
+ $('message').textContent=state.message;$('finish').disabled=!e||e.status!=='Preparing evidence';$('fail').disabled=!e||e.status!=='Preparing evidence';
+ $('history').innerHTML=state.experiments.filter(e=>!e.archived).map(e=>'<div class="row"><button data-open="'+e.id+'">Open experiment '+e.id+'</button><small>'+escape(e.disease)+' - '+e.status+'</small></div>').join('')||'<p class="muted">No experiments in the main history.</p>';
+ $('archive').innerHTML=state.experiments.filter(e=>e.archived).map(e=>'<div class="row">Experiment '+e.id+'<small>'+escape(e.disease)+' - '+e.status+'</small><button data-restore="'+e.id+'">Restore</button></div>').join('')||'<p class="muted">Nothing archived.</p>';
+ let html='';if(e){html='<h3>Experiment '+e.id+' - '+escape(e.disease)+'</h3>';
+  if(e.archived)html+='<p>Archived. Use Restore to view its candidates again.</p>';
+  else if(e.candidates.length){html+='<p>Select candidate drugs to compare their evidence and docking results.</p><div class="two">'+e.candidates.map(c=>'<div class="candidate"><label><input type="checkbox" data-select="'+c.id+'" '+(state.comparison.includes(c.id)?'checked':'')+'>'+c.name+'</label><p>'+c.target+'</p><p class="muted">'+c.warning+'</p><button data-dock="'+c.id+'">Generate sample poses</button></div>').join('')+'</div>';
+   const selected=e.candidates.filter(c=>state.comparison.includes(c.id));if(selected.length)html+='<h3 style="margin-top:20px">Compare candidates in this experiment</h3><table><thead><tr><th>Drug</th><th>Evidence</th><th>Warnings</th><th>Docking</th></tr></thead><tbody>'+selected.map(c=>'<tr><td>'+c.name+'</td><td>'+c.evidence+'</td><td>'+c.warning+'</td><td>'+(e.docking[c.id]?e.docking[c.id].status+'; '+e.docking[c.id].poses+' sample poses':'Not requested')+'</td></tr>').join('')+'</tbody></table>';
+  }else html+='<p>'+ (e.status==='Evidence unavailable'?'No evidence available. Try another disease.':'Preparing sample evidence. Use the simulation button to finish.')+'</p>';
+  html+='<div class="controls"><button id="completeDock">Simulate docking ready</button>'+(!e.archived?'<button id="archiveCurrent">Archive experiment</button>':'')+'</div>';
+ }else html='<p class="muted">Start an experiment to see its candidates.</p>';
+ $('workspace').innerHTML=html;
+ document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>send({type:'open',id:+b.dataset.open}));document.querySelectorAll('[data-restore]').forEach(b=>b.onclick=()=>send({type:'restore',id:+b.dataset.restore}));document.querySelectorAll('[data-select]').forEach(b=>b.onchange=()=>send({type:'select',candidate:b.dataset.select}));document.querySelectorAll('[data-dock]').forEach(b=>b.onclick=()=>send({type:'dock',candidate:b.dataset.dock}));if($('completeDock'))$('completeDock').onclick=()=>send({type:'docked'});if($('archiveCurrent'))$('archiveCurrent').onclick=()=>send({type:'archive'});
+ renderSteps();
+}
+const scenarios=[
+ {name:'Compare drugs',description:'One disease search produces several candidates. Comparing two drugs does not create another experiment.',steps:[['Start one experiment',{type:'start'}],['Show candidates',{type:'ready'}],['Select Candidate A',{type:'select',candidate:'a'}],['Select Candidate B',{type:'select',candidate:'b'}],['Generate poses for A',{type:'dock',candidate:'a'}],['Finish sample docking',{type:'docked'}]]},
+ {name:'Return later',description:'Docking results belong to their original experiment. Opening another saved search and returning preserves them.',steps:[['Start first experiment',{type:'start'}],['Show its candidates',{type:'ready'}],['Generate A poses',{type:'dock',candidate:'a'}],['Finish docking',{type:'docked'}],['Start another disease',{type:'start',disease:'Multiple myeloma'}],['Show its candidates',{type:'ready'}],['Return to experiment 1',{type:'open',id:1}]]},
+ {name:'Archive during docking',description:'Proposed edge case: archive hides an experiment but does not cancel docking. Its result stays available after restoration.',steps:[['Start experiment',{type:'start'}],['Show candidates',{type:'ready'}],['Start A docking',{type:'dock',candidate:'a'}],['Archive experiment',{type:'archive'}],['Docking finishes while archived',{type:'docked'}],['Restore saved experiment',{type:'restore',id:1}]]},
+ {name:'No evidence',description:'An unsuccessful search is recorded without making up drugs. Invalid actions explain why they cannot proceed.',steps:[['Start experiment',{type:'start'}],['Try docking before candidates',{type:'dock',candidate:'a'}],['Simulate unavailable evidence',{type:'fail'}],['Archive unsuccessful experiment',{type:'archive'}],['Restore it',{type:'restore',id:1}]]}
+];
+function choose(i){scenarioIndex=i;stepIndex=0;state=initial();render();}
+function renderSteps(){const sc=scenarios[scenarioIndex];$('tabs').innerHTML=scenarios.map((s,i)=>'<button role="tab" aria-selected="'+(i===scenarioIndex)+'" data-tab="'+i+'">'+s.name+'</button>').join('');document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>choose(+b.dataset.tab));$('scenario').textContent=sc.description;$('steps').innerHTML=sc.steps.map(([label],i)=>'<button data-step="'+i+'" '+(i!==stepIndex?'disabled':'')+'>'+ (i<stepIndex?'Done: ':'')+(i+1)+'. '+label+'</button>').join('');document.querySelectorAll('[data-step]').forEach(b=>b.onclick=()=>{const a=sc.steps[stepIndex][1];stepIndex++;send(a);});}
+$('start').onclick=()=>send({type:'start',disease:$('disease').value});$('finish').onclick=()=>send({type:'ready'});$('fail').onclick=()=>send({type:'fail'});$('reset').onclick=()=>choose(scenarioIndex);render();
+</script>
+</html>
