@@ -10,7 +10,7 @@ import openai
 import pytest
 
 from jury.client import (
-    CortexModel, build_prompt, consensus, mock_model, run_jury,
+    CortexModel, RESPONSE_FORMAT, build_prompt, consensus, mock_model, run_jury,
     validate_config, validate_packet, validate_reply, visible_packet,
 )
 
@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PACKET = json.loads((ROOT / "fixtures/evidence_packet.json").read_text())
 FIXTURE = json.loads((ROOT / "fixtures/jury_result.json").read_text())
 CONFIG = json.loads((ROOT / "jury/config.json").read_text())
+RECORDED = json.loads((Path(__file__).parent / "data/live_recording.json").read_text())
 
 
 def reply():
@@ -112,6 +113,50 @@ def test_invalid_replies_never_supply_reviews(change):
 def test_bad_json(raw):
     reviews, flags = validate_reply(raw, PACKET)
     assert reviews is None and flags["schema"] is False
+
+
+def test_recorded_claude_fence_and_identifiers():
+    recorded = RECORDED["claude-sonnet-5"]
+    assert recorded["validation"]["errors"] == [
+        "Attempt 1: JSON decoding failed", "Attempt 2: JSON decoding failed"]
+    reviews, flags = validate_reply(recorded["raw_output"], PACKET)
+    assert reviews is not None and flags["errors"] == []
+    assert "BCL2" in reviews[-1]["rationale"]
+    assert "E19" in reviews[-1]["rationale"]
+
+
+@pytest.mark.parametrize("wrapper", ["{}", "```json\n{}\n```", "Here is my vote:\n{}\nEnd."])
+def test_single_object_wrappers_preserve_validation(wrapper):
+    raw = RECORDED["claude-sonnet-5"]["raw_output"][8:-4]
+    assert validate_reply(wrapper.format(raw), PACKET)[0] is not None
+    value = json.loads(raw)
+    value["reviews"][0]["rank"] = 2  # Duplicate rank still rejects the entire ballot.
+    assert validate_reply(wrapper.format(json.dumps(value)), PACKET)[0] is None
+
+
+@pytest.mark.parametrize("wrapper", [
+    "{}\n{}", "[{}]", '{{"broken": {}, "reviews": []',
+    '{}\n{{"broken":', '{{"reviews":[],"reviews":[]}}\n{}',
+])
+def test_never_salvage_ambiguous_or_malformed_objects(wrapper):
+    raw = RECORDED["claude-sonnet-5"]["raw_output"][8:-4]
+    reviews, flags = validate_reply(wrapper.format(raw, raw), PACKET)
+    assert reviews is None and flags["schema"] is False
+
+
+@pytest.mark.parametrize("hyphen", ["-", "\u2010", "\u2011"])
+@pytest.mark.parametrize("field", ["rationale", "objection"])
+def test_recorded_gpt_numeric_text_with_typographic_identifier(hyphen, field):
+    # The failed first GPT reply was not retained. Replay its retained second
+    # ballot, varying only the typography of the packet's Bcl-2 identifier.
+    value = {"reviews": [{k: v for k, v in r.items() if k != "candidate_id"}
+                         for r in RECORDED["openai-gpt-5.4"]["reviews"]]}
+    review = next(r for r in value["reviews"] if r["label"] == "C2")
+    review[field] = review[field].replace("BCL2", "BCL" + hyphen + "2").replace("Bcl-2", "Bcl" + hyphen + "2")
+    assert validate_reply(json.dumps(value), PACKET)[0] is not None
+    review[field] += " Unsupported measurement 0.60000000000000001."
+    reviews, flags = validate_reply(json.dumps(value), PACKET)
+    assert reviews is None and flags["numbers_match"] is False
 
 
 @pytest.mark.parametrize("text,accepted", [
@@ -270,6 +315,12 @@ def test_sdk_endpoint_auth_config_model_and_no_hidden_retries(monkeypatch):
         assert request.headers["authorization"] == "Bearer fake-test-token"
         body = json.loads(request.content)
         assert body["model"] == "configured-model" and body["temperature"] == 0
+        assert body["response_format"] == RESPONSE_FORMAT
+        schema = body["response_format"]["json_schema"]["schema"]
+        assert schema["required"] == ["reviews"] and schema["additionalProperties"] is False
+        review_schema = schema["properties"]["reviews"]["items"]
+        assert set(review_schema["required"]) == set(reply()["reviews"][0])
+        assert set(review_schema["properties"]) == set(reply()["reviews"][0])
         return httpx.Response(200, json={"id": "test", "choices": [
             {"index": 0, "message": {"role": "assistant", "content": "OK"}, "finish_reason": "stop"}]})
     def factory(**kwargs):
@@ -284,8 +335,57 @@ def test_sdk_endpoint_auth_config_model_and_no_hidden_retries(monkeypatch):
     assert len(calls) == 1
 
 
+@pytest.mark.parametrize("configured,explicit,expected", [(None, None, 300), ("420", None, 420), ("420", 180, 180)])
+def test_recorded_glm_timeout_budget(monkeypatch, configured, explicit, expected):
+    monkeypatch.setenv("SNOWFLAKE_ACCOUNT", "test-account")
+    monkeypatch.setenv("SNOWFLAKE_PAT", "fake-test-token")
+    if configured is None:
+        monkeypatch.delenv("SNOWFLAKE_TIMEOUT_SECONDS", raising=False)
+    else:
+        monkeypatch.setenv("SNOWFLAKE_TIMEOUT_SECONDS", configured)
+    glm = RECORDED["glm-5.3"]
+    assert glm["validation"]["errors"] == [
+        "Attempt 1: call failed (APITimeoutError)", "Attempt 2: call failed (APITimeoutError)"]
+    assert glm["raw_output"] is None
+    observed_timeout = glm["latency_ms"] / glm["attempts"] / 1000
+    recovered = glm["recovered_vote"]
+    completion_seconds = recovered["latency_ms"] / 1000
+    assert completion_seconds > observed_timeout > 60
+    real_openai = openai.OpenAI
+    calls = []
+    def handle(request):
+        calls.append(request)
+        # Simulate a slow completion without sleeping or spending live credit.
+        budget = request.extensions["timeout"]["read"]
+        if budget <= completion_seconds:
+            raise httpx.ReadTimeout("simulated slow-model timeout", request=request)
+        return httpx.Response(200, json={"id": "recorded", "choices": [
+            {"index": 0, "message": {"role": "assistant", "content":
+             recovered["reply"]}, "finish_reason": "stop"}]})
+    def factory(**kwargs):
+        assert kwargs["timeout"] == expected and kwargs["max_retries"] == 0
+        return real_openai(**kwargs, http_client=httpx.Client(transport=httpx.MockTransport(handle)))
+    monkeypatch.setattr(openai, "OpenAI", factory)
+    client = CortexModel(timeout=explicit)
+    try:
+        result = run_jury(PACKET, {**CONFIG, "models": list(RECORDED)}, client)
+    finally:
+        client.close()
+    assert len(calls) == 3
+    assert all(j["status"] == "valid" and j["attempts"] == 1 for j in result["jurors"])
+
+
+@pytest.mark.parametrize("timeout", ["0", "-1", "nan", "inf", "bad"])
+def test_invalid_timeout(monkeypatch, timeout):
+    monkeypatch.setenv("SNOWFLAKE_ACCOUNT", "test-account")
+    monkeypatch.setenv("SNOWFLAKE_PAT", "fake-test-token")
+    monkeypatch.setenv("SNOWFLAKE_TIMEOUT_SECONDS", timeout)
+    with pytest.raises(ValueError):
+        CortexModel()
+
+
 def test_cli_mock(tmp_path):
-    out = tmp_path / "result.json"
+    out = tmp_path / "new-directory" / "result.json"
     process = subprocess.run([str(ROOT / ".venv/bin/python"), "-m", "jury",
                               "fixtures/evidence_packet.json", "--out", str(out), "--mock"],
                              cwd=ROOT, capture_output=True, text=True)
