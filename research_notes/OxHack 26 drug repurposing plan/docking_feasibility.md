@@ -1,5 +1,8 @@
 # On-demand docking / binding-pose generation for a 24-hour hackathon (OxHack '26)
 
+> **Older research snapshot.** Where this note differs from `plan.md`, follow `plan.md`. In particular: docking runs AutoDock Vina on CPU (no rented GPUs), the Model jury uses three Snowflake Cortex model families (no Gemini), and IDs are mapped through UniProt and Ensembl IDs, never gene symbols.
+
+
 Research date: 24 Oct 2026. All "as of" statements refer to sources fetched on that date. Claims I could not verify against a primary source are marked **[UNVERIFIED]**.
 
 ## Does DiffDock (or its NIM) run on DGX Spark (aarch64, Blackwell sm_121)? What about PyTorch Geometric / torch-cluster / e3nn, Boltz-2 and GNINA?

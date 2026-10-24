@@ -185,10 +185,10 @@ GET https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id={id}&
 ```
 
 - Group the activities by target and keep targets with a median pChEMBL of at least 7.
-- **ChEMBL target to gene symbol:** call `/target.json?target_chembl_id__in={ids}`.
+- **ChEMBL target to Ensembl gene ID** (`plan.md` section 3; never through gene symbols): call `/target.json?target_chembl_id__in={ids}`.
   - Keep only `target_type == "SINGLE PROTEIN"`.
-  - Read the symbol from `target_components[].target_component_synonyms[]` where `syn_type == "GENE_SYMBOL"`.
-- **Gene symbol to Ensembl ID:** use `mapIds` with `entityNames: ["target"]`.
+  - Take the UniProt accession from `target_components[].accession`.
+  - Map the accession to an Ensembl gene ID through Open Targets `target.proteinIds` entries whose source starts with `uniprot_`. If it matches no gene or several, mark the target `unmapped` with the reason.
 - `limit` is capped at 1000, so follow `page_meta.next`. Cache results per drug.
 
 **A8. Direct-evidence score (the baseline in `plan.md` section 6.1).** For each drug, take its targets (mechanism and bioactivity):
@@ -198,7 +198,7 @@ GET https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id={id}&
 
 Sort by `(evidence_score, breadth)`. The UI shows every supported target, with no other bonus for hitting more targets.
 
-**A10. Build evidence items** (`E1`, `E2`, …) per candidate, for the UI and the jury:
+**A10. Build evidence items** for the UI and the jury. Number them `E1`, `E2`, … once per Experiment, so each ID is unique across all its candidates (`plan.md` section 3):
 
 - **Target association:** symbol, mode score and datatype breakdown, linked to `https://platform.opentargets.org/evidence/{ensembl_id}/{disease_id}`.
 - **Mechanism:** the `mechanismOfAction` sentence plus its references.

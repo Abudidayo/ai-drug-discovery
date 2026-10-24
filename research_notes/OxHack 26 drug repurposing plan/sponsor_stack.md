@@ -1,5 +1,8 @@
 # OxHack '26 sponsor technologies and partner prizes for a 24-hour drug-repurposing app
 
+> **Older research snapshot.** Where this note differs from `plan.md`, follow `plan.md`. In particular: docking runs AutoDock Vina on CPU (no rented GPUs), the Model jury uses three Snowflake Cortex model families (no Gemini), and IDs are mapped through UniProt and Ensembl IDs, never gene symbols.
+
+
 Research date: 24 Oct 2026 (day 1 of the event). Sources were read live today. These sources were JavaScript-rendered or protected by a Cloudflare challenge, so they were read in a real browser: the Devpost prize list and rules, the Snowflake Marketplace and the Vultr pricing page. Prize descriptions below are paraphrased, with one short verbatim quote. The exact wording is at the linked Devpost and MLH pages.
 
 ## What prizes are actually offered at OxHack '26, and what do they ask for?
