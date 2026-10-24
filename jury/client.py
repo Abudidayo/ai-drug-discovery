@@ -16,6 +16,114 @@ REVIEW_KEYS = {
     "label", "rank", "decision", "direction", "rationale", "objection",
     "missing_evidence", "supporting_evidence_ids", "contradicting_evidence_ids", "safety",
 }
+# Open Targets 26.09 symbolSynonyms; provenance: data/pilot/name_aliases.json.
+# Lexical name exemptions only, not evidence of biological entailment.
+NUMERIC_TARGET_ALIASES = {'ENSG00000001626': ['ABC35', 'ABCC7', 'MRP7', 'dJ760C5.1'],
+ 'ENSG00000010322': ['I-1', 'I-1 receptor candidate protein', 'I1R', 'I1R candidate protein', 'IR1',
+                     'KIAA0975'],
+ 'ENSG00000036530': ['CH24H', 'CP46', 'CYP46'],
+ 'ENSG00000055118': ['ERG-1', 'ERG1', 'Eag-related protein 1', 'Ether-a-go-go-related protein 1', 'HERG1',
+                     'Kv11.1', 'LQT2', 'SQT1', 'erg1', 'hERG-1', 'hERG1'],
+ 'ENSG00000061938': ['ACK-1', 'ACK1', 'p21cdc42Hs'],
+ 'ENSG00000065361': ['ErbB-3', 'HER3', 'LCCS2', 'MDA-BF-1', 'VSCN1', 'c-erbB-3', 'c-erbB3', 'erbB3-S',
+                     'p180-ErbB3', 'p45-sErbB3', 'p85-sErbB3'],
+ 'ENSG00000065989': ['DPDE2', 'PDE4', 'PDE46'],
+ 'ENSG00000066468': ['BFR-1', 'CD332', 'CEK3', 'CFD1', 'ECT1', 'FGFR-2', 'TK14', 'TK25'],
+ 'ENSG00000069696': ['D4DR'],
+ 'ENSG00000072506': ['17b-HSD10', 'DUPXp11.22', 'HADH2', 'HCD2', 'HSD10MD', 'MRPP2', 'MRX17', 'MRX31',
+                     'MRXS10', 'Mitochondrial RNase P protein 2', 'SDR5C1', 'XH98G2'],
+ 'ENSG00000076351': ['G21', 'HCP1', 'MGC9564'],
+ 'ENSG00000088832': ['12 kDa FKBP', 'FKBP-12', 'FKBP-1A', 'FKBP1', 'FKBP12', 'FKBP12C', 'PKC12', 'PKCI2',
+                     'PPIase FKBP1A'],
+ 'ENSG00000094631': ['FLJ16239', 'HD6', 'JM21', 'KDAC6', 'KIAA0901', 'PPP1R90'],
+ 'ENSG00000100429': ['DKFZP761B039', 'HD10'],
+ 'ENSG00000101981': ['F9 p22', 'P19', 'THPH8'],
+ 'ENSG00000102468': ['5-HT-2', '5-HT-2A', '5-HT2A', 'HTR2'],
+ 'ENSG00000103546': ['NAT1', 'NET1', 'SLC6A5'],
+ 'ENSG00000104365': ['IKK-2', 'IKK2', 'IMD15', 'IMD15A', 'IMD15B'],
+ 'ENSG00000105639': ['JAK-3', 'JAK3_HUMAN'],
+ 'ENSG00000105650': ['DPDE1', 'PDE21'],
+ 'ENSG00000107159': ['G250', 'RCC-associated antigen G250'],
+ 'ENSG00000107779': ['10q23del', 'ACVRLK3', 'ALK-3', 'ALK3', 'BMP type-1A receptor', 'BMPR-1A', 'CD292',
+                     'SKR5'],
+ 'ENSG00000108576': ['5-HTT', '5-HTTLPR', '5HTT', 'OCD1', 'SERT1'],
+ 'ENSG00000109084': ['MAC30', 'S2R', 'Sigma-2 receptor', 'Sigma2 receptor', 'sigma2R', 'σ2R'],
+ 'ENSG00000109163': ['GNRHR1', 'HH7'],
+ 'ENSG00000110619': ['MGC:11246'],
+ 'ENSG00000111816': ['PTK5'],
+ 'ENSG00000112038': ['M-OR-1', 'MOR-1', 'MOR1'],
+ 'ENSG00000113448': ['ACRDYS2', 'DPDE3', 'HSPDE4D', 'PDE43', 'PDE4DN2', 'STRK1'],
+ 'ENSG00000114739': ['HTX4'],
+ 'ENSG00000115170': ['ACVR1A', 'ACVRLK2', 'ALK-2', 'ALK2', 'SKR1'],
+ 'ENSG00000115353': ['NK-1R', 'NK1R', 'TAC1R'],
+ 'ENSG00000116478': ['GON-10', 'HD1', 'KDAC1', 'RPD3', 'RPD3L1'],
+ 'ENSG00000118298': ['UNQ690/PRO1335'],
+ 'ENSG00000120907': ['ADRA1C', 'ADRA1L1', 'ALPHA1AAR', 'Alpha-1A adrenoceptor'],
+ 'ENSG00000121989': ['ACVR2'],
+ 'ENSG00000126351': ['AR7', 'CHNG6', 'EAR-7', 'EAR-7.1/EAR-7.2', 'EAR7', 'ERB-T-1', 'ERBA1', 'NR1A1', 'THRA1',
+                     'THRA2', 'THRA3', 'THRalpha1', 'THRalpha2', 'TRalpha1', 'TRalpha2', 'c-ERBA-1'],
+ 'ENSG00000129521': ['HIF-PH3', 'HIF-prolyl hydroxylase 3', 'HIFP4H3', 'HIFPH3', 'HPH-3', 'PHD3'],
+ 'ENSG00000133019': ['HM3', 'm3AChR'],
+ 'ENSG00000135766': ['C1orf12', 'ECYT3', 'HIF-PH2', 'HIF-prolyl hydroxylase 2', 'HIFPH2', 'HPH-2', 'HPH2',
+                     'PHD2', 'PNAS-118', 'PNAS-137', 'SM-20', 'SM20', 'ZMYND6'],
+ 'ENSG00000135914': ['5-HT(2B)', '5-HT-2B', '5-HT2B'],
+ 'ENSG00000138696': ['ALK-6', 'ALK6', 'AMD3', 'BDA1D', 'BDA2', 'BMP type-1B receptor', 'BMPR-1B', 'CDw293'],
+ 'ENSG00000140009': ['NR3A2', 'ODG8'],
+ 'ENSG00000140675': ['Na(+)/glucose cotransporter 2', 'SGLT2'],
+ 'ENSG00000141736': ['CD340', 'HER-2', 'HER-2/neu', 'HER2', 'MLN 19', 'MLN-19', 'MLN19', 'TKR1', 'VSCN2',
+                     'c-ERB-2', 'c-ERB2', 'p185(erbB2)'],
+ 'ENSG00000141867': ['CDLS6', 'FSHRG4', 'HUNK1'],
+ 'ENSG00000142319': ['DAT1', 'PKDYS1'],
+ 'ENSG00000146648': ['ERBB1', 'HER1', 'NISBD2', 'PIG61'],
+ 'ENSG00000147246': ['5-HT-1C', '5-HT-2C', '5-HT1C', '5-HT2C', '5-HTR2C', '5HTR2C', 'HTR1C'],
+ 'ENSG00000147955': ['AAG8', 'ALS16', 'DSMA2', 'HMNR2', 'OPRS1', 'SIG-1R', 'SIGMA1R', 'SR-BP1',
+                     'Sigma1-receptor', 'Sigma1R', 'hSigmaR1', 'sigma1R'],
+ 'ENSG00000148408': ['CACH5', 'CACNL1A5', 'Cav2.2', 'DYT23'],
+ 'ENSG00000149295': ['D2DR', 'D2R'],
+ 'ENSG00000150594': ['ADRA2', 'ADRA2R', 'ALPHA2AAR', 'Alpha-2A adrenoceptor', 'Alpha-2AAR', 'FPLD8'],
+ 'ENSG00000151090': ['C-ERBA-2', 'ERBA2', 'NR1A2', 'THR1', 'THRB1', 'THRB2', 'THRbeta1', 'TRbeta1',
+                     'Thrbeta2', 'c-erbA-2'],
+ 'ENSG00000151577': ['D3DR', 'ETM1', 'FET1'],
+ 'ENSG00000151623': ['NR3C2VIT'],
+ 'ENSG00000152270': ['CGIP1', 'HcGIP1', 'cGIPDE1'],
+ 'ENSG00000159640': ['ACE1', 'CD143', 'DCP1'],
+ 'ENSG00000160789': ['CDCD1', 'CMD1A', 'CMT2B1', 'EMD2', 'FPLD2', 'LDP1', 'LGMD1B', 'LMN1', 'LMNL1', 'PRO1'],
+ 'ENSG00000160801': ['PTH1 receptor', 'PTHR1'],
+ 'ENSG00000165409': ['CHNG1', 'LGR3'],
+ 'ENSG00000165819': ['IME4', 'M6A', 'MT-A70', 'MTA70', 'Spo8', 'hMETTL3'],
+ 'ENSG00000167434': ['Car4', 'RP17'],
+ 'ENSG00000167658': ['EEF-2', 'EF-2', 'EF2', 'SCA26'],
+ 'ENSG00000168539': ['HM1', 'M1', 'M1R'],
+ 'ENSG00000169252': ['ADRB2R', 'ARB2', 'B2AR', 'BETA2AR', 'Beta-2 adrenoceptor'],
+ 'ENSG00000169676': ['DRD1B', 'DRD1L2'],
+ 'ENSG00000170214': ['ADRA1', 'ALPHA1BAR', 'Alpha-1B adrenoceptor'],
+ 'ENSG00000171720': ['HD3', 'KDAC3', 'RPD3', 'RPD3-2'],
+ 'ENSG00000171873': ['ADRA1', 'ADRA1A', 'ADRA1R', 'ALPHA1', 'Alpha-1D adrenoceptor', 'dJ779E11.2'],
+ 'ENSG00000176890': ['HST422', 'HsT422', 'OK/SW-cl.29'],
+ 'ENSG00000178394': ['5-HT-1A', '5-HT1A', '5HT1a', 'ADRB2RL1', 'ADRBRL1', 'G-21'],
+ 'ENSG00000178467': ['EGLN4', 'FLJ20262', 'HIF-PH4', 'HIF-prolyl hydroxylase 4', 'HIFPH4', 'HPH-4', 'P4H-TM',
+                     'PH-4', 'PH4', 'PHD4'],
+ 'ENSG00000180720': ['HM4', 'M4R'],
+ 'ENSG00000181072': ['HM2'],
+ 'ENSG00000184160': ['ADRA2L2', 'ADRA2RL2', 'ADRARL2', 'ALPHA2CAR', 'Alpha-2C adrenoceptor', 'Alpha-2CAR'],
+ 'ENSG00000184588': ['DPDE4'],
+ 'ENSG00000184984': ['HM5'],
+ 'ENSG00000185010': ['DXS1253E', 'F8B', 'F8C', 'THPH13'],
+ 'ENSG00000185015': ['FLJ37995', 'MGC59868'],
+ 'ENSG00000188389': ['ADMIO4', 'CD279', 'PD-1', 'PD1', 'Protein PD-1', 'SLEB2', 'hPD-1', 'hSLE1'],
+ 'ENSG00000196591': ['HD2', 'KDAC2', 'RPD3', 'YAF1'],
+ 'ENSG00000196639': ['H1-R', 'H1R', 'HH1R', 'hisH1'],
+ 'ENSG00000197299': ['MGRISCE1', 'RECQ2', 'RECQL2', 'RECQL3', 'RecQ2'],
+ 'ENSG00000197891': ['OAT4L', 'OATL4', 'UNQ6453/PRO34004', 'URAT1', 'hURAT1'],
+ 'ENSG00000198805': ['PRO1837'],
+ 'ENSG00000204217': ['BMP type-2 receptor', 'BMPR-2', 'BMPR3', 'BMR2', 'BRK-3', 'POVD1', 'PPH1'],
+ 'ENSG00000213341': ['BPS2', 'IKK-1', 'IKK1', 'TCF-16', 'TCF16'],
+ 'ENSG00000228716': ['DHFR1'],
+ 'ENSG00000269858': ['EIT-6', 'EIT6', 'HIF-PH1', 'HIF-prolyl hydroxylase 1', 'HIFPH1', 'HPH-1', 'HPH-3',
+                     'PHD1'],
+ 'ENSG00000274286': ['ADRA2L1', 'ADRA2RL1', 'ADRARL1', 'ALPHA2BAR', 'Alpha-2B adrenoceptor', 'Alpha-2BAR',
+                     'FAME2', 'alpha-2BAR']}
+
 DECISIONS = {"investigate", "watch", "deprioritise"}
 DIRECTIONS = {"supported", "contradicted", "unknown"}
 SAFETY = {"warnings_recorded", "unknown"}
@@ -113,10 +221,12 @@ Candidates), decision (investigate, watch, deprioritise), direction (supported,
 contradicted, unknown), rationale (string), objection (separate critical string),
 missing_evidence (array of strings), supporting_evidence_ids (array of E IDs),
 contradicting_evidence_ids (array of E IDs), safety (object with status and evidence_ids).
+Decisions must not improve as rank gets worse: investigate > watch > deprioritise.
 Direction asks whether the drug's action (for example inhibiting a Target) would help this Disease. An association score only says a Target is linked to the Disease; it does not say whether inhibiting or activating that Target helps or harms. Use supported only when a cited item shows that this action on the Target is beneficial in this Disease, contradicted only when a cited item shows it is harmful, and unknown otherwise.
-Every numeric literal in rationale or objection must equal a numeric value in the
+Every quoted measurement in rationale or objection must equal a numeric value in the
 values of evidence cited by that review. Do not derive, round, convert to percentages,
-or invent numbers. Source releases and digits inside protein names are identifiers.
+or invent numbers. Digits inside Disease, drug, protein and protein-family names,
+and Candidate/evidence IDs, are identifiers rather than measurements.
 Compare Candidates qualitatively; do not quote another Candidate's measurements
 in a review, including when explaining why its evidence is stronger or weaker.
 Cite only evidence assigned to that Candidate. Cite warnings only in safety, never
@@ -151,12 +261,70 @@ def _review_shape(review):
 
 
 def _numbers(text, identifiers):
-    # Only packet identifiers are exempt: an invented token like dose-99 is a claim.
+    # Only source-grounded identifiers are exempt; an unknown dose-99 stays checked.
     text = text.translate(str.maketrans({"\u2010": "-", "\u2011": "-"}))
-    for identifier in identifiers:
+    known = {identifier.casefold() for identifier in identifiers}
+    def family_list(match):
+        prefix, members = match.groups()
+        if prefix.casefold() not in {"c", "e"} and all(
+                (prefix + member).casefold() in known for member in members.split("/")):
+            return " "
+        return match[0]
+    text = re.sub(r"(?<!\w)([A-Za-z]+|[0-9]+-[A-Za-z]+)([0-9]+[A-Za-z]*(?:/[0-9]+[A-Za-z]*)+)(?!\w)",
+                  family_list, text)
+    for identifier in sorted(identifiers, key=lambda value: (-len(value), value)):
         text = re.sub(r"(?<!\w)" + re.escape(identifier) + r"(?!\w)", " ", text, flags=re.I)
     pattern = r"[+\-−]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:[eE][+\-]?\d+)?|[+\-−]?\.\d+(?:[eE][+\-]?\d+)?"
     return [Decimal(x.replace(",", "").replace("−", "-")) for x in re.findall(pattern, text)]
+
+
+def _name_identifiers(packet):
+    """Recognize source names before parsing measurements, longest match first.
+
+    Aliases here exempt name digits only; they do not establish biological
+    entailment. Arbitrary identifiers such as JAK99 or dose-99 stay checked.
+    """
+    names = [packet["disease"]["name"]]
+    identifiers = {e["id"] for e in packet["evidence"]}
+    text = " ".join(e["statement"] for e in packet["evidence"])
+    for candidate in packet["candidates"]:
+        names.append(candidate["name"])
+        identifiers.update((candidate["label"], candidate["candidate_id"]))
+        for target in candidate["targets"]:
+            names.append(target["name"])
+            identifiers.add(target["id"])
+            aliases = NUMERIC_TARGET_ALIASES.get(target["id"], ())
+            identifiers.update(aliases)
+            for name in (target["name"], *aliases):
+                family = re.fullmatch(r"([A-Z]+[0-9]+)[A-Z]+", name)
+                if family:
+                    identifiers.add(family[1])
+    identifiers.update(names)
+    text += " " + " ".join(names)
+    # Include digit-leading receptor names such as 5-HT1a, not just HT1a.
+    for token in re.findall(r"(?<!\w)[A-Za-z0-9]+(?:[-+][A-Za-z0-9]+)*(?!\w)", text):
+        # Attached units and scientific notation remain measurements even when
+        # their text occurs in an uncited source statement.
+        measurement = re.fullmatch(
+            r"\d+(?:[eE][+-]?\d+)?(?:mg|mcg|ug|ng|pg|g|kg|ml|l|nm|um|mm|mmol|mol|fold|x)",
+            token, flags=re.I)
+        measurement = measurement or re.fullmatch(r"(?:dose|score|pchembl)-?\d+", token, flags=re.I)
+        if (re.search(r"[A-Za-z]", token) and re.search(r"[0-9]", token)
+                and not measurement and not re.fullmatch(r"\d+[eE][+-]?\d+", token)):
+            identifiers.add(token)
+    # Family shorthand also occurs in mechanism text, e.g. 5-HT2a → 5-HT2.
+    for identifier in tuple(identifiers):
+        family = re.fullmatch(r"([A-Za-z0-9-]*[0-9]+)[A-Za-z]+", identifier)
+        if family:
+            identifiers.add(family[1])
+    # Short Disease names and their initials: type 2 diabetes [mellitus], T2D[M].
+    words = packet["disease"]["name"].split()
+    if any(word.isdigit() for word in words):
+        for end in range(2, len(words) + 1):
+            prefix = words[:end]
+            identifiers.add(" ".join(prefix))
+            identifiers.add("".join(word if word.isdigit() else word[0] for word in prefix))
+    return identifiers
 
 
 def _unique_object(pairs):
@@ -194,18 +362,18 @@ def validate_reply(raw, packet):
     reviews = value["reviews"]
     candidates = {c["label"]: c for c in packet["candidates"]}
     items = {e["id"]: e for e in packet["evidence"]}
-    source_text = " ".join([e["statement"] for e in items.values()] + [
-        t["name"] for c in candidates.values() for t in c["targets"]])
-    identifiers = set(re.findall(r"\b[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*\b", source_text))
-    identifiers = {s for s in identifiers if any(c.isdigit() for c in s)}
-    identifiers.update(items)
-    identifiers.update(candidates)
+    identifiers = _name_identifiers(packet)
     validation["unique_ranks"] = (
         Counter(r["label"] for r in reviews) == Counter(candidates.keys())
         and sorted(r["rank"] for r in reviews) == list(range(1, len(candidates) + 1))
     )
     if not validation["unique_ranks"]:
         validation["errors"].append("Expected every Candidate once and unique ranks 1..n")
+    decision_order = {"investigate": 2, "watch": 1, "deprioritise": 0}
+    ranked = sorted(reviews, key=lambda review: review["rank"])
+    if any(decision_order[lower["decision"]] > decision_order[higher["decision"]]
+           for higher, lower in zip(ranked, ranked[1:])):
+        validation["errors"].append("Decisions must not improve as rank gets worse")
     validation["evidence_ids_exist"] = True
     validation["numbers_match"] = True
     for review in reviews:
