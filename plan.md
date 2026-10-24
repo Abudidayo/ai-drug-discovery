@@ -299,13 +299,13 @@ Keep large graph arrays, source Parquet and pose files in files/object storage; 
 
 ## 10. Team ownership
 
-Three workstreams; assign names later. Each interface has one owner.
+Three workstreams, one owner each. Each interface has one owner.
 
 | Workstream | Owner delivers | First integration test |
 |---|---|---|
-| **A — Biomedical data + jury** | Open Targets, ChEMBL and STRING ingestion; regulator-backed approved-drug list; stable IDs; the Disease Target rule; evidence packets and fixtures. Then the Cortex jury client, reviewer schema, claim validation and agreement data. | One Disease → mapped Targets and approved Candidates with real citations; three jurors review one saved 15-Candidate packet |
-| **B — Prediction + evaluation** | Graph construction, the precomputed distance matrix, the network-proximity algorithm, baselines, coverage report, frozen retrieval and re-ranking evaluation | The same input produces reproducible ranked Candidates and a baseline comparison |
-| **C — Product + docking/infrastructure** | FastAPI integration, Tiger schema, React views, Vina worker and 3D viewer, Vultr deployment | A saved Experiment shows Candidates and one verifiable docking result |
+| **A — Biomedical data + jury** (Jessica) | Open Targets, ChEMBL and STRING ingestion; regulator-backed approved-drug list; stable IDs; the Disease Target rule; evidence packets and fixtures. Then the Cortex jury client, reviewer schema, claim validation and agreement data. | One Disease → mapped Targets and approved Candidates with real citations; three jurors review one saved 15-Candidate packet |
+| **B — Prediction + evaluation** (Zaid) | Graph construction, the precomputed distance matrix, the network-proximity algorithm, baselines, coverage report, frozen retrieval and re-ranking evaluation | The same input produces reproducible ranked Candidates and a baseline comparison |
+| **C — Product + docking/infrastructure** (Abudi) | FastAPI integration, Tiger schema, React views, Vina worker and 3D viewer, Vultr deployment | A saved Experiment shows Candidates and one verifiable docking result |
 
 **Parallelism:** A and B agree identifiers and fixtures first. B then builds the graph and distance matrix while A builds the evidence pipeline. A develops the jury against frozen fixture packets. C scaffolds the frontend, history and docking preparation without waiting for model results. Keep docking a bounded, cached demonstration.
 
