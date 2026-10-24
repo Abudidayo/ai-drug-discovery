@@ -40,16 +40,6 @@ After big code changes, refresh the graph with `trail build` (deterministic,
 no API key, $0).
 <!-- trail:end -->
 
-<!-- shared-skills:caveman:start -->
-## Chat style
-
-At the start of each session, read `.agents/skills/caveman/SKILL.md` and use
-normal Caveman for chat by default, without waiting for a command.
-Keep technical facts, uncertainty, numbers and units explicit. Honor requests
-for more detail and the user's chosen language. Use normal prose in documents.
-`stop caveman` or `normal mode` disables this default for the rest of the session.
-<!-- shared-skills:caveman:end -->
-
 <!-- shared-skills:trail-replies:start -->
 ## Trail reply preferences
 

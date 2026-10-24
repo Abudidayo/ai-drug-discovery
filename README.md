@@ -1,33 +1,24 @@
 # OxHack '26: Drug discovery explorer
 
-We're building a guided app for students to explore existing drugs worth
-investigating for a disease, with evidence explaining each candidate.
+An educational research app for students. Pick a disease, and it suggests existing approved drugs worth investigating, with the evidence behind each one.
 
-## Planned experience
+## How it works
 
-1. Search a disease and explore linked proteins and candidate drugs.
-2. Compare evidence, safety warnings and rankings from a model jury.
-3. Request docking for a supported drug–protein pair and inspect predicted
-   binding poses in 3D.
-4. Save experiments, compare candidates, and archive or restore history.
+1. Search a disease and see its linked proteins (targets), with sources.
+2. Rank approved drugs by network proximity: how close their targets sit to the disease's proteins on a protein-interaction network. A direct-evidence ranking is shown alongside as the baseline.
+3. A Model jury reviews the same evidence and challenges each candidate.
+4. Optionally inspect a predicted binding pose in 3D for a supported drug–protein pair.
+5. Save experiments, compare candidates, and archive or restore history.
 
-Results are research hypotheses. A predicted pose or agreement between models
-does not establish that a drug treats a disease.
+Results are research hypotheses, not medical advice. A ranking, a jury verdict or a binding pose does not show that a drug treats a disease.
 
 ## Start here
 
-- [MVP scope](docs/mvp-spec.md): what we're building and its limits.
-- [Team build plan](docs/team-build-plan.md): tasks, dependencies and delivery checks.
-- [Project glossary](CONTEXT.md): shared terms and scientific boundaries.
+- [Plan](plan.md): the official plan.
+- [Glossary](CONTEXT.md): shared terms and scientific limits.
+- [Build reference](docs/build-reference.md): verified API queries, database schema and docking steps.
 
-## UI prototypes
+## Background
 
-- [Candidate pipeline](prototypes/candidate-pipeline.prototype.html)
-- [Candidate comparison and history](prototypes/experiment-history.prototype.html)
-
-Open either HTML file in a browser to explore the proposed interface.
-
-## First build steps
-
-Confirm service and machine access, test one real docking pair, and agree
-the data contracts and task owners. See the team build plan for details.
+- Research notes in `research_notes/`. They are a dated record; where they differ from the plan, `plan.md` wins.
+- Data-source test bench in `demos/data-sources/`.
