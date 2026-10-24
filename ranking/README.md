@@ -1,7 +1,12 @@
-# Stream B — Stage 1 protein network
+# Stream B — protein network and Candidate ranking
 
-This package builds a disease-independent, undirected, unweighted Ensembl-gene
-network and reusable shortest-path distances. It does not rank Candidates.
+Stage 1 builds a disease-independent, undirected, unweighted Ensembl-gene
+network and reusable shortest-path distances. Stage 2 reuses those artifacts for
+raw proximity, conditional degree-matched scoring, baselines and shortlisting.
+
+See [Stage 2 usage and output contract](STAGE2.md) and
+[measured Stage 2 results](STAGE2_RESULTS.md). The sections below describe the
+Stage 1 foundation; its saved graph and distance matrix remain reusable.
 
 ## Inputs inspected in this checkout
 
