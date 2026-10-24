@@ -1,0 +1,169 @@
+"""Every route of plan.md section 9.1, plus /api/health."""
+
+from __future__ import annotations
+
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Query, status
+
+from .. import __version__
+from ..deps import ComponentsDep, ServiceDep
+from ..errors import responses
+from ..schemas import (
+    DiseaseSearchResponse,
+    DockJob,
+    DockRequest,
+    Evaluation,
+    Experiment,
+    ExperimentCreate,
+    ExperimentList,
+    Health,
+    JuryRun,
+    StructureList,
+)
+
+router = APIRouter(prefix="/api")
+
+
+@router.get("/health", tags=["health"], summary="Check that the API is up")
+def health(components: ComponentsDep) -> Health:
+    return Health(status="ok", source=components.settings.source, version=__version__)
+
+
+# Diseases --------------------------------------------------------------------
+
+
+@router.get(
+    "/diseases/search",
+    tags=["diseases"],
+    summary="Search Diseases this API can build an Experiment for",
+    responses=responses(422, 503),
+)
+def search_diseases(
+    service: ServiceDep,
+    q: Annotated[str, Query(min_length=1, max_length=200, description="Search text.")],
+    limit: Annotated[int, Query(ge=1, le=50, description="Most results to return.")] = 10,
+) -> DiseaseSearchResponse:
+    return DiseaseSearchResponse(query=q, results=service.search(q, limit))
+
+
+# Experiments -------------------------------------------------------------------
+
+
+@router.post(
+    "/experiments",
+    tags=["experiments"],
+    summary="Create an Experiment and start building it",
+    status_code=status.HTTP_202_ACCEPTED,
+    responses=responses(422, 503),
+)
+def create_experiment(body: ExperimentCreate, service: ServiceDep) -> Experiment:
+    """Returns the queued Experiment at once. Poll it until `status` is ready or failed."""
+    return service.create(body.disease_id)
+
+
+@router.get(
+    "/experiments",
+    tags=["experiments"],
+    summary="List saved Experiments (history)",
+    responses=responses(422),
+)
+def list_experiments(
+    service: ServiceDep,
+    archived: Annotated[
+        bool, Query(description="List archived Experiments instead of active ones.")
+    ] = False,
+    include_building: Annotated[
+        bool,
+        Query(description="Also list Experiments that are queued, building or failed."),
+    ] = False,
+) -> ExperimentList:
+    return ExperimentList(
+        items=service.history(archived=archived, include_building=include_building)
+    )
+
+
+@router.get(
+    "/experiments/{experiment_id}",
+    tags=["experiments"],
+    summary="Get an Experiment with its Targets, Candidates, jury and docking jobs",
+    responses=responses(404, 422),
+)
+def get_experiment(experiment_id: UUID, service: ServiceDep) -> Experiment:
+    return service.get(experiment_id)
+
+
+@router.post(
+    "/experiments/{experiment_id}/jury",
+    tags=["experiments"],
+    summary="Ask the Model jury to review the shortlist",
+    status_code=status.HTTP_202_ACCEPTED,
+    responses=responses(404, 409, 422),
+)
+def ask_jury(experiment_id: UUID, service: ServiceDep) -> JuryRun:
+    """Once per Experiment. Poll the Experiment to follow each juror's progress."""
+    return service.ask_jury(experiment_id)
+
+
+@router.post(
+    "/experiments/{experiment_id}/archive",
+    tags=["experiments"],
+    summary="Archive an Experiment: hide it from history, keeping it recoverable",
+    responses=responses(404, 409, 422),
+)
+def archive_experiment(experiment_id: UUID, service: ServiceDep) -> Experiment:
+    return service.archive(experiment_id)
+
+
+@router.post(
+    "/experiments/{experiment_id}/restore",
+    tags=["experiments"],
+    summary="Restore an archived Experiment to history",
+    responses=responses(404, 422),
+)
+def restore_experiment(experiment_id: UUID, service: ServiceDep) -> Experiment:
+    return service.restore(experiment_id)
+
+
+# Docking -----------------------------------------------------------------------
+
+
+@router.get(
+    "/structures",
+    tags=["docking"],
+    summary="List the prepared protein structures and their redocking controls",
+)
+def list_structures(components: ComponentsDep) -> StructureList:
+    return StructureList(structures=components.docking.structures())
+
+
+@router.post(
+    "/dock",
+    tags=["docking"],
+    summary="Request a binding pose for one Candidate in one prepared structure",
+    status_code=status.HTTP_202_ACCEPTED,
+    responses=responses(404, 409, 422),
+)
+def request_dock(body: DockRequest, service: ServiceDep) -> DockJob:
+    """An identical earlier computation is reused: the job is then already done and
+    `cached_from` names the job it reuses. Otherwise poll `GET /api/dock/{job_id}`."""
+    return service.request_dock(body)
+
+
+@router.get(
+    "/dock/{job_id}",
+    tags=["docking"],
+    summary="Get a docking job's status and results, including failures",
+    responses=responses(404, 422),
+)
+def get_dock_job(job_id: UUID, service: ServiceDep) -> DockJob:
+    return service.get_dock_job(job_id)
+
+
+# Evaluation --------------------------------------------------------------------
+
+
+@router.get("/evaluation", tags=["evaluation"], summary="Get the frozen evaluation metrics")
+def get_evaluation(components: ComponentsDep) -> Evaluation:
+    return components.evaluation.evaluation()
