@@ -18,6 +18,36 @@ REVIEW_KEYS = {
 DECISIONS = {"investigate", "watch", "deprioritise"}
 DIRECTIONS = {"supported", "contradicted", "unknown"}
 SAFETY = {"warnings_recorded", "unknown"}
+RESPONSE_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "jury_vote", "strict": True,
+        "schema": {
+            "type": "object", "additionalProperties": False, "required": ["reviews"],
+            "properties": {"reviews": {"type": "array", "items": {
+                "type": "object", "additionalProperties": False,
+                "required": sorted(REVIEW_KEYS),
+                "properties": {
+                    **{key: {"type": "string"} for key in
+                       ("label", "rationale", "objection")},
+                    "rank": {"type": "integer"},
+                    "decision": {"type": "string", "enum": sorted(DECISIONS)},
+                    "direction": {"type": "string", "enum": sorted(DIRECTIONS)},
+                    **{key: {"type": "array", "items": {"type": "string"}} for key in
+                       ("missing_evidence", "supporting_evidence_ids", "contradicting_evidence_ids")},
+                    "safety": {
+                        "type": "object", "additionalProperties": False,
+                        "required": ["status", "evidence_ids"],
+                        "properties": {
+                            "status": {"type": "string", "enum": sorted(SAFETY)},
+                            "evidence_ids": {"type": "array", "items": {"type": "string"}},
+                        },
+                    },
+                },
+            }}},
+        },
+    },
+}
 
 
 def validate_packet(packet):
@@ -119,6 +149,7 @@ def _review_shape(review):
 
 def _numbers(text, identifiers):
     # Only packet identifiers are exempt: an invented token like dose-99 is a claim.
+    text = text.translate(str.maketrans({"\u2010": "-", "\u2011": "-"}))
     for identifier in identifiers:
         text = re.sub(r"(?<!\w)" + re.escape(identifier) + r"(?!\w)", " ", text, flags=re.I)
     pattern = r"[+\-−]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:[eE][+\-]?\d+)?|[+\-−]?\.\d+(?:[eE][+\-]?\d+)?"
@@ -139,8 +170,15 @@ def validate_reply(raw, packet):
     validation = dict(schema=False, unique_ranks=None, evidence_ids_exist=None,
                       numbers_match=None, errors=[])
     try:
-        value = json.loads(raw, object_pairs_hook=_unique_object,
-                           parse_constant=lambda x: (_ for _ in ()).throw(ValueError(x)))
+        # Decode the first object only; never salvage nested or competing objects.
+        if not isinstance(raw, str):
+            raise TypeError("Expected text")
+        start = raw.index("{")
+        decoder = json.JSONDecoder(object_pairs_hook=_unique_object,
+                                   parse_constant=lambda x: (_ for _ in ()).throw(ValueError(x)))
+        value, end = decoder.raw_decode(raw, start)
+        if re.search(r"[{}\[\]]", raw[:start] + raw[end:]):
+            raise ValueError("Expected exactly one JSON object")
     except (ValueError, TypeError):
         validation["errors"].append("JSON decoding failed")
         return None, validation
@@ -238,7 +276,7 @@ def consensus(packet, jurors):
 class CortexModel:
     """One SDK request per attempt; our runner owns the bounded retry budget."""
 
-    def __init__(self):
+    def __init__(self, timeout=None):
         from openai import OpenAI
 
         account = os.environ.get("SNOWFLAKE_ACCOUNT", "")
@@ -247,13 +285,17 @@ class CortexModel:
             raise ValueError("Set SNOWFLAKE_ACCOUNT and SNOWFLAKE_PAT")
         if not re.fullmatch(r"[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*", account):
             raise ValueError("SNOWFLAKE_ACCOUNT must be an account identifier")
+        timeout = float(os.environ.get("SNOWFLAKE_TIMEOUT_SECONDS", "300") if timeout is None else timeout)
+        if not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError("Request timeout must be a positive finite number of seconds")
         self.client = OpenAI(api_key=token, base_url=(
             f"https://{account}.snowflakecomputing.com/api/v2/cortex/v1"),
-            max_retries=0, timeout=60)
+            max_retries=0, timeout=timeout)
 
     def __call__(self, model, prompt, temperature):
         response = self.client.chat.completions.create(
-            model=model, messages=[{"role": "user", "content": prompt}], temperature=temperature)
+            model=model, messages=[{"role": "user", "content": prompt}], temperature=temperature,
+            response_format=RESPONSE_FORMAT)
         return response.choices[0].message.content
 
     def close(self):
