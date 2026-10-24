@@ -69,13 +69,36 @@ flowchart TD
 
 ### Identifiers
 
-- **Disease:** Open Targets-supported stable ontology ID (often MONDO or EFO).
-- **Target:** stable protein identifier, with explicit Ensembl ↔ UniProt ↔ STRING mapping where needed.
-- **Candidate:** stable ChEMBL molecule ID; record parent/variant IDs rather than silently merging different molecules.
-- **Network:** one pinned human protein network and an identifier mapping table.
-- **Evidence item:** stable local `E#` ID, source identifier/URL, datatype and original numerical values.
+**Rule: one ID per kind of thing.** Every table, file, API response and join uses only the ID in the "Our ID" column. Other IDs are kept only as lookup columns for talking to a specific source, and are never used as keys. Names and symbols (`JAK1`, `baricitinib`) are display text only and never join anything.
 
-Reject ambiguous mappings instead of silently joining on protein names or drug strings. Mark mapping failures as `unmapped`, and report coverage.
+| Thing | Our ID | Format | Example | Other IDs, used only for lookups |
+|---|---|---|---|---|
+| Disease | Open Targets disease ID, exactly as the API returns it | `^[A-Za-z]+_[0-9]+$` (underscore) | `MONDO_0009693` (plasma cell myeloma) | ChEMBL writes `MONDO:0009693`: replace `:` with `_` before joining |
+| Protein (Target, and every network node) | Ensembl gene ID | `^ENSG[0-9]{11}$` | `ENSG00000162434` (JAK1) | UniProt `P23458` for ChEMBL and RCSB lookups; STRING `9606.ENSP00000499900` while building the network only |
+| Drug (Candidate) | ChEMBL parent molecule ID | `^CHEMBL[0-9]+$` | `CHEMBL2105759` (baricitinib) | Salt and hydrate records, e.g. `CHEMBL1795071` (ruxolitinib phosphate), kept in `source_chembl_ids`; PubChem CID only for drawings |
+| ChEMBL target (bioactivity only) | Not stored: converted to a protein ID straight away | `^CHEMBL[0-9]+$` | `CHEMBL2835` (JAK1, single protein) → `ENSG00000162434` | — |
+| Protein structure (docking) | PDB ID + chain | `^[0-9][A-Z0-9]{3}_[A-Za-z0-9]+$` | `6WTO_A` (JAK2 with baricitinib) | Ligand component ID (`3JW`) stored with the structure |
+| Experiment | UUID | Postgres `gen_random_uuid()` | `3f2c…` | — |
+| Evidence item | `E` + number, unique within one Experiment | `^E[0-9]+$` | `E12` | Each item stores `source`, `source_id`, `url` and `release` |
+| Candidate label in a jury packet | `C` + number, unique within one packet | `^C[0-9]+$` | `C3` | Mapped back to the ChEMBL ID after the vote; never shown to jurors |
+| Data release | Source + version | `source-version` | `opentargets-26.09`, `chembl-37`, `string-12.5` | — |
+
+### How each source maps to our IDs
+
+| Source | What it gives us | How to convert |
+|---|---|---|
+| Open Targets | Disease IDs, Ensembl gene IDs, ChEMBL drug IDs | Already our IDs. For drugs, use `drug.parentMolecule.id` when present, otherwise `drug.id`. |
+| ChEMBL | Molecule, target and disease IDs | Molecule → `molecule_hierarchy.parent_chembl_id`. Target → keep only `SINGLE PROTEIN` targets, take the UniProt accession, then map UniProt → Ensembl gene with Open Targets `target.proteinIds`. Disease → `:` becomes `_`. |
+| STRING | Protein IDs like `9606.ENSP00000499900` | Drop the `9606.` prefix and look up the `ENSP` in Open Targets `target.proteinIds` (source `ensembl_PRO`). Checked: JAK1's list contains `ENSP00000499900`. If several STRING proteins map to one gene, merge their edges into one node. |
+| RCSB PDB | Entries with UniProt accessions | UniProt → Ensembl gene, as above. A structure only belongs to the protein it actually contains: a JAK2 structure is never shown for JAK1. |
+| PubChem | CIDs and 2D drawings | Look up by the ChEMBL InChIKey (`XUZMWHLSFXCVMG-UHFFFAOYSA-N` for baricitinib), never by name |
+
+### Mapping rules
+
+- **Old disease IDs.** IDs change between releases: `EFO_0001378` (multiple myeloma) now returns nothing, and `MONDO_0009693` lists it under `obsoleteTerms`. Always store the current ID, and resolve old ones through `obsoleteTerms`.
+- **Salts.** Merge salts and hydrates into the parent molecule, but never merge two different parents. Open Targets wrongly parents deuruxolitinib phosphate to ruxolitinib, so keep a small override list for known bad links.
+- **No guessing.** If a mapping is missing or ambiguous (one source ID to several of ours, or the other way round), mark the item `unmapped` with the reason, keep it visible, and count it in coverage. Never fall back to matching on names or symbols.
+- **One release at a time.** Every ID is valid for its pinned data release. Record the release with every stored row.
 
 ## 4. The prediction method: network proximity
 
