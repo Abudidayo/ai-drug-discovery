@@ -1,3 +1,5 @@
+import type { components } from "../api/schema";
+
 /**
  * The copy deck: every sentence the interface says, in one place (docs/design.md, "Plain words").
  *
@@ -182,13 +184,10 @@ export function stepCopy(slug: StepSlug): StepCopy {
 }
 
 /**
- * Why a Candidate can't be scored on the protein network.
- *
- * TODO(phase 3b): replace this local union with the generated API type
- * (`components["schemas"]["UnscorableReason"]` in src/api/schema.d.ts) once api/openapi.json
- * exists. The `Record` keeps a new code from compiling until it has wording.
+ * Why a Candidate can't be scored on the protein network. The codes come from the API
+ * contract, so a new code fails to compile until it has wording here.
  */
-export type UnscorableReason = "no_retained_disease_targets" | "no_retained_drug_targets";
+export type UnscorableReason = components["schemas"]["UnscorableReason"];
 
 export const unscorableReasons: Record<UnscorableReason, string> = {
   no_retained_disease_targets:
@@ -196,6 +195,20 @@ export const unscorableReasons: Record<UnscorableReason, string> = {
   no_retained_drug_targets:
     "None of this drug’s targets are human proteins in the network, so it has no place in it.",
 };
+
+/** Why a network score is incomplete or less reliable. Same compile-time guarantee. */
+export type NetworkWarning = components["schemas"]["NetworkWarning"];
+
+export const networkWarnings: Record<NetworkWarning, string> = {
+  zero_null_variance:
+    "Random proteins all landed at the same distance, so closeness can’t be measured. Ranked by distance only.",
+  insufficient_degree_matched_pool:
+    "Too few comparable proteins to compare against, so closeness is less reliable.",
+};
+
+export function networkWarningText(warning: NetworkWarning): string {
+  return networkWarnings[warning];
+}
 
 export function unscorableReasonText(reason: UnscorableReason): string {
   return unscorableReasons[reason];
