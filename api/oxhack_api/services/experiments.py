@@ -5,6 +5,10 @@
 - Jury and docking requests are refused while an Experiment is archived.
 - Archiving is refused while the Experiment is building or a docking job is live.
 - An identical docking computation is reused instead of run twice.
+
+Each change and the job it needs are made in one `repo.locked()` block, so the
+Postgres repo checks the rule, writes the change and queues the job in one
+transaction.
 """
 
 from __future__ import annotations
@@ -12,15 +16,14 @@ from __future__ import annotations
 from uuid import UUID, uuid4
 
 from ..errors import Conflict, NotFound, Unavailable, Unprocessable
-from ..jobs import Runner, build_experiment, run_dock, run_jury, utcnow
-from ..repo import AlreadyExists, Repo
+from ..jobs import JobRef, Runner, pending_jurors, utcnow
+from ..repo import AlreadyExists, DockInputs, DuplicateComputation, Repo
 from ..schemas import (
     DiseaseSearchResult,
     DockJob,
     DockRequest,
     Experiment,
     ExperimentSummary,
-    Juror,
     JuryRun,
 )
 from .docking import DockingBackend, cache_key, unsupported_reason
@@ -75,8 +78,9 @@ class ExperimentService:
             created_at=utcnow(),
             archived_at=None,
         )
-        self.repo.add_experiment(experiment)
-        self.runner.submit(build_experiment(self.repo, self.source, experiment.id))
+        with self.repo.transaction():
+            self.repo.add_experiment(experiment)
+            self.runner.submit(JobRef("experiment_build", experiment.id))
         return experiment
 
     def get(self, experiment_id: UUID) -> Experiment:
@@ -135,10 +139,7 @@ class ExperimentService:
             run = JuryRun(
                 status="queued",
                 models=models,
-                jurors=[
-                    Juror(model_id=m.id, status="pending", attempts=0, latency_ms=None, errors=[])
-                    for m in models
-                ],
+                jurors=pending_jurors(models),
                 votes=[],
                 consensus=None,
                 agreement=None,
@@ -150,12 +151,12 @@ class ExperimentService:
             )
             try:
                 self.repo.add_jury_run(experiment_id, run)
+                self.runner.submit(JobRef("jury_run", experiment_id))
             except AlreadyExists:
                 raise Conflict(
                     "The Model jury has already reviewed this Experiment. Each Experiment has "
                     "one jury review."
                 ) from None
-        self.runner.submit(run_jury(self.repo, self.jury, experiment_id))
         return run
 
     # Docking ----------------------------------------------------------------
@@ -182,9 +183,7 @@ class ExperimentService:
                 raise Unprocessable(reason)
             assert smiles is not None  # unsupported_reason refuses a drug without SMILES
             settings = self.docking.settings_for(structure)
-            key = cache_key(structure, smiles, settings)
-            reused = self.repo.find_reusable_dock_job(key)
-            now = utcnow()
+            inputs = DockInputs(cache_key(structure, smiles, settings), smiles)
             job = DockJob(
                 id=uuid4(),
                 kind="candidate",
@@ -200,26 +199,34 @@ class ExperimentService:
                 error=None,
                 cached_from=None,
                 fixture=self.docking.fixture,
-                created_at=now,
+                created_at=utcnow(),
                 started_at=None,
                 finished_at=None,
             )
-            if reused is not None:
-                # Identical inputs: reuse the result (or the live run) instead of docking again.
-                job = job.model_copy(
-                    update={
-                        "status": reused.status,
-                        "scores": reused.scores,
-                        "files": reused.files,
-                        "fixture": reused.fixture,
-                        "cached_from": reused.id,
-                        "started_at": reused.started_at,
-                        "finished_at": now if reused.status == "done" else None,
-                    }
-                )
-            self.repo.add_dock_job(job, key)
-        if reused is None:
-            self.runner.submit(run_dock(self.repo, self.docking, job.id))
+            reused = self.repo.find_reusable_dock_job(inputs.cache_key)
+            if reused is None:
+                try:
+                    self.repo.add_dock_job(job, inputs)
+                    self.runner.submit(JobRef("dock", job.id))
+                    return job
+                except DuplicateComputation:
+                    # Another request started the same computation since we looked.
+                    reused = self.repo.find_reusable_dock_job(inputs.cache_key)
+                    if reused is None:
+                        raise
+            # Identical inputs: reuse the result (or the live run) instead of docking again.
+            job = job.model_copy(
+                update={
+                    "status": reused.status,
+                    "scores": reused.scores,
+                    "files": reused.files,
+                    "fixture": reused.fixture,
+                    "cached_from": reused.id,
+                    "started_at": reused.started_at,
+                    "finished_at": job.created_at if reused.status == "done" else None,
+                }
+            )
+            self.repo.add_dock_job(job, inputs)
         return job
 
     def get_dock_job(self, job_id: UUID) -> DockJob:

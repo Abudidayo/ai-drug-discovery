@@ -6,6 +6,8 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115",
+  "psycopg-pool>=3.2,<4",
+  "psycopg[binary]>=3.2,<4",
   "pydantic>=2.9",
   "pydantic-settings>=2.6",
   "typing-extensions>=4.12",
@@ -32,6 +34,8 @@ packages = ["oxhack_api"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+# db/ holds migrate.py and the throwaway-Postgres helpers shared with db/tests.
+pythonpath = ["../db"]
 
 [tool.ruff]
 line-length = 100
@@ -48,3 +52,4 @@ pythonVersion = "3.11"
 typeCheckingMode = "strict"
 venvPath = "."
 venv = ".venv"
+extraPaths = ["../db"]

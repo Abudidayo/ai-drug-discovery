@@ -28,7 +28,8 @@ The tests start a temporary Postgres cluster with the local `initdb` and
 `TEST_DATABASE_URL` at a disposable server, such as
 `docker run --rm -e POSTGRES_HOST_AUTH_METHOD=trust -p 5432:5432 postgres:16`
 with `TEST_DATABASE_URL=postgresql://postgres@localhost:5432/postgres`.
-Each test creates and drops its own database there.
+Each test creates and drops its own database there. The helpers live in
+`throwaway_pg.py`, which the API tests (`api/tests`) use too.
 
 ## Rules the schema enforces
 
@@ -37,3 +38,10 @@ Each test creates and drops its own database there.
 - A failed Experiment, job, jury run or docking job must carry an error.
 - At most one queued or running job of each kind per Experiment.
 - One live docking computation per cache key; a repeat request reuses it.
+- An Experiment cannot be archived while it is building or a docking job for
+  it is queued or running, and a docking job cannot be added to an archived or
+  unfinished Experiment (0003 triggers `experiments_archive_guard` and
+  `dock_jobs_experiment_active`). Both lock the Experiment row, so the two
+  cannot race; the API checks the same rules first.
+- Jurors get a row as soon as the jury is asked (`pending`, `running`, then
+  `valid`, `invalid` or `failed`); only valid jurors have `jury_votes`.

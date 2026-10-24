@@ -16,9 +16,12 @@ from oxhack_api.settings import Settings
 
 @pytest.fixture
 def live_client(settings: Settings) -> Iterator[TestClient]:
-    components = build_components(settings)
+    """The app as it runs: a ThreadRunner on memory; on Postgres, the job queue with
+    the worker running in-process."""
+    components = build_components(settings.model_copy(update={"inprocess_worker": True}))
     with TestClient(create_app(components=components)) as client:
         yield client
+    components.close()
 
 
 def poll(fetch: Callable[[], dict[str, Any]], done: Callable[[dict[str, Any]], bool]) -> Any:

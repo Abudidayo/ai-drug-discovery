@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
-from .jobs import Runner
+from .jobs import JobFactory, Runner, ThreadRunner
 from .repo import Repo
 from .services.docking import DockingBackend
 from .services.evaluation import EvaluationSource
@@ -28,6 +28,13 @@ class Components:
     evaluation: EvaluationSource
     molecules: MoleculeSource
     runner: Runner
+    jobs: JobFactory
+
+    def close(self) -> None:
+        """Stop in-process jobs and release the repo's connections."""
+        if isinstance(self.runner, ThreadRunner):
+            self.runner.shutdown()
+        self.repo.close()
 
 
 def get_components(request: Request) -> Components:

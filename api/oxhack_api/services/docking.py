@@ -17,6 +17,7 @@ from uuid import UUID
 
 from pydantic import Field
 
+from ..repo.base import DockInputs
 from ..schemas import (
     Candidate,
     CandidateId,
@@ -50,8 +51,8 @@ class DockingBackend(Protocol):
         """The SMILES docked for a drug, or None when it cannot be docked."""
         ...
 
-    def seed_jobs(self) -> list[tuple[DockJob, str]]:
-        """Results computed ahead of time (docs/build-reference.md C9), with cache keys."""
+    def seed_jobs(self) -> list[tuple[DockJob, DockInputs]]:
+        """Results computed ahead of time (docs/build-reference.md C9), with their inputs."""
         ...
 
     def dock(self, job: DockJob) -> DockSteps: ...
@@ -142,8 +143,8 @@ class FixtureDocking:
     def ligand_smiles(self, candidate_id: str) -> str | None:
         return self._data.smiles.get(candidate_id)
 
-    def seed_jobs(self) -> list[tuple[DockJob, str]]:
-        seeded: list[tuple[DockJob, str]] = []
+    def seed_jobs(self) -> list[tuple[DockJob, DockInputs]]:
+        seeded: list[tuple[DockJob, DockInputs]] = []
         for control in self._data.controls:
             structure = self.structure(control.structure_id)
             smiles = self.ligand_smiles(control.candidate_id)
@@ -169,7 +170,7 @@ class FixtureDocking:
                 started_at=self.seeded_at,
                 finished_at=self.seeded_at,
             )
-            seeded.append((job, cache_key(structure, smiles, settings)))
+            seeded.append((job, DockInputs(cache_key(structure, smiles, settings), smiles)))
         return seeded
 
     def dock(self, job: DockJob) -> DockSteps:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
@@ -20,13 +20,18 @@ from ..schemas import (
     JuryRun,
     NetworkGraph,
 )
-from .base import AlreadyExists
+from .base import AlreadyExists, DockInputs, DuplicateComputation
 
 
 @dataclass
 class _DockRow:
     job: DockJob
-    cache_key: str
+    inputs: DockInputs
+
+    @property
+    def computes(self) -> bool:
+        """True while this job computes its cache key itself (the live-computation rule)."""
+        return self.job.cached_from is None and self.job.status != "failed"
 
 
 class MemoryRepo:
@@ -39,9 +44,17 @@ class MemoryRepo:
         self._dock: dict[UUID, _DockRow] = {}
 
     @contextmanager
-    def locked(self, experiment_id: UUID) -> Generator[None]:
+    def transaction(self) -> Generator[None]:
+        # The lock keeps other threads from seeing the unit half done. Unlike
+        # Postgres, writes made before an error are not rolled back.
         with self._lock:
             yield
+
+    def locked(self, experiment_id: UUID) -> AbstractContextManager[None]:
+        return self.transaction()
+
+    def close(self) -> None:
+        pass
 
     # Experiments ------------------------------------------------------------
 
@@ -140,11 +153,17 @@ class MemoryRepo:
 
     # Docking ----------------------------------------------------------------
 
-    def add_dock_job(self, job: DockJob, cache_key: str) -> None:
+    def add_dock_job(self, job: DockJob, inputs: DockInputs) -> None:
         with self._lock:
             if job.id in self._dock:
                 raise AlreadyExists(f"docking job {job.id}")
-            self._dock[job.id] = _DockRow(job.model_copy(deep=True), cache_key)
+            row = _DockRow(job.model_copy(deep=True), inputs)
+            if row.computes and any(
+                other.computes and other.inputs.cache_key == inputs.cache_key
+                for other in self._dock.values()
+            ):
+                raise DuplicateComputation(f"a live docking job computes {inputs.cache_key}")
+            self._dock[job.id] = row
 
     def get_dock_job(self, job_id: UUID) -> DockJob | None:
         with self._lock:
@@ -158,13 +177,8 @@ class MemoryRepo:
     def find_reusable_dock_job(self, cache_key: str) -> DockJob | None:
         with self._lock:
             for row in self._dock.values():
-                job = row.job
-                if (
-                    row.cache_key == cache_key
-                    and job.cached_from is None
-                    and job.status != "failed"
-                ):
-                    return job.model_copy(deep=True)
+                if row.inputs.cache_key == cache_key and row.computes:
+                    return row.job.model_copy(deep=True)
             return None
 
     def list_dock_jobs_cached_from(self, job_id: UUID) -> list[DockJob]:

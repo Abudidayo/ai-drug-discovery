@@ -7,9 +7,10 @@ for every request and response; `openapi.json` is generated from it and the
 web app's TypeScript types are generated from that.
 
 Today the API runs in **fixture mode**: Experiments, jury reviews, structures
-and docking results come from `oxhack_api/fixtures/`, and everything is kept in
-memory. Postgres storage (phase 4), the live pipeline (phase 5), the live jury
-(phase 6) and the docking worker (phase 7) plug into the same seams.
+and docking results come from `oxhack_api/fixtures/`. They are kept in memory
+by default, or saved in Postgres with `OXHACK_REPO=postgres` (see below). The
+live pipeline (phase 5), the live jury (phase 6) and the docking worker
+(phase 7) plug into the same seams.
 
 ## Run
 
@@ -23,7 +24,88 @@ uv run uvicorn oxhack_api.app:app --reload     # http://127.0.0.1:8000/docs
 |---|---|---|
 | `OXHACK_FIXTURE_DELAY_MS` | `400` | Pause between background job steps, so the UI can show progress. |
 | `OXHACK_FIXTURES_DIR` | `oxhack_api/fixtures` | Folder holding the fixture files. |
-| `OXHACK_WORKER_THREADS` | `4` | Threads for in-process background jobs. |
+| `OXHACK_WORKER_THREADS` | `4` | Threads that run background jobs, in the API or in the worker. |
+| `OXHACK_REPO` | `memory` | `memory` (lost on restart) or `postgres`. |
+| `OXHACK_DATABASE_URL` | none | Postgres connection string; required with `OXHACK_REPO=postgres`. |
+| `OXHACK_DATABASE_POOL_SIZE` | `10` | Most Postgres connections one process opens. |
+| `OXHACK_INPROCESS_WORKER` | `1` | With Postgres, also run the job worker inside the API. Set `0` when `python -m oxhack_api.worker` runs. |
+| `OXHACK_WORKER_POLL_MS` | `1000` | How often an idle worker checks for jobs it was not notified about. |
+| `OXHACK_JOB_HEARTBEAT_S` | `10` | How often a worker refreshes the heartbeat of the jobs it runs. |
+| `OXHACK_JOB_STALE_AFTER_S` | `60` | A running job with an older heartbeat lost its worker and is re-queued. |
+| `OXHACK_JOB_MAX_ATTEMPTS` | `3` | Claims of one job before a stale one is failed instead of re-queued. |
+
+## Run against Postgres
+
+The app never migrates the database; migrate it first. Never point tests or
+local runs at the Tiger service. A throwaway local Postgres 16:
+
+```sh
+# From the repository root. Any free port works; 5433 avoids a system Postgres.
+initdb -D /tmp/oxhack-pg -U postgres -A trust
+pg_ctl -D /tmp/oxhack-pg -o "-p 5433 -c listen_addresses=localhost" -l /tmp/oxhack-pg/log -w start
+createdb -h localhost -p 5433 -U postgres oxhack
+DATABASE_URL=postgresql://postgres@localhost:5433/oxhack uv run db/migrate.py
+```
+
+Or with Docker: `docker run --rm -d --name oxhack-pg -e POSTGRES_HOST_AUTH_METHOD=trust
+-p 5433:5432 postgres:16`, then the same `createdb` and `migrate.py` lines.
+
+Then start the API on it:
+
+```sh
+cd api
+OXHACK_REPO=postgres \
+OXHACK_DATABASE_URL=postgresql://postgres@localhost:5433/oxhack \
+uv run uvicorn oxhack_api.app:app --reload
+```
+
+Experiments, jury runs and docking jobs now survive a restart. The API refuses
+to start on a database that is missing a migration, and says to run
+`uv run db/migrate.py`. Stop the throwaway server with
+`pg_ctl -D /tmp/oxhack-pg stop` and delete the folder.
+
+## Background jobs
+
+Building an Experiment, running the Model jury and docking are background
+jobs. With the memory repo they run on threads inside the API. With Postgres
+they are rows in a queue, written in the same transaction as the change that
+needs them:
+
+- **`jobs`** holds Experiment builds (`experiment_build`) and jury runs
+  (`jury_run`); at most one queued or running job of each kind per Experiment.
+- **`dock_jobs`**: each docking job's own row is its queue entry. A job that
+  reuses an identical computation (`cached_from`) is not queued; it follows the
+  job it reuses.
+
+A worker claims the oldest queued row with `FOR UPDATE SKIP LOCKED`, so several
+workers never take the same job, and Postgres `NOTIFY` wakes it when a job is
+committed. By default the worker runs inside the API (`OXHACK_INPROCESS_WORKER=1`).
+To run it as its own process, or several of them:
+
+```sh
+cd api
+OXHACK_REPO=postgres OXHACK_DATABASE_URL=postgresql://postgres@localhost:5433/oxhack \
+uv run python -m oxhack_api.worker      # stops on Ctrl-C or SIGTERM
+```
+
+and start the API with `OXHACK_INPROCESS_WORKER=0`.
+
+Job states (both tables):
+
+| State | Meaning |
+|---|---|
+| `queued` | Waiting for a worker. |
+| `running` | Claimed: `attempts` went up by one, `started_at` and `heartbeat_at` are set. The worker writes `progress` (e.g. `{"stage": "ranking"}`, `{"jurors_done": 1, "jurors_total": 3}`) and the heartbeat after each step, and refreshes the heartbeat every `OXHACK_JOB_HEARTBEAT_S` while a step runs. |
+| `done` | Finished. The Experiment, jury run or docking job holds the result. |
+| `failed` | Finished with `error`, the same reason the Experiment, jury run or docking job shows. |
+
+A `running` job whose heartbeat is older than `OXHACK_JOB_STALE_AFTER_S` lost
+its worker. Workers put it back to `queued` when they start and then every
+half of that period; after `OXHACK_JOB_MAX_ATTEMPTS` claims it is `failed`
+instead, and so is its Experiment build, jury run or docking job. A worker that
+is stopped between steps puts its job back at once. Jobs are safe to run again:
+a rebuild replaces what an interrupted one left, and a jury run starts from the
+first juror.
 
 ## Test and check
 
@@ -33,6 +115,14 @@ uv run ruff check .
 uv run ruff format --check .
 uv run pyright
 ```
+
+Every test that uses the API client runs twice: on the memory repo and on
+Postgres, each time in a fresh migrated database cloned from a template.
+`tests/test_postgres.py` adds what only Postgres has: restarts, the job queue,
+`SKIP LOCKED`, stale jobs and races. The database comes from
+`db/throwaway_pg.py` (shared with `db/tests`): a temporary cluster started
+with the local `initdb` and `pg_ctl`, or the disposable server in
+`TEST_DATABASE_URL`. Without either, the Postgres runs are skipped.
 
 ## Export the contract
 

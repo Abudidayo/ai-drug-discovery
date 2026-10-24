@@ -1,4 +1,4 @@
-"""The storage seam. `MemoryRepo` implements it now; a Postgres repo follows in phase 4.
+"""The storage seam, implemented by `MemoryRepo` and `PostgresRepo`.
 
 Each method maps onto the tables in `db/migrations/`:
 
@@ -9,13 +9,16 @@ Each method maps onto the tables in `db/migrations/`:
 
 The service checks rules (archived, already asked, job still running) and then
 writes. `locked()` makes that check-then-write atomic: the memory repo holds a
-lock, and the Postgres repo will open a transaction and lock the Experiment row
-with `SELECT ... FOR UPDATE`.
+lock; the Postgres repo opens a transaction and locks the Experiment row with
+`SELECT ... FOR UPDATE`, and its triggers refuse the same changes again.
+
+Background jobs are queued by the `Runner` (see `jobs.py`), not here.
 """
 
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 from uuid import UUID
@@ -37,9 +40,32 @@ class AlreadyExists(Exception):
     """A row with this key exists already (a primary key or unique violation)."""
 
 
+class DuplicateComputation(AlreadyExists):
+    """Another live docking job already computes this cache key; reuse it instead."""
+
+
+@dataclass(frozen=True)
+class DockInputs:
+    """What a docking job is stored with beyond the `DockJob` the API shows."""
+
+    cache_key: str
+    """SHA-256 of everything that decides the result (`services.docking.cache_key`)."""
+    ligand_smiles: str
+    """The SMILES that is docked."""
+
+
 class Repo(Protocol):
+    def transaction(self) -> AbstractContextManager[None]:
+        """Run the enclosed calls as one unit: all of them are saved, or none."""
+        ...
+
     def locked(self, experiment_id: UUID) -> AbstractContextManager[None]:
-        """Hold the Experiment still while a rule is checked and the change written."""
+        """A transaction that also holds the Experiment still while a rule is checked
+        and the change written."""
+        ...
+
+    def close(self) -> None:
+        """Release connections. The repo cannot be used afterwards."""
         ...
 
     # Experiments ------------------------------------------------------------
@@ -70,7 +96,10 @@ class Repo(Protocol):
         targets: list[DiseaseTarget],
         network: NetworkGraph,
         candidates: list[Candidate],
-    ) -> None: ...
+    ) -> None:
+        """Replace the Experiment's Targets, network and Candidates (a rerun of a build
+        overwrites what an interrupted one left)."""
+        ...
 
     def set_archived_at(self, experiment_id: UUID, archived_at: datetime | None) -> None: ...
 
@@ -84,14 +113,17 @@ class Repo(Protocol):
 
     # Docking ----------------------------------------------------------------
 
-    def add_dock_job(self, job: DockJob, cache_key: str) -> None:
-        """Insert a job. In Postgres a second live job computing the same cache key
-        violates `dock_jobs_cache_key_live_idx`; the caller then reuses the first."""
+    def add_dock_job(self, job: DockJob, inputs: DockInputs) -> None:
+        """Insert a job. Raise DuplicateComputation when it would compute a cache key
+        that a live job (queued, running or done, not itself reusing one) already
+        computes; the caller then reuses that job."""
         ...
 
     def get_dock_job(self, job_id: UUID) -> DockJob | None: ...
 
-    def update_dock_job(self, job: DockJob) -> None: ...
+    def update_dock_job(self, job: DockJob) -> None:
+        """Save the job's progress and results (status, scores, files, error, times)."""
+        ...
 
     def find_reusable_dock_job(self, cache_key: str) -> DockJob | None:
         """The job that computes this cache key itself and has not failed, if any."""

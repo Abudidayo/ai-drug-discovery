@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from uuid import uuid4
 
+import pytest
 from conftest import (
     BARICITINIB,
     REMDESIVIR,
@@ -18,6 +19,7 @@ from conftest import (
 )
 from fastapi.testclient import TestClient
 
+from oxhack_api.repo import Repo
 from oxhack_api.schemas import DockJob, Structure
 from oxhack_api.services.docking import (
     DockingFailed,
@@ -221,3 +223,31 @@ def test_a_failed_docking_job_reports_why_and_is_not_reused(
     assert retry["cached_from"] is None
     # The rest of the Experiment stays saved.
     assert client.get(f"/api/experiments/{experiment_id}").json()["status"] == "ready"
+
+
+def test_a_racing_duplicate_reuses_the_job_that_won(
+    client: TestClient, runner: SteppedRunner, repo: Repo, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Another request starts the same computation between our lookup and our insert:
+    the repo refuses a second live computation and the request follows the first."""
+    first_experiment = ready_experiment(client, runner)["id"]
+    second_experiment = ready_experiment(client, runner)["id"]
+    first = dock(client, first_experiment, RUXOLITINIB, "6WTN_A").json()
+
+    lookups: list[str] = []
+    find = repo.find_reusable_dock_job
+
+    def stale_first_lookup(cache_key: str) -> DockJob | None:
+        lookups.append(cache_key)
+        return None if len(lookups) == 1 else find(cache_key)
+
+    monkeypatch.setattr(repo, "find_reusable_dock_job", stale_first_lookup)
+    response = dock(client, second_experiment, RUXOLITINIB, "6WTN_A")
+    assert response.status_code == 202, response.text
+    second = response.json()
+    assert len(lookups) == 2, "looked again after the duplicate was refused"
+    assert second["cached_from"] == first["id"]
+    assert second["status"] == "queued"
+    assert len(runner.jobs) == 1, "the computation runs once"
+    jobs = client.get(f"/api/experiments/{second_experiment}").json()["dock_jobs"]
+    assert [j["id"] for j in jobs] == [second["id"]]

@@ -306,3 +306,127 @@ def test_one_live_docking_computation_per_cache_key(migrated: str) -> None:
         assert failed != original
         with pytest.raises(errors.UniqueViolation):
             conn.execute(insert, (key, "queued", None, None))
+
+
+# ---------------------------------------------------------------------------
+# 0003: archive and docking guards, juror progress
+# ---------------------------------------------------------------------------
+
+
+def _queue_dock_job(conn: psycopg.Connection, experiment_id: uuid.UUID) -> None:
+    conn.execute(
+        """insert into dock_jobs (experiment_id, candidate_id, target_id, structure_id, ligand_smiles, settings, cache_key)
+           values (%s, 'CHEMBL2105759', 'ENSG00000096968', '6WTO_A', 'C', '{}', %s)""",
+        (experiment_id, uuid.uuid4().hex * 2),
+    )
+
+
+def test_archive_is_refused_while_a_dock_job_is_live(migrated: str) -> None:
+    with psycopg.connect(migrated) as conn:
+        experiment_id = _experiment(conn)
+        _candidate(conn, experiment_id)
+        _queue_dock_job(conn, experiment_id)
+        conn.commit()
+        with pytest.raises(
+            errors.CheckViolation, match="still being computed"
+        ) as refused:
+            conn.execute(
+                "update experiments set archived_at = now() where id = %s",
+                (experiment_id,),
+            )
+        assert refused.value.diag.constraint_name == "experiments_archive_guard"
+        conn.rollback()
+        conn.execute(
+            "update dock_jobs set status = 'done' where experiment_id = %s",
+            (experiment_id,),
+        )
+        conn.execute(
+            "update experiments set archived_at = now() where id = %s", (experiment_id,)
+        )
+
+
+def test_archive_is_refused_while_building(migrated: str) -> None:
+    with (
+        psycopg.connect(migrated) as conn,
+        pytest.raises(errors.CheckViolation, match="still being built"),
+    ):
+        experiment_id = _experiment(conn, status="building", stage="ranking")
+        conn.execute(
+            "update experiments set archived_at = now() where id = %s", (experiment_id,)
+        )
+
+
+def test_docking_is_refused_for_an_archived_experiment(migrated: str) -> None:
+    with psycopg.connect(migrated) as conn:
+        experiment_id = _experiment(conn)
+        _candidate(conn, experiment_id)
+        conn.execute(
+            "update experiments set archived_at = now() where id = %s", (experiment_id,)
+        )
+        with pytest.raises(errors.CheckViolation, match="archived") as refused:
+            _queue_dock_job(conn, experiment_id)
+        assert refused.value.diag.constraint_name == "dock_jobs_experiment_active"
+
+
+def test_archive_waits_for_a_docking_insert_and_then_sees_it(migrated: str) -> None:
+    """The insert share-locks the Experiment row, so a concurrent archive blocks until
+    the docking job commits and is then refused, instead of missing it."""
+    with psycopg.connect(migrated, autocommit=True) as setup:
+        experiment_id = _experiment(setup)
+        _candidate(setup, experiment_id)
+    outcome: list[BaseException | None] = []
+    with psycopg.connect(migrated) as docking, psycopg.connect(migrated) as archiving:
+        _queue_dock_job(docking, experiment_id)  # not committed yet
+
+        def archive() -> None:
+            try:
+                archiving.execute(
+                    "update experiments set archived_at = now() where id = %s",
+                    (experiment_id,),
+                )
+                outcome.append(None)
+            except BaseException as exc:  # noqa: BLE001 - checked below
+                outcome.append(exc)
+
+        thread = threading.Thread(target=archive)
+        thread.start()
+        thread.join(0.3)
+        assert thread.is_alive(), "archive waits for the docking transaction"
+        docking.commit()
+        thread.join(10)
+    [error] = outcome
+    assert isinstance(error, errors.CheckViolation)
+    assert error.diag.constraint_name == "experiments_archive_guard"
+
+
+def test_jurors_record_progress_and_never_asked_failures(migrated: str) -> None:
+    with psycopg.connect(migrated) as conn:
+        experiment_id = _experiment(conn)
+        insert = """insert into jurors (experiment_id, model_id, status, attempts)
+                    values (%s, %s, %s, %s)"""
+        conn.execute(insert, (experiment_id, "claude-sonnet-5", "pending", 0))
+        conn.execute(insert, (experiment_id, "openai-gpt-5.4", "running", 0))
+        conn.execute(insert, (experiment_id, "glm-5.3", "failed", 0))
+        assert conn.execute(
+            "select presented_order, validation from jurors where model_id = 'glm-5.3'"
+        ).fetchone() == ([], {})
+        with pytest.raises(errors.CheckViolation):
+            conn.execute(insert, (experiment_id, "other-model", "valid", 0))
+
+
+def test_a_vote_may_have_no_packet_label(migrated: str) -> None:
+    with psycopg.connect(migrated) as conn:
+        experiment_id = _experiment(conn)
+        _candidate(conn, experiment_id)
+        conn.execute(
+            """insert into jurors (experiment_id, model_id, status, attempts)
+               values (%s, 'glm-5.3', 'valid', 1)""",
+            (experiment_id,),
+        )
+        conn.execute(
+            """insert into jury_votes (experiment_id, model_id, candidate_id, rank, decision,
+                 direction, rationale, objection, safety)
+               values (%s, 'glm-5.3', 'CHEMBL2105759', 1, 'watch', 'unknown', 'r', 'o',
+                 '{"status": "unknown", "evidence_ids": []}')""",
+            (experiment_id,),
+        )
