@@ -61,7 +61,7 @@ flowchart TD
 | **Open Targets Platform** | Map Disease IDs; obtain Disease–Target association records and source-level evidence; provide clinical context where appropriate | Its association score is not a probability that a drug will treat a Disease |
 | **ChEMBL** | Map approved small-molecule Candidates to measured or documented Targets and bioactivity; retrieve molecule structure identifiers | An assay measurement alone does not establish effective action in patients |
 | **STRING** | Human protein-association network; start with documented high-confidence experimental interactions, with physical/functional edge type recorded | A network edge does not guarantee direct physical binding or therapeutically useful causality |
-| **Regulatory source, such as FDA/EMA records** | Verify approval status and display safety documentation | Missing warnings do not mean a Candidate is safe |
+| **Regulator-backed approval records** (FDA, EMA, PMDA, DailyMed, read through Open Targets clinical reports) | Verify approval status and display safety documentation | Missing warnings do not mean a Candidate is safe |
 | **PubChem** | 2D molecular drawings and structure identifiers, when available | A drawing does not establish activity |
 | **RCSB PDB** | Experimental protein structures and co-crystal controls for docking | A structure and predicted binding pose do not prove treatment efficacy |
 
@@ -87,10 +87,11 @@ Reject ambiguous mappings instead of silently joining on protein names or drug s
 2. Retain only proteins that can be mapped to the Target identifiers used by Open Targets and ChEMBL.
 3. Store the graph as versioned edge lists and a sparse adjacency representation (SciPy); record isolated and disconnected nodes.
 4. Validate basic properties: node/edge counts, duplicate edges, self-loops, mapping rates and connected-component sizes.
+5. **Precompute distances once.** Compute all-pairs shortest-path distances on the pinned graph (unweighted, e.g. SciPy `csgraph.shortest_path` run in row chunks) and store them as a `uint8` matrix of about n² bytes (roughly 360 MB for 19,000 proteins). Ranking a Disease, including the degree-matched random samples, then needs only lookups; nothing is recomputed per request.
 
 ### 4.2 Build the Candidate universe
 
-1. Assemble a reusable list of **existing approved drugs** backed by a suitable regulator record. Regulatory verification is distinct from merely observing a high ChEMBL phase or an Open Targets stage.
+1. Assemble a reusable list of **existing approved drugs**. Keep a drug only if Open Targets lists an indication at `APPROVAL` whose clinical reports include a regulator source: `FDA`, `EMA Human Drugs`, `PMDA` or `DailyMed` (checked on release 26.09; see `plan.md` step A6). Stage fields alone are not enough: Open Targets lists navitoclax at `APPROVAL`, but it has never been approved.
 2. Map each eligible drug to its supported human Targets using documented mechanism evidence; add ChEMBL bioactivity links only under a predeclared assay/target-quality rule.
 3. Record Target type, evidence provenance, action type when known, and the number of supported Targets.
 4. Keep Candidates even when they are not network-scorable, but mark that status. Do not assign missing Candidates a network score of zero.
@@ -98,7 +99,7 @@ Reject ambiguous mappings instead of silently joining on protein names or drug s
 ### 4.3 Rank a Disease
 
 1. Resolve the Disease to its identifier.
-2. Select Disease Targets using **non-treatment-derived evidence**. Freeze an explicit threshold or top-`k` rule; show which Targets were selected.
+2. Select Disease Targets with one fixed rule: the **top 50 Targets by `evidence_only` association score**. These are Open Targets scores recomputed without trial-derived `clinical_precedence` and drug-naming `cancer_biomarkers` evidence (`plan.md` step A3). Keep only Targets that map into the network, and show which were selected. In the pilot only, check sensitivity with the top 25 and top 100, then freeze the rule before the final test.
 3. For each drug, calculate the average minimum shortest-path distance between its mapped Targets and the Disease Target set:
 
    \[
@@ -163,7 +164,7 @@ Rank **the same eligible universe** using:
 
 **Question:** On **exactly the same frozen panel** of 15 Candidates per Disease, does the Model jury improve rank quality or expose unsupported assumptions?
 
-- Generate candidate panels under a declared procedure; keep them identical across all jury configurations and direct/network baselines.
+- Build each panel as **one true drug plus 14 popularity-matched approved decoys** that have no record for that Disease, drawn with a fixed seed. Keep panels identical across all jury configurations and direct/network baselines. Chance levels for 15 Candidates: Hits@5 = 33% (5 ÷ 15) and MRR ≈ 0.22.
 - Compare direct-evidence ordering, network ordering, independent jury consensus, and an explicitly declared combination *only if one is later designed and validated*.
 - Report Hits@5 and MRR, citation-ID validity, structural claim checks, and an independently selected manual audit of scientific claims.
 - Explicitly measure **selection recall** separately: the jury cannot recover a Candidate absent from the panel.
@@ -275,16 +276,15 @@ Keep large graph arrays, source Parquet and pose files in files/object storage; 
 
 ## 10. Team ownership
 
-Adapt names to actual team membership, but make each interface owned by one person.
+Three workstreams; assign names later. Each interface has one owner.
 
 | Workstream | Owner delivers | First integration test |
 |---|---|---|
-| **A — Biomedical data** | Open Targets/ChEMBL/STRING ingestion, regulator checks, stable IDs, source evidence and fixtures | One Disease → mapped Targets and approved Candidates with real citations |
-| **B — Prediction + evaluation** | Graph construction, network-proximity algorithm, baselines, coverage report, frozen retrieval evaluation | Same input produces reproducible ranked Candidates and baseline comparison |
-| **C — Jury + scientific review** | Cortex client, reviewer schema, claim validation, agreement and critical-analysis UI data | Three jurors independently evaluate one saved 15-Candidate packet |
-| **D — Product + docking/infrastructure** | FastAPI integration, Tiger schema, React views, Vina worker/3D viewer, Vultr deployment | Saved Experiment shows Candidates and one verifiable docking result |
+| **A — Biomedical data + jury** | Open Targets, ChEMBL and STRING ingestion; regulator-backed approved-drug list; stable IDs; the Disease Target rule; evidence packets and fixtures. Then the Cortex jury client, reviewer schema, claim validation and agreement data. | One Disease → mapped Targets and approved Candidates with real citations; three jurors review one saved 15-Candidate packet |
+| **B — Prediction + evaluation** | Graph construction, the precomputed distance matrix, the network-proximity algorithm, baselines, coverage report, frozen retrieval and re-ranking evaluation | The same input produces reproducible ranked Candidates and a baseline comparison |
+| **C — Product + docking/infrastructure** | FastAPI integration, Tiger schema, React views, Vina worker and 3D viewer, Vultr deployment | A saved Experiment shows Candidates and one verifiable docking result |
 
-**Parallelism:** A and B agree identifiers/fixtures immediately; C can develop against frozen fixtures; D can scaffold frontend, history and docking preparation without waiting for model results. If staffing allows, split docking from product/deployment; otherwise make docking a bounded, cached demonstration.
+**Parallelism:** A and B agree identifiers and fixtures first. B then builds the graph and distance matrix while A builds the evidence pipeline. A develops the jury against frozen fixture packets. C scaffolds the frontend, history and docking preparation without waiting for model results. Keep docking a bounded, cached demonstration.
 
 ## 11. Milestones and acceptance tests
 
