@@ -85,8 +85,9 @@ S = Σᵢ(Rᵢ − m(n+1)/2)² and Kendall's W = 12S / [m²(n³ − n)], rounded
 decimals; W is null below two valid jurors. `contested` means valid jurors gave
 different decisions. Here the points are 6, 3, 3, 0, W is 0.9000, and C3 is
 contested. The invalid juror supplies no vote. Reviews are examples, not model
-calls. **All three model IDs are placeholders until checked in the Snowflake
-account.**
+calls. **All three model IDs were checked in the team's Snowflake account: each
+answered through `AI_COMPLETE`** (Anthropic, OpenAI and Zhipu `glm-5.3`;
+`glm-5.3` replaced `llama3.1-8b`, which is too small for this review).
 
 Live verification on 2026-10-24 (no credentials):
 
