@@ -6,4 +6,6 @@ vina==1.2.7
 meeko==0.8.0
 rdkit==2026.9.1
 gemmi==0.7.5
+# Meeko imports SciPy without declaring it.
+scipy
 posebusters==0.6.5
