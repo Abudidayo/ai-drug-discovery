@@ -14,7 +14,7 @@ The default is a local CLI installation with shared repository learnings:
 | Data | Location | Handling |
 | --- | --- | --- |
 | Project decisions, contracts and discoveries | Repository's `.trail/` | Review and share through Git |
-| Generated code map | Each clone's `graft/` | Keep locally ignored |
+| Generated code map | Each clone's `.trail/cache/` (older versions: `graft/`) | Keep locally ignored |
 | Personal preferences and machine setup | Each person's `~/.trail/` | Keep private; do not copy into the repository |
 
 Use `--local-only` only when the user wants repository learnings kept out of
@@ -39,8 +39,11 @@ commits as well. Keep the skill's existing name for compatibility.
    to both the preview and the actual setup command. A preview does not change
    the helper's ignore rules.
 4. Run `sh <skill-base-dir>/scripts/trail-init-local.sh` with the selected flags.
-   Both modes initialize the two agents and locally exclude `/graft/` using
+   Both modes initialize project instructions for the two agents and locally exclude legacy `/graft/` using
    `git rev-parse --git-path info/exclude`.
+   Current Trail versions ignore `.trail/cache/` through `.trail/.gitignore`.
+   `--no-global` skips user-level MCP registration and lifecycle hooks; the
+   agents can use Trail through the CLI and repository instructions.
    Team mode removes the exact legacy `.trail/` and `/.trail/` entries from
    that file, preserving unrelated rules. It reports a failure if another rule
    still blocks repository learnings, rather than silently changing shared or
@@ -49,7 +52,7 @@ commits as well. Keep the skill's existing name for compatibility.
    files private. Repeated setup does not add duplicate exclude entries.
 5. Inspect `git status --short`, `git diff`,
    `git ls-files -- graft .trail` and
-   `git check-ignore -v -- graft/ .trail/`. Excludes do not hide already
+   `git check-ignore -v -- graft/ .trail/cache/ .trail/`. Excludes do not hide already
    tracked data or changes to tracked integration files. In team mode, verify
    that `.trail/learnings/` is available to Git and review the learnings before
    proposing a commit. Report exactly what changed, which data remains tracked
@@ -62,7 +65,8 @@ them available for review. Do not report failed initialization as success.
 
 The setup makes repository learnings available for sharing; it does not publish
 them. Actual sharing happens when the user commits and pushes reviewed `.trail/`
-files. Each teammate installs Trail locally and builds their own code map.
+files. Each teammate's agent installs Trail locally and builds their own code
+map when asked to follow `skills.md`.
 Personal data in `~/.trail/` is left untouched. Git linked worktrees share the
 clone's `info/exclude`, so changing modes affects all of that clone's worktrees.
 

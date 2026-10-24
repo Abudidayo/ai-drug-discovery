@@ -3,7 +3,7 @@
 Use [skills.md](../skills.md) for installation, usage and the skill list.
 This guide records sources, adaptations and technical details.
 
-The fourteen selected skills are stored in `skills/`. These are actual copies,
+The fifteen selected skills are stored in `skills/`. These are actual copies,
 including their supporting resources, with no dependency on the original
 author's home directory. `.claude/skills/` contains relative aliases to the same
 folders, following the nv-fabric layout.
@@ -24,14 +24,23 @@ folders, following the nv-fabric layout.
 | `code-review` | Review the diff against standards and the originating spec | Adapted from nv-fabric to work without its tracker setup |
 | `break-ui` | Stress-test UI with realistic worst-case data and states | Existing personal skill, including its edge-case catalog |
 | `i-have-adhd` | Action-first responses, numbered steps and visible progress | Installed ayghri/i-have-adhd plugin 0.4.1; [upstream](https://github.com/ayghri/i-have-adhd); included MIT license |
+| `caveman` | Concise answers with exact code, commands and technical facts | [JuliusBrussee/caveman v4.0.1](https://github.com/JuliusBrussee/caveman/tree/v4.0.1/skills/caveman), commit `d262ab3882952a59312ff3537cd86d894523c5ab`; included Apache 2.0 license and upstream notices |
 
 ## Use and share
 
 The agent installation entry point is [skills.md](../skills.md). Give the agent
-the complete bundle and say: **Read `skills.md` and install all 14 skills in this
-project.** The included `.agents/install-skills.py` copies all supporting files,
+the complete bundle and say: **Read `skills.md` and set everything up.**
+The included `.agents/install-skills.py` copies all supporting files,
 keeps identical existing skills, reports conflicting definitions before copying,
 and creates Claude Code aliases (or copies if symlinks are unavailable).
+It also appends a normal Caveman default to the project's `AGENTS.md` and
+`CLAUDE.md`, preserving existing content and avoiding duplicate blocks.
+The same files suppress Trail closing lines. A shared standing preference is
+also installed in `.trail/learnings/` so Trail's startup guidance carries the
+team's choice. Existing learnings are never overwritten. Restart existing
+agent sessions to load it; Trail's code map and learning workflows stay active.
+
+Check the installer with `python3 .agents/test_install_skills.py`.
 
 Keep both `.agents/` and `.claude/skills/` when copying this bundle to another
 repository. Review any existing folders before copying; do not overwrite a
@@ -83,13 +92,24 @@ Runtime notes:
   metadata, Gemini command template and upstream license. This bundle contains
   the command skill; the plugin's always-on hooks and personal plugin data
   are not included.
+- Caveman includes the upstream `caveman` skill and its license notices.
+  The installer makes normal Caveman automatic in project sessions through
+  `AGENTS.md` and `CLAUDE.md`; no command or global hook is needed.
+  Requests for detail remain supported. Say `stop caveman` or `normal mode`
+  to disable it for the current session. Its optional
+  `ultracave` and `megacave` sibling skills, runtime, proxy and startup hooks
+  are not part of this pack.
 - Trail-Code is installed separately on each teammate's machine. The bundled
   helper previews changes with `--dry-run`, initializes repository wiring with
-  `--no-global` and keeps `graft/` in local Git excludes. Its default team mode
-  leaves `.trail/` available for review and sharing through Git, and removes
+  `--no-global` and keeps legacy `graft/` in local Git excludes. Current Trail
+  versions ignore their map at `.trail/cache/` through `.trail/.gitignore`.
+  Its default team mode leaves learnings available for review and sharing through Git, and removes
   the helper's legacy `.trail/` exclusions. Personal preferences stay in each
-  person's `~/.trail/`. Copying this skill does not initialize Trail or publish
-  learnings; those are separate actions.
+  person's `~/.trail/`. The installer copies files only; `skills.md` then tells
+  the agent to initialize Trail on that teammate's machine and checkout.
+  User-level MCP registration and lifecycle hooks are outside this project's
+  `--no-global` setup. The agent can use the CLI and project instructions.
+  Setup does not publish learnings.
 - For solo work, append `--local-only` to keep untracked `.trail/` learnings
   locally ignored as well. Combine it with `--dry-run` to preview that mode.
   The helper refuses local-only mode when `.trail/` is already tracked and
@@ -129,6 +149,6 @@ The seven additions selected for this hackathon are now included:
 | Next | `code-review` | Compare an implementation against the spec and coding standards; its issue-tracker setup dependency has been removed |
 | Optional | `break-ui` | Exercise missing evidence, long drug names, empty results and failed or running docking states; available as a personal skill |
 
-The bundle contains the original six skills, these seven additions and
-`i-have-adhd`: fourteen skills in total. Next Verse's UI brand rules, deployment checks and
+The bundle contains the original six skills, these seven additions,
+`i-have-adhd` and `caveman`: fifteen skills in total. Next Verse's UI brand rules, deployment checks and
 tracker workflow have not been imported. LinkedIn skills are excluded.
