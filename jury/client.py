@@ -301,6 +301,8 @@ class CortexModel:
         self.client = OpenAI(api_key=token, base_url=(
             f"https://{account}.snowflakecomputing.com/api/v2/cortex/v1"),
             max_retries=0, timeout=timeout)
+        # Optional per-model reasoning effort, e.g. {"kimi-k3": "low"}; recorded with the jury settings.
+        self.reasoning_effort = json.loads(os.environ.get("SNOWFLAKE_REASONING_EFFORT", "{}"))
 
     def __call__(self, model, prompt, temperature):
         if model.startswith("claude-"):
@@ -318,7 +320,8 @@ class CortexModel:
                 usage.get("input_tokens"), usage.get("output_tokens"))
         response = self.client.chat.completions.create(
             model=model, messages=[{"role": "user", "content": prompt}], temperature=temperature,
-            response_format=RESPONSE_FORMAT)
+            response_format=RESPONSE_FORMAT,
+            **({"reasoning_effort": self.reasoning_effort[model]} if model in self.reasoning_effort else {}))
         return ModelReply(response.choices[0].message.content,
                           getattr(response.usage, "prompt_tokens", None),
                           getattr(response.usage, "completion_tokens", None))
