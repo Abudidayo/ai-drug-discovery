@@ -1,8 +1,0 @@
-{
-  "_note": "Sample TxGNN output rows. IDs are real; scores, ranks and statuses are illustrative.",
-  "rows": [
-    {"disease_id": "MONDO_0009693", "drug_chembl_id": "CHEMBL3137309", "raw_score": 2.10, "rank": 3, "status": "scored", "model_version": "txgnn-example", "snapshot_date": "2023-06-07"},
-    {"disease_id": "MONDO_0009693", "drug_chembl_id": "CHEMBL3545376", "raw_score": 1.24, "rank": 12, "status": "scored", "model_version": "txgnn-example", "snapshot_date": "2023-06-07"},
-    {"disease_id": "MONDO_0009693", "drug_chembl_id": "CHEMBL4594350", "raw_score": null, "rank": null, "status": "not_in_model", "model_version": "txgnn-example", "snapshot_date": "2023-06-07"}
-  ]
-}
