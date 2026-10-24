@@ -25,6 +25,27 @@ The headline result is a **backtest across many diseases**. We hide the direct e
 - MLH Best Use of Vultr;
 - MLH Best Use of Gemini API.
 
+### Workflow
+
+```mermaid
+flowchart TD
+  S["Student enters a disease"] --> R["Resolve the disease ID<br/>Open Targets search and mapIds"]
+  R --> T["Fetch disease–target associations<br/>Open Targets"]
+  T --> M["Re-score targets in three modes<br/>default · evidence only · strict"]
+  M --> D["Reach drugs through the top targets<br/>Open Targets mechanisms + ChEMBL bioactivity"]
+  D --> F["Keep regulator-approved drugs<br/>FDA · EMA · PMDA · DailyMed"]
+  F --> L["Two lists with evidence, safety and leak flags<br/>Already used or trialled · Repurposing candidates"]
+  L --> J["Model jury ranks the same evidence<br/>Snowflake Cortex + Gemini, plus juror zero"]
+  J --> K{"Dock a candidate?"}
+  K -->|"prepared structure"| V["Vina docking job<br/>poses + redocking control"]
+  V --> X["3D viewer<br/>3Dmol.js"]
+  X --> H["Saved experiment<br/>compare · archive · restore"]
+  K -->|"not dockable"| H
+  B["Backtest: 30–50 held-out approved pairs<br/>evidence masked, 19 decoys each"] -.-> M
+  B -.-> J
+  B --> O["Hits@5 · Hits@10 · MRR with intervals<br/>vs random and popularity"]
+```
+
 ## 2. Decisions
 
 | Area | Decision |
@@ -40,6 +61,27 @@ The headline result is a **backtest across many diseases**. We hide the direct e
 | Not building | DiffDock, Boltz-2, GNINA, co-folding models, B200/B300 rental, DGX Spark, docking inside Snowflake, database forks, experiment branching, cross-experiment comparison, new molecules, ElevenLabs, Solana, Presage, Delta. |
 
 Abudi's Node test bench (`demos/data-sources/`) stays as a reference for working query text. The production backend is Python, because RDKit, Vina, Meeko, pandas and SciPy are Python libraries.
+
+### Infrastructure
+
+```mermaid
+flowchart LR
+  U["Browser<br/>React + 3Dmol.js"]
+  API["Vultr VM · London<br/>FastAPI: API + built frontend"]
+  W["Vultr VM · London<br/>Docking worker: Vina + Meeko + RDKit"]
+  DATA["Public data APIs<br/>Open Targets · ChEMBL · PubChem · RCSB PDB"]
+  JURY["Model jury<br/>Snowflake Cortex: Claude · GPT · Grok · Llama<br/>Gemini API"]
+  DB[("Tiger Cloud Postgres · eu-west-2<br/>experiments · candidates · dock_jobs<br/>jury_votes + runs hypertables")]
+  DISK[("VM disk<br/>result files · Parquet cache")]
+
+  U -->|"HTTP"| API
+  API --> DATA
+  API --> JURY
+  API <--> DB
+  API --> DISK
+  W <-->|"claim jobs"| DB
+  W --> DISK
+```
 
 ## 3. Ground rules
 
