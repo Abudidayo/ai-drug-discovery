@@ -8,6 +8,9 @@ import sys
 
 from .artifacts import build_artifacts, load_artifacts
 from .scoring import RankingSettings, rank_files
+from .evaluation import EvaluationSettings
+from .evaluation_io import run_evaluation
+from .integration import adapt_ranking
 
 
 def main() -> int:
@@ -34,12 +37,40 @@ def main() -> int:
     rank.add_argument("--seed", type=int, default=0)
     rank.add_argument("--min-bin-size", type=int, default=100)
     rank.add_argument("--top-targets", type=int, default=50)
+    evaluate = commands.add_parser("evaluate", help="Evaluate frozen rankings against separate reference labels")
+    evaluate.add_argument("--rankings", type=Path, nargs="+", required=True)
+    labels = evaluate.add_mutually_exclusive_group(required=True)
+    labels.add_argument("--references", type=Path, help="Independent evaluation reference JSON")
+    labels.add_argument("--indications", type=Path, help="Extract exact Stream A indication IDs for a smoke test")
+    evaluate.add_argument("--output", type=Path, required=True)
+    evaluate.add_argument("--seed", type=int, default=0)
+    evaluate.add_argument("--bootstrap-samples", type=int, default=1000)
+    evaluate.add_argument("--missing-score-policy", choices=("unretrieved", "append_by_id"), default="unretrieved")
+    adapt = commands.add_parser("adapt", help="Add and validate missing shared Candidate API fields")
+    adapt.add_argument("--input", type=Path, required=True)
+    adapt.add_argument("--output", type=Path, required=True)
+    adapt.add_argument("--enrichment", type=Path, help="Optional Candidate-ID keyed evidence/safety/structure JSON")
     args = parser.parse_args()
 
     def progress(done: int, total: int) -> None:
         print(f"Distances: {done}/{total} rows", file=sys.stderr, flush=True)
 
     try:
+        if args.command == "evaluate":
+            summary = run_evaluation(args.rankings, args.output, references_path=args.references, indication_source=args.indications,
+                                     settings=EvaluationSettings(args.seed, args.bootstrap_samples, args.missing_score_policy))
+            print(json.dumps(summary, indent=2, allow_nan=False))
+            return 0
+        if args.command == "adapt":
+            payload = json.loads(args.input.read_text(encoding="utf-8"))
+            enrichment = None if args.enrichment is None else json.loads(args.enrichment.read_text(encoding="utf-8"))
+            result = adapt_ranking(payload, enrichment)
+            encoded = json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n"
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            with args.output.open("x", encoding="utf-8") as handle:
+                handle.write(encoded)
+            print(json.dumps({"output": str(args.output), "candidates": len(result["candidates"]), "integration": result["integration"]}, indent=2))
+            return 0
         if args.command == "rank":
             if args.output.exists():
                 raise FileExistsError(f"Output already exists; choose a new path: {args.output}")

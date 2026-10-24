@@ -8,6 +8,10 @@ See [Stage 2 usage and output contract](STAGE2.md) and
 [measured Stage 2 results](STAGE2_RESULTS.md). The sections below describe the
 Stage 1 foundation; its saved graph and distance matrix remain reusable.
 
+Stage 3 adds [retrospective evaluation and API adaptation](STAGE3.md), with
+[the measured two-Disease smoke test](STAGE3_RESULTS.md). It reads frozen
+Stage 2 rankings and separate reference labels without rerunning scoring.
+
 ## Inputs inspected in this checkout
 
 `fixtures/README.md` is absent. The actual full Stream A release is under
