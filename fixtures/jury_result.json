@@ -1,0 +1,22 @@
+{
+  "_note": "Sample jury output for fixtures/evidence_packet.json. Everything here is illustrative.",
+  "packet_sha256": "example-not-a-real-hash",
+  "jurors": [
+    {
+      "model": "claude-sonnet-5",
+      "status": "ok",
+      "rankings": [
+        {"candidate_id": "C1", "rank": 1, "score": 0.7, "decision": "investigate", "supporting_ids": ["E1", "E2"], "contradicting_ids": [], "insufficient_evidence": false, "rationale": "FGFR3 is linked to the disease [E1]. Erdafitinib inhibits FGFR3 [E2]. No warnings are recorded, so safety is unknown [E3]."},
+        {"candidate_id": "C2", "rank": 2, "score": 0.5, "decision": "watch", "supporting_ids": ["E4", "E5"], "contradicting_ids": [], "insufficient_evidence": false, "rationale": "KRAS is linked to the disease [E4]. Adagrasib inhibits KRAS [E5]."}
+      ]
+    },
+    {"model": "llama3.1-8b", "status": "dropped", "reason": "Cited E9, which is not in the packet, twice"}
+  ],
+  "consensus": [
+    {"candidate_id": "C1", "rank": 1, "decision": "investigate"},
+    {"candidate_id": "C2", "rank": 2, "decision": "watch"}
+  ],
+  "kendall_w": 0.67,
+  "citation_valid_rate": 0.97,
+  "supported_claim_rate": 0.88
+}

@@ -1,0 +1,28 @@
+{
+  "_note": "Sample jury input. IDs are real; texts and scores are illustrative.",
+  "packet_sha256": "example-not-a-real-hash",
+  "disease": {"id": "MONDO_0009693", "name": "plasma cell myeloma"},
+  "mode": "evidence_only",
+  "condition": "open_book",
+  "candidates": [
+    {
+      "candidate_id": "C1",
+      "drug_chembl_id": "CHEMBL3545376",
+      "name": "ERDAFITINIB",
+      "items": [
+        {"id": "E1", "kind": "target_association", "text": "FGFR3 is linked to plasma cell myeloma: evidence-only score 0.64.", "url": "https://platform.opentargets.org/evidence/ENSG00000068078/MONDO_0009693"},
+        {"id": "E2", "kind": "mechanism", "text": "Erdafitinib is an FGFR inhibitor (action type INHIBITOR).", "url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL3545376/"},
+        {"id": "E3", "kind": "safety", "text": "No warnings recorded in our sources: safety unknown.", "url": null}
+      ]
+    },
+    {
+      "candidate_id": "C2",
+      "drug_chembl_id": "CHEMBL4594350",
+      "name": "ADAGRASIB",
+      "items": [
+        {"id": "E4", "kind": "target_association", "text": "KRAS is linked to plasma cell myeloma: evidence-only score 0.66.", "url": "https://platform.opentargets.org/evidence/ENSG00000133703/MONDO_0009693"},
+        {"id": "E5", "kind": "mechanism", "text": "Adagrasib is a GTPase KRas inhibitor (action type INHIBITOR).", "url": "https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL4594350/"}
+      ]
+    }
+  ]
+}
