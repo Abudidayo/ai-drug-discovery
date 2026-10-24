@@ -2,6 +2,7 @@
 
 from collections import Counter
 from copy import deepcopy
+from dataclasses import dataclass
 from decimal import Decimal, DecimalException
 import json
 import math
@@ -116,6 +117,8 @@ Use unknown direction unless drug action and Disease biology establish direction
 Every numeric literal in rationale or objection must equal a numeric value in the
 values of evidence cited by that review. Do not derive, round, convert to percentages,
 or invent numbers. Source releases and digits inside protein names are identifiers.
+Compare Candidates qualitatively; do not quote another Candidate's measurements
+in a review, including when explaining why its evidence is stronger or weaker.
 Cite only evidence assigned to that Candidate. Cite warnings only in safety, never
 as biological support or contradiction. Copy safety_status into safety.status and
 include all that Candidate's warning E IDs in safety.evidence_ids. Missing warnings
@@ -273,6 +276,13 @@ def consensus(packet, jurors):
                 key=lambda label: int(label[1:]))}
 
 
+@dataclass(frozen=True)
+class ModelReply:
+    text: str | None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+
+
 class CortexModel:
     """One SDK request per attempt; our runner owns the bounded retry budget."""
 
@@ -293,10 +303,25 @@ class CortexModel:
             max_retries=0, timeout=timeout)
 
     def __call__(self, model, prompt, temperature):
+        if model.startswith("claude-"):
+            response = self.client.post("/messages", cast_to=dict, body={
+                "model": model, "max_tokens": 4096,
+                "messages": [{"role": "user", "content": prompt}],
+                "output_config": {"format": {
+                    "type": "json_schema", "schema": RESPONSE_FORMAT["json_schema"]["schema"],
+                }},
+            }, options={"headers": {"anthropic-version": "2023-06-01"}})
+            usage = response.get("usage") or {}
+            return ModelReply(
+                "".join(block["text"] for block in response.get("content", [])
+                        if block.get("type") == "text"),
+                usage.get("input_tokens"), usage.get("output_tokens"))
         response = self.client.chat.completions.create(
             model=model, messages=[{"role": "user", "content": prompt}], temperature=temperature,
             response_format=RESPONSE_FORMAT)
-        return response.choices[0].message.content
+        return ModelReply(response.choices[0].message.content,
+                          getattr(response.usage, "prompt_tokens", None),
+                          getattr(response.usage, "completion_tokens", None))
 
     def close(self):
         self.client.close()
@@ -344,18 +369,25 @@ def run_jury(packet, config, model_call):
         random.Random(config["shuffle_seed"] + index).shuffle(order)
         prompt = build_prompt(packet, order)
         errors, reviews, raw = [], None, None
+        token_usage = []
         validation = dict(schema=False, unique_ranks=None, evidence_ids_exist=None,
                           numbers_match=None, errors=[])
         status = "failed"
         started = perf_counter()
         for attempt in range(1, config["max_attempts"] + 1):
+            usage = {"attempt": attempt, "input_tokens": None, "output_tokens": None}
+            token_usage.append(usage)
             try:
                 reply = model_call(model, prompt, config["temperature"])
             except Exception as exc:
                 # Exception messages can contain authorization headers or request bodies.
                 errors.append(f"Attempt {attempt}: call failed ({type(exc).__name__})")
                 continue
-            raw = reply
+            if isinstance(reply, ModelReply):
+                usage.update(input_tokens=reply.input_tokens, output_tokens=reply.output_tokens)
+                raw = reply.text
+            else:
+                raw = reply
             reviews, validation = validate_reply(raw, packet)
             if reviews is not None:
                 status = "valid"
@@ -364,6 +396,7 @@ def run_jury(packet, config, model_call):
             errors.extend(f"Attempt {attempt}: {error}" for error in validation["errors"])
         validation["errors"] = errors
         jurors.append({"model": model, "status": status, "attempts": attempt,
+                       "token_usage": token_usage,
                        "latency_ms": round((perf_counter() - started) * 1000),
                        "presented_order": order, "reviews": reviews,
                        "validation": validation, "raw_output": None if status == "valid" else raw})

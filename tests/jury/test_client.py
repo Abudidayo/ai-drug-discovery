@@ -10,7 +10,7 @@ import openai
 import pytest
 
 from jury.client import (
-    CortexModel, RESPONSE_FORMAT, build_prompt, consensus, mock_model, run_jury,
+    CortexModel, ModelReply, RESPONSE_FORMAT, build_prompt, consensus, mock_model, run_jury,
     validate_config, validate_packet, validate_reply, visible_packet,
 )
 
@@ -60,7 +60,8 @@ def test_seeded_orders_and_output_shape():
         random.Random(CONFIG["shuffle_seed"] + i).shuffle(order)
         assert j["presented_order"] == order
         assert j["status"] == "valid" and j["attempts"] == 1
-        assert set(j) == set(FIXTURE["jurors"][0])
+        assert set(j) == set(FIXTURE["jurors"][0]) | {"token_usage"}
+        assert j["token_usage"] == [{"attempt": 1, "input_tokens": None, "output_tokens": None}]
         assert set(j["reviews"][0]) == set(FIXTURE["jurors"][0]["reviews"][0])
         assert j["validation"]["errors"] == []
     again = run_jury(PACKET, CONFIG, mock_model)
@@ -329,10 +330,94 @@ def test_sdk_endpoint_auth_config_model_and_no_hidden_retries(monkeypatch):
     monkeypatch.setattr(openai, "OpenAI", factory)
     client = CortexModel()
     try:
-        assert client("configured-model", "test prompt", 0) == "OK"
+        assert client("configured-model", "test prompt", 0) == ModelReply("OK")
     finally:
         client.close()
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize("model", ["claude-opus-5-5", "claude-sonnet-5", "openai-gpt-5.4", "glm-5.3"])
+def test_endpoint_routing_structured_output_and_usage(monkeypatch, model):
+    monkeypatch.setenv("SNOWFLAKE_ACCOUNT", "test-account")
+    monkeypatch.setenv("SNOWFLAKE_PAT", "fake-test-token")
+    real_openai = openai.OpenAI
+    calls = []
+    raw = json.dumps(reply())
+    def handle(request):
+        calls.append(request)
+        assert request.method == "POST"
+        assert request.headers["authorization"] == "Bearer fake-test-token"
+        assert request.extensions["timeout"]["read"] == 300
+        body = json.loads(request.content)
+        assert body["model"] == model
+        assert body["messages"] == [{"role": "user", "content": "test prompt"}]
+        if model.startswith("claude-"):
+            assert str(request.url) == "https://test-account.snowflakecomputing.com/api/v2/cortex/v1/messages"
+            assert request.headers["anthropic-version"] == "2023-06-01"
+            assert body["max_tokens"] == 4096
+            assert "temperature" not in body  # Opus 5.5 rejects sampling parameters.
+            assert "response_format" not in body
+            assert body["output_config"] == {"format": {
+                "type": "json_schema", "schema": RESPONSE_FORMAT["json_schema"]["schema"]}}
+            return httpx.Response(200, json={"content": [
+                {"type": "thinking", "thinking": "This is not part of the vote."},
+                {"type": "text", "text": raw[:20]}, {"type": "text", "text": raw[20:]}],
+                "usage": {"input_tokens": 123, "output_tokens": 456}})
+        assert str(request.url) == "https://test-account.snowflakecomputing.com/api/v2/cortex/v1/chat/completions"
+        assert body["temperature"] == 0
+        assert "anthropic-version" not in request.headers
+        assert body["response_format"] == RESPONSE_FORMAT
+        assert "output_config" not in body
+        return httpx.Response(200, json={"id": "test", "choices": [
+            {"index": 0, "message": {"role": "assistant", "content": raw}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 123, "completion_tokens": 456, "total_tokens": 579}})
+    def factory(**kwargs):
+        assert kwargs["max_retries"] == 0
+        return real_openai(**kwargs, http_client=httpx.Client(transport=httpx.MockTransport(handle)))
+    monkeypatch.setattr(openai, "OpenAI", factory)
+    client = CortexModel()
+    try:
+        result = client(model, "test prompt", 0)
+    finally:
+        client.close()
+    assert result == ModelReply(raw, input_tokens=123, output_tokens=456)
+    assert validate_reply(result.text, PACKET)[0] is not None
+    assert len(calls) == 1
+
+
+def test_recorded_cross_candidate_numbers_still_reject():
+    raw = (Path(__file__).parent / "data/gpt_cross_candidate_vote.json").read_text()
+    reviews, flags = validate_reply(raw, PACKET)
+    assert reviews is None and flags["numbers_match"] is False
+    assert flags["errors"] == ["C2: unsupported or unparseable number in rationale"]
+    value = json.loads(raw)
+    c2 = next(r for r in value["reviews"] if r["label"] == "C2")
+    c2["rationale"] = c2["rationale"].replace("scores of 0.8 or 0.9", "stronger association evidence")
+    assert validate_reply(json.dumps(value), PACKET)[0] is not None
+    assert "Compare Candidates qualitatively" in build_prompt(PACKET, ["C1", "C2", "C3", "C4"])
+
+
+@pytest.mark.parametrize("outcomes,expected_status,expected_usage", [
+    ([ModelReply("invalid", 10, 2), ModelReply(json.dumps(reply()), 20, 30)], "valid", [(10, 2), (20, 30)]),
+    ([TimeoutError("private"), ModelReply(json.dumps(reply()), 20, 30)], "valid", [(None, None), (20, 30)]),
+    ([ModelReply("invalid", 10, 2), TimeoutError("private")], "invalid", [(10, 2), (None, None)]),
+])
+def test_usage_retained_for_every_attempt(outcomes, expected_status, expected_usage):
+    calls = {}
+    def model_call(model, *args):
+        index = calls.get(model, 0)
+        calls[model] = index + 1
+        outcome = outcomes[index]
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+    result = run_jury(PACKET, CONFIG, model_call)
+    for juror in result["jurors"]:
+        assert juror["status"] == expected_status and juror["attempts"] == 2
+        assert juror["token_usage"] == [
+            {"attempt": i, "input_tokens": counts[0], "output_tokens": counts[1]}
+            for i, counts in enumerate(expected_usage, 1)]
+    assert "private" not in json.dumps(result)
 
 
 @pytest.mark.parametrize("configured,explicit,expected", [(None, None, 300), ("420", None, 420), ("420", 180, 180)])
@@ -359,6 +444,8 @@ def test_recorded_glm_timeout_budget(monkeypatch, configured, explicit, expected
         budget = request.extensions["timeout"]["read"]
         if budget <= completion_seconds:
             raise httpx.ReadTimeout("simulated slow-model timeout", request=request)
+        if request.url.path.endswith("/messages"):
+            return httpx.Response(200, json={"content": [{"type": "text", "text": recovered["reply"]}]})
         return httpx.Response(200, json={"id": "recorded", "choices": [
             {"index": 0, "message": {"role": "assistant", "content":
              recovered["reply"]}, "finish_reason": "stop"}]})
@@ -403,7 +490,7 @@ def test_one_real_cortex_call():
     validate_config(config)
     client = CortexModel()
     try:
-        text = client(config["models"][0], "Reply with the single word OK", config["temperature"])
+        text = client(config["models"][0], "Reply with the single word OK", config["temperature"]).text
         assert isinstance(text, str) and text.strip()
     finally:
         client.close()
