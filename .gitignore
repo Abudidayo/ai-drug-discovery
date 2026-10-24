@@ -2,3 +2,9 @@
 /graft/
 # Local secrets (see .env.example).
 .env
+# Python caches and local virtual environments.
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
