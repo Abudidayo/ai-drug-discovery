@@ -90,3 +90,32 @@ def test_removes_only_affected_decoys_including_records_on_salts():
     assert old_ids - new_ids == {removed}
     assert len(new_ids - old_ids) == 1
     assert all(d['target_count_difference'] == 0 for d in new['decoys'])
+
+
+def test_v2_requires_seven_true_top50_decoys_and_no_records():
+    from pipeline.panels import build_v2_panel
+    source = universe()
+    # Synthetic mechanical test: source IDs and counts are not scientific results.
+    for i, d in enumerate(source['drugs']):
+        d['targets'] = [{'target_id': f'ENSG{(1 if i < 12 else 2):011d}'}]
+    true = source['drugs'][0]
+    disease = {'id': 'MONDO_1', 'name': 'Test disease'}
+    top = {'targets': [{'target_id': 'ENSG00000000001'}]}
+    p = build_v2_panel(source, disease, true, top, {'ENSG00000000001': .8}, blocked={'CHEMBL2'}, seed=42)
+    assert len(p['decoys']) == 14 and sum(d['plausible'] for d in p['decoys']) >= 7
+    assert all(d['target_count_difference'] == 0 and d['drug_id'] != 'CHEMBL2' for d in p['decoys'])
+    assert p == build_v2_panel(source, disease, true, top, {'ENSG00000000001': .8}, blocked={'CHEMBL2'}, seed=42)
+    with pytest.raises(ValueError, match='seven'):
+        build_v2_panel(source, disease, true, {'targets': []}, {}, blocked=set(), seed=42)
+
+
+def test_v2_missing_parent_hierarchy_requires_an_explicit_source_link(monkeypatch):
+    from pipeline.panels import V2Sources, PilotSources
+    recorded = {'molecule_chembl_id': 'CHEMBL3707224', 'molecule_hierarchy': None}
+    monkeypatch.setattr(PilotSources, 'chembl', lambda self, endpoint: recorded)
+    source = V2Sources(offline=True)
+    assert source.chembl('molecule/CHEMBL3707224.json')['molecule_hierarchy'] is None
+    # The recorded bromide row explicitly names CHEMBL3707224 as its parent.
+    source.parent_links['CHEMBL3707224'] = ['CHEMBL3707223']
+    assert source.chembl('molecule/CHEMBL3707224.json')['molecule_hierarchy'] == {'parent_chembl_id': 'CHEMBL3707224'}
+    assert recorded['molecule_hierarchy'] is None
