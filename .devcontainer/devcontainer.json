@@ -1,0 +1,44 @@
+{
+  "name": "OxHack drug repurposing",
+  "build": { "dockerfile": "Dockerfile" },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/node:1": { "version": "lts" },
+    "ghcr.io/va-h/devcontainers-features/uv:1": {}
+  },
+  // Picks the 4-core / 16 GB codespace: the distance matrix and Vina need it.
+  "hostRequirements": { "cpus": 4, "memory": "16gb" },
+  "containerEnv": {
+    "DOCKING_VENV": "/home/vscode/.venvs/docking",
+    // Only /workspaces survives a codespace rebuild.
+    "RESULTS_DIR": "/workspaces/results"
+  },
+  "remoteEnv": {
+    "PATH": "/home/vscode/.venvs/docking/bin:${containerEnv:PATH}"
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "forwardPorts": [8000, 5173],
+  "portsAttributes": {
+    "8000": { "label": "API" },
+    "5173": { "label": "Vite" }
+  },
+  "secrets": {
+    "DATABASE_URL": {
+      "description": "Tiger Cloud connection string (postgres://...), from the config file saved when the service was created."
+    },
+    "SNOWFLAKE_ACCOUNT": {
+      "description": "Snowflake account identifier used in https://<account>.snowflakecomputing.com."
+    },
+    "SNOWFLAKE_PAT": {
+      "description": "Snowflake programmatic access token for the Cortex REST API."
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "ms-azuretools.vscode-docker"],
+      "settings": {
+        "python.defaultInterpreterPath": "/home/vscode/.venvs/docking/bin/python"
+      }
+    }
+  }
+}

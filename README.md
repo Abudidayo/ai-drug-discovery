@@ -17,6 +17,7 @@ Results are research hypotheses, not medical advice. A ranking, a jury verdict o
 - [Plan](plan.md): the official plan.
 - [Glossary](CONTEXT.md): shared terms and scientific limits.
 - [Build reference](docs/build-reference.md): verified API queries, database schema and docking steps.
+- [Dev container](.devcontainer/README.md): the shared environment and the demo codespace.
 
 ## Background
 
