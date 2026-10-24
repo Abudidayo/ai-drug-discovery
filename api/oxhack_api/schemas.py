@@ -775,6 +775,36 @@ class DockJob(Model):
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Molecules: 3D conformers for drawing a Candidate (small molecules only).
+# ---------------------------------------------------------------------------
+
+
+class ConformerAtom(Model):
+    element: str = Field(description="Element symbol, e.g. C, N, O.")
+    x: float = Field(description="Position in angstroms.")
+    y: float
+    z: float
+
+
+class ConformerBond(Model):
+    a: int = Field(ge=0, description="Index of the first atom in `atoms`.")
+    b: int = Field(ge=0, description="Index of the second atom in `atoms`.")
+    order: int = Field(ge=1, le=3, description="1 single, 2 double, 3 triple.")
+
+
+class Conformer(Model):
+    """One computed 3D shape of a small molecule, for display only.
+
+    Antibodies and other biologics have no conformer; the API answers 404 for them.
+    """
+
+    pubchem_cid: int = Field(gt=0, description="PubChem compound ID.")
+    source_url: str = Field(description="Where the conformer came from (PubChem 3D).")
+    atoms: list[ConformerAtom]
+    bonds: list[ConformerBond]
+
+
 class ExperimentCreate(Model):
     disease_id: DiseaseId
 

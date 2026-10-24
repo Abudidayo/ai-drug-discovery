@@ -5,12 +5,13 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Path, Query, status
 
 from .. import __version__
 from ..deps import ComponentsDep, ServiceDep
-from ..errors import responses
+from ..errors import NotFound, responses
 from ..schemas import (
+    Conformer,
     DiseaseSearchResponse,
     DockJob,
     DockRequest,
@@ -159,6 +160,26 @@ def request_dock(body: DockRequest, service: ServiceDep) -> DockJob:
 )
 def get_dock_job(job_id: UUID, service: ServiceDep) -> DockJob:
     return service.get_dock_job(job_id)
+
+
+# Molecules ---------------------------------------------------------------------
+
+
+@router.get(
+    "/molecules/{pubchem_cid}/conformer",
+    tags=["molecules"],
+    summary="Get a small molecule's 3D conformer for drawing",
+    responses=responses(404, 422),
+)
+def get_conformer(
+    components: ComponentsDep,
+    pubchem_cid: Annotated[int, Path(gt=0, description="PubChem compound ID.")],
+) -> Conformer:
+    """Display only. Antibodies and other biologics have none, so they answer 404."""
+    conformer = components.molecules.conformer(pubchem_cid)
+    if conformer is None:
+        raise NotFound(f"No 3D structure is available for PubChem compound {pubchem_cid}.")
+    return conformer
 
 
 # Evaluation --------------------------------------------------------------------

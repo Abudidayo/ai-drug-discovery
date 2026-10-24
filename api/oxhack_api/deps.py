@@ -13,6 +13,7 @@ from .services.docking import DockingBackend
 from .services.evaluation import EvaluationSource
 from .services.experiments import ExperimentService
 from .services.jury import JuryBackend
+from .services.molecules import MoleculeSource
 from .services.source import ExperimentSource
 from .settings import Settings
 
@@ -25,6 +26,7 @@ class Components:
     jury: JuryBackend
     docking: DockingBackend
     evaluation: EvaluationSource
+    molecules: MoleculeSource
     runner: Runner
 
 

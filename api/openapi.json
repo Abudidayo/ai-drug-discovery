@@ -326,6 +326,107 @@
         "title": "ConfidenceInterval",
         "type": "object"
       },
+      "Conformer": {
+        "additionalProperties": false,
+        "description": "One computed 3D shape of a small molecule, for display only.\n\nAntibodies and other biologics have no conformer; the API answers 404 for them.",
+        "properties": {
+          "atoms": {
+            "items": {
+              "$ref": "#/components/schemas/ConformerAtom"
+            },
+            "title": "Atoms",
+            "type": "array"
+          },
+          "bonds": {
+            "items": {
+              "$ref": "#/components/schemas/ConformerBond"
+            },
+            "title": "Bonds",
+            "type": "array"
+          },
+          "pubchem_cid": {
+            "description": "PubChem compound ID.",
+            "exclusiveMinimum": 0.0,
+            "title": "Pubchem Cid",
+            "type": "integer"
+          },
+          "source_url": {
+            "description": "Where the conformer came from (PubChem 3D).",
+            "title": "Source Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pubchem_cid",
+          "source_url",
+          "atoms",
+          "bonds"
+        ],
+        "title": "Conformer",
+        "type": "object"
+      },
+      "ConformerAtom": {
+        "additionalProperties": false,
+        "properties": {
+          "element": {
+            "description": "Element symbol, e.g. C, N, O.",
+            "title": "Element",
+            "type": "string"
+          },
+          "x": {
+            "description": "Position in angstroms.",
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "title": "Y",
+            "type": "number"
+          },
+          "z": {
+            "title": "Z",
+            "type": "number"
+          }
+        },
+        "required": [
+          "element",
+          "x",
+          "y",
+          "z"
+        ],
+        "title": "ConformerAtom",
+        "type": "object"
+      },
+      "ConformerBond": {
+        "additionalProperties": false,
+        "properties": {
+          "a": {
+            "description": "Index of the first atom in `atoms`.",
+            "minimum": 0.0,
+            "title": "A",
+            "type": "integer"
+          },
+          "b": {
+            "description": "Index of the second atom in `atoms`.",
+            "minimum": 0.0,
+            "title": "B",
+            "type": "integer"
+          },
+          "order": {
+            "description": "1 single, 2 double, 3 triple.",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Order",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "a",
+          "b",
+          "order"
+        ],
+        "title": "ConformerBond",
+        "type": "object"
+      },
       "Consensus": {
         "additionalProperties": false,
         "properties": {
@@ -3036,6 +3137,62 @@
         "summary": "Check that the API is up",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/molecules/{pubchem_cid}/conformer": {
+      "get": {
+        "description": "Display only. Antibodies and other biologics have none, so they answer 404.",
+        "operationId": "get_conformer",
+        "parameters": [
+          {
+            "description": "PubChem compound ID.",
+            "in": "path",
+            "name": "pubchem_cid",
+            "required": true,
+            "schema": {
+              "description": "PubChem compound ID.",
+              "exclusiveMinimum": 0,
+              "title": "Pubchem Cid",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conformer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnprocessableResponse"
+                }
+              }
+            },
+            "description": "The request cannot be carried out."
+          }
+        },
+        "summary": "Get a small molecule's 3D conformer for drawing",
+        "tags": [
+          "molecules"
         ]
       }
     },

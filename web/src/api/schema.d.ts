@@ -185,6 +185,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/molecules/{pubchem_cid}/conformer": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get a small molecule's 3D conformer for drawing
+     * @description Display only. Antibodies and other biologics have none, so they answer 404.
+     */
+    get: operations["get_conformer"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/structures": {
     parameters: {
       query?: never;
@@ -360,6 +380,63 @@ export interface components {
        * @description Lower bound.
        */
       low: number;
+    };
+    /**
+     * Conformer
+     * @description One computed 3D shape of a small molecule, for display only.
+     *
+     *     Antibodies and other biologics have no conformer; the API answers 404 for them.
+     */
+    Conformer: {
+      /** Atoms */
+      atoms: components["schemas"]["ConformerAtom"][];
+      /** Bonds */
+      bonds: components["schemas"]["ConformerBond"][];
+      /**
+       * Pubchem Cid
+       * @description PubChem compound ID.
+       */
+      pubchem_cid: number;
+      /**
+       * Source Url
+       * @description Where the conformer came from (PubChem 3D).
+       */
+      source_url: string;
+    };
+    /** ConformerAtom */
+    ConformerAtom: {
+      /**
+       * Element
+       * @description Element symbol, e.g. C, N, O.
+       */
+      element: string;
+      /**
+       * X
+       * @description Position in angstroms.
+       */
+      x: number;
+      /** Y */
+      y: number;
+      /** Z */
+      z: number;
+    };
+    /** ConformerBond */
+    ConformerBond: {
+      /**
+       * A
+       * @description Index of the first atom in `atoms`.
+       */
+      a: number;
+      /**
+       * B
+       * @description Index of the second atom in `atoms`.
+       */
+      b: number;
+      /**
+       * Order
+       * @description 1 single, 2 double, 3 triple.
+       */
+      order: number;
     };
     /** Consensus */
     Consensus: {
@@ -1874,6 +1951,47 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Health"];
+        };
+      };
+    };
+  };
+  get_conformer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description PubChem compound ID. */
+        pubchem_cid: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Conformer"];
+        };
+      };
+      /** @description Not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description The request cannot be carried out. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["UnprocessableResponse"];
         };
       };
     };

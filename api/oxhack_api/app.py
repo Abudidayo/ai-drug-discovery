@@ -17,6 +17,7 @@ from .routes.api import router
 from .services.docking import DockingBackend, FixtureDocking
 from .services.evaluation import EvaluationSource, FixtureEvaluation
 from .services.jury import FixtureJury, JuryBackend
+from .services.molecules import FixtureMolecules, MoleculeSource
 from .services.source import ExperimentSource, FixtureSource
 from .settings import Settings
 
@@ -29,6 +30,7 @@ def build_components(
     jury: JuryBackend | None = None,
     docking: DockingBackend | None = None,
     evaluation: EvaluationSource | None = None,
+    molecules: MoleculeSource | None = None,
     runner: Runner | None = None,
 ) -> Components:
     """Fixture-mode pieces by default; any piece can be replaced."""
@@ -45,6 +47,7 @@ def build_components(
         jury=jury or FixtureJury(fixtures),
         docking=docking,
         evaluation=evaluation or FixtureEvaluation(fixtures),
+        molecules=molecules or FixtureMolecules(fixtures),
         runner=runner or ThreadRunner(settings.fixture_delay_ms, settings.worker_threads),
     )
 
