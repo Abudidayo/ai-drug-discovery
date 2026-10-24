@@ -113,7 +113,7 @@ Candidates), decision (investigate, watch, deprioritise), direction (supported,
 contradicted, unknown), rationale (string), objection (separate critical string),
 missing_evidence (array of strings), supporting_evidence_ids (array of E IDs),
 contradicting_evidence_ids (array of E IDs), safety (object with status and evidence_ids).
-Use unknown direction unless drug action and Disease biology establish direction.
+Direction asks whether the drug's action (for example inhibiting a Target) would help this Disease. An association score only says a Target is linked to the Disease; it does not say whether inhibiting or activating that Target helps or harms. Use supported only when a cited item shows that this action on the Target is beneficial in this Disease, contradicted only when a cited item shows it is harmful, and unknown otherwise.
 Every numeric literal in rationale or objection must equal a numeric value in the
 values of evidence cited by that review. Do not derive, round, convert to percentages,
 or invent numbers. Source releases and digits inside protein names are identifiers.
