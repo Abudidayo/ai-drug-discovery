@@ -271,14 +271,14 @@ def test_excluded_target_needs_a_reason(migrated: str) -> None:
     with psycopg.connect(migrated) as conn:
         experiment_id = _experiment(conn)
         conn.execute(
-            """insert into experiment_targets (experiment_id, target_id, name, rank, evidence_only_score, retained)
-               values (%s, 'ENSG00000130234', 'ACE2', 1, 0.82, true)""",
+            """insert into experiment_targets (experiment_id, target_id, symbol, name, rank, evidence_only_score, retained)
+               values (%s, 'ENSG00000130234', 'ACE2', 'Angiotensin-converting enzyme 2', 1, 0.82, true)""",
             (experiment_id,),
         )
         with pytest.raises(errors.CheckViolation):
             conn.execute(
-                """insert into experiment_targets (experiment_id, target_id, name, rank, evidence_only_score, retained)
-                   values (%s, 'ENSG00000163818', 'LZTFL1', 2, 0.4, false)""",
+                """insert into experiment_targets (experiment_id, target_id, symbol, name, rank, evidence_only_score, retained)
+                   values (%s, 'ENSG00000163818', 'LZTFL1', 'Leucine zipper transcription factor like 1', 2, 0.4, false)""",
                 (experiment_id,),
             )
 

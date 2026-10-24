@@ -61,6 +61,8 @@ create trigger experiments_forbid_delete
 create table experiment_targets (
   experiment_id       uuid not null references experiments (id) on delete restrict,
   target_id           text not null check (target_id ~ '^ENSG[0-9]{11}$'),
+  -- Gene symbol shown in the UI, e.g. ACE2; name is the full protein name.
+  symbol              text not null,
   name                text not null,
   rank                integer not null check (rank > 0),
   evidence_only_score real not null check (evidence_only_score >= 0 and evidence_only_score <= 1),
