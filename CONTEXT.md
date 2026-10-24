@@ -13,7 +13,7 @@ A protein linked to a disease that a drug can act on.
 _Avoid_: gene, receptor (unless that is the specific kind)
 
 **Candidate**:
-A drug the app has found for a disease, because it acts on one of that disease's targets.
+An existing approved drug the app has found for a disease, because it acts on one of that disease's targets or on a protein close to them in the protein network.
 _Avoid_: hit, lead, compound (in the UI)
 
 **Binding pose**:
