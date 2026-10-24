@@ -573,10 +573,14 @@ Sort by `(evidence_score, breadth)`. The UI shows every supported target, with n
 
 **A12. Run the backtest (the HRT number).**
 
-1. **Positives.** From the Parquet cache, list drug–disease pairs with an `APPROVAL` row backed by a regulator report.
-   - Pick 30–50 pairs, one per disease, spread across at least five therapeutic areas (50 gives tighter intervals).
-   - Prefer small molecules.
-   - Skip diseases with fewer than 20 associated targets.
+1. **Positives.** Prefer KG-Bench's time split (Wei et al., *Bioinformatics* 2026, btag159), so the held-out pairs are approvals added after the evidence snapshot.
+   - **Source:** indications that are new in Open Targets 23.06 or 24.06 compared with 21.06. Their code (`github.com/cmbi/Benchmark_GNN_OpenTargets`, MIT licence) builds this list from the raw `indication` Parquet files of those releases. Check those files are still on the Open Targets FTP.
+   - **Fallback:** if the old files are unavailable, list drug–disease pairs from our Parquet cache with an `APPROVAL` row backed by a regulator report.
+   - **Selection:**
+     - Pick 30–50 pairs, one per disease, spread across at least five therapeutic areas (50 gives tighter intervals).
+     - Keep only regulator-backed approvals and prefer small molecules.
+     - Skip diseases with fewer than 20 associated targets.
+   - **Caveat:** KG-Bench's split is by curation date, and about 450 links arrive in a single release (22.04), so "new" means newly curated, not newly approved.
 2. **Decoys.** For each pair, draw 19 regulator-approved drugs that have no candidate row for that disease at any stage.
    - Also exclude its parent and child disease terms where the disease table lists them.
    - Match on popularity: count each approved drug's approved indications, split all approved drugs into five equal bins by that count, and draw decoys from the positive's bin with a fixed seed.
@@ -586,7 +590,9 @@ Sort by `(evidence_score, breadth)`. The UI shows every supported target, with n
 6. **Rankers:**
    - random (analytical);
    - popularity;
+   - shared-target count: how many of the drug's targets have any `strict`-mode association with the disease. On KG-Bench's shipped graph this rule alone separates known from random drug–disease pairs at AUC 0.848 with no model, close to their GNNs' reported test AUC of 0.84–0.91. It is the bar every smarter ranker must beat;
    - juror zero (A8, `strict` mode);
+   - optionally, KG-Bench's best GNN (RGCN) scored on the same 20-candidate pools (section 12);
    - each LLM in `blinded` and `open_book` conditions, with two candidate orders each;
    - jury consensus.
 7. **Metrics.** Per disease, record the rank of the true drug. Report Hits@1, Hits@5, Hits@10 and MRR, each with a 95% bootstrap interval over diseases (1,000 resamples). Add a paired bootstrap of the difference against popularity. Chance levels are 0.05, 0.25 and 0.50 for Hits@1, @5 and @10, and about 0.18 for MRR.
@@ -921,6 +927,15 @@ Do these only if M6 is done and the Vultr credit covers an A40:
 
 - **GPU batch screen:** dock every approved small molecule against one prepared target with a GPU Vina variant (Uni-Dock) on a Vultr A40. Report how well known ChEMBL actives rise to the top (AUROC). Present it as an illustration.
 - **Second docking engine:** call NVIDIA's hosted DiffDock for one prepared pair, and show it beside Vina with both RMSD and PoseBusters results.
+- **KG-Bench GNN as an extra ranker.**
+  1. Clone `github.com/cmbi/Benchmark_GNN_OpenTargets` and download the 21.06, 23.06 and 24.06 `indication` Parquet files.
+  2. Build the graph and train RGCN only. Skip the GNNExplainer step, which is slow.
+  3. Check the log prints "New validation edges" and "New test edges", and **not** "Using random splits". Without the raw files, the script quietly builds random splits.
+  4. Score each 20-candidate backtest pool with the trained model and add it as a ranker.
+  - **Install risk:** `torch-scatter` and `torch-sparse`. Use the Linux VM rather than a Mac.
+  - **Caveats:**
+    - The shipped `processed_data/` does not match the paper: 1,116 drug–disease edges against 996, and 103,921 disease–gene edges against 72,977.
+    - Their disease–gene edges use Open Targets overall scores, which include clinical-trial evidence (`scripts/1_create_graph.py` lines 65 and 452). That is the same leak as our `default` mode, so report RGCN as "uses trial evidence".
 
 ## 13. Fallbacks
 
@@ -948,7 +963,7 @@ Do these only if M6 is done and the Vultr credit covers an A40:
 
 > Retrospective check, frozen ([hash]): [N] drug–disease approvals, each hidden among 19 popularity-matched approved drugs, with trial, indication and literature evidence removed. The blinded jury consensus ranked the true drug in its top 5 for [k]/[N] diseases ([x]%, 95% CI [a–b]%). Chance is 25%; the popularity baseline is [y]%. LLM jurors may have seen some of these approvals during training.
 
-**Context line:** "A 2026 Bioinformatics benchmark (KG-Bench) found that even specialised graph models reach only about 0.2 average precision when known treatments are outnumbered 100:1, so we treat every ranked drug as a hypothesis, not an answer."
+**Context line:** "A 2026 Bioinformatics benchmark (KG-Bench) compared six graph neural networks. Even the best reach only about 0.2 average precision when known treatments are outnumbered 100:1. On its own graph, simply counting shared targets scores almost as well as the models. So we report that trivial baseline beside our rankers and treat every ranked drug as a hypothesis, not an answer."
 
 **We can say:**
 - every statement links to the record it came from, and we show the citation-validity rate;
