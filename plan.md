@@ -261,22 +261,22 @@ A GPU is **not a requirement**. TxGNN and KG-Bench RGCN are useful research refe
 
 ```json
 {
-  "candidate_id": "CHEMBL_EXAMPLE",
-  "name": "Example approved drug",
+  "candidate_id": "CHEMBL3545376",
+  "name": "ERDAFITINIB",
   "status": "scored",
   "selected_by": ["network", "evidence"],
   "network": {
     "rank": 3,
     "mean_distance": 1.8,
     "degree_matched_z": -1.4,
-    "graph_version": "pinned-release-id"
+    "graph_version": "string-12.5"
   },
   "direct_evidence_rank": 7,
   "targets": [
-    {"id": "ENSG_EXAMPLE", "name": "Example Target", "mechanism": "unknown"}
+    {"id": "ENSG00000068078", "name": "FGFR3", "mechanism": "INHIBITOR"}
   ],
   "evidence": [
-    {"id": "E1", "source": "Open Targets", "url": "https://platform.opentargets.org/", "kind": "target_association"}
+    {"id": "E1", "source": "open_targets", "release": "opentargets-26.09", "url": "https://platform.opentargets.org/evidence/ENSG00000068078/MONDO_0009693", "kind": "target_association"}
   ],
   "warnings": [],
   "safety_status": "unknown",
@@ -284,7 +284,7 @@ A GPU is **not a requirement**. TxGNN and KG-Bench RGCN are useful research refe
 }
 ```
 
-**All values above are fictional fixtures, not study results.** For an unscorable Candidate: `status = "not_scorable"`, `network = null`, and an explicit `unscorable_reason`. Jury results are stored as a separate object, so reviewers cannot unknowingly inherit the network score.
+**The IDs are real and follow section 3; every score and rank is fictional, not a study result.** For an unscorable Candidate: `status = "not_scorable"`, `network = null`, and an explicit `unscorable_reason`. Jury results are stored as a separate object, so reviewers cannot unknowingly inherit the network score.
 
 ### 9.3 Minimum persistent tables
 

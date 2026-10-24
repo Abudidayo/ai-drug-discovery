@@ -20,6 +20,6 @@ Results are research hypotheses, not medical advice. A ranking, a jury verdict o
 
 ## Background
 
-- Research notes in `research_notes/`, with a summary report in `reports/`.
+- Research notes in `research_notes/`, with a summary report in `reports/`. These are a dated record; where they differ from the plan, `plan.md` wins.
 - Data-source test bench in `demos/data-sources/`.
 - UI prototypes in `prototypes/`; open the HTML files in a browser.

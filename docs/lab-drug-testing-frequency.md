@@ -150,9 +150,9 @@ PhRMA's "$2.6 billion" is DiMasi's figure ([PhRMA 2015](https://invivobiosystems
 
 The FDA describes five steps, and Step 1 is "Discovery and Development" ([FDA](https://www.fda.gov/patients/drug-development-process/step-1-discovery-and-development)). The app sits entirely inside Step 1, and within that, inside step 1 of Pushpakom's three repurposing steps: **hypothesis generation** ([Pushpakom 2019](https://doi.org/10.1038/nrd.2018.168)). Concretely:
 
-- **Disease -> targets -> approved drugs (Open Targets, ChEMBL)** does what HTS does physically, but as a knowledge lookup. It narrows the roughly 2,400-4,000 approved molecules ([Huang 2011](https://doi.org/10.1126/scitranslmed.3001862)) to the ones with a known mechanism on a disease-linked target. This is a "focused" or knowledge-based screen in the sense of [Hughes et al. 2011](https://doi.org/10.1111/j.1476-5381.2010.01127.x), Table 1.
-- **The model jury** is a ranking step, comparable to the computational pipelines in [Gysi et al. 2021](https://doi.org/10.1073/pnas.2025581118). In that real test, the best single pipeline had 9 actives in its top 100, and the actives were cell-culture antiviral hits, not cures.
-- **Docking (DiffDock/Vina)** is a virtual screen. Pushpakom et al. list the known limits: missing structures, poorly curated structure databases, and weak affinity prediction. Gysi et al. found 76 of 77 cell-active drugs worked through mechanisms that docking against the virus-targeted proteins would miss. This supports the MVP's rule that a pose does not establish binding strength or efficacy.
+- **Disease -> targets -> approved drugs (Open Targets, ChEMBL)** does what HTS does physically, but as a knowledge lookup. It narrows the roughly 2,400-4,000 approved molecules ([Huang 2011](https://doi.org/10.1126/scitranslmed.3001862)) to the ones acting on a disease-linked target, or on a protein close to one in the protein network. This is a "focused" or knowledge-based screen in the sense of [Hughes et al. 2011](https://doi.org/10.1111/j.1476-5381.2010.01127.x), Table 1.
+- **The network-proximity ranking** is the same kind of step as the network-based pipelines in [Gysi et al. 2021](https://doi.org/10.1073/pnas.2025581118), and the model jury then reviews the shortlist. In that real test, the best single pipeline had 9 actives in its top 100, and the actives were cell-culture antiviral hits, not cures.
+- **Docking (AutoDock Vina)** is a virtual screen. Pushpakom et al. list the known limits: missing structures, poorly curated structure databases, and weak affinity prediction. Gysi et al. found 76 of 77 cell-active drugs worked through mechanisms that docking against the virus-targeted proteins would miss. This supports the plan's rule (`plan.md` section 7) that a pose does not establish binding strength or efficacy.
 
 ### A realistic framing for students
 
@@ -166,7 +166,7 @@ Suggested copy for guided mode:
 ### Implications for product copy and the demo
 
 - Keep calling outputs **candidates** or hypotheses, never "treatments". This matches the funnel: a candidate has not yet passed even the first lab assay.
-- The **COVID-19/baricitinib known-answer check** fits well because it is a documented computational repurposing success. But the original hypothesis emphasised AAK1, while the benefit is attributed to JAK1/2 immunomodulation. That is worth saying in guided mode: a good ranking can be right for a partly different reason. It also supports the MVP rule that a JAK2 structure must not be presented as JAK1 validation.
+- The **COVID-19/baricitinib known-answer check** fits well because it is a documented computational repurposing success. But the original hypothesis emphasised AAK1, while the benefit is attributed to JAK1/2 immunomodulation. That is worth saying in guided mode: a good ranking can be right for a partly different reason. It also supports the plan's rule (`plan.md` section 7) that a JAK2 structure must not be presented as JAK1 validation.
 - Do not show a "probability of success". Use the base rates above as context instead. Model agreement and docking scores are not comparable to the 8%-14% clinical success rates.
 - Avoid the untraceable numbers: "5,000-10,000 -> 250 -> 5 -> 1" (if used, label it "PhRMA illustration, 1990s"), "30% of approvals are repurposed", and "$300M per repurposed drug".
 
