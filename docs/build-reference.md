@@ -229,12 +229,12 @@ Sort by `(evidence_score, breadth)`. The UI shows every supported target, with n
 
 ## 3. Docking recipes
 
-**C1. Install** on the VM, and on a Mac for local testing:
+**C1. Install.** The dev container already has this toolchain, pinned in `.devcontainer/docking-requirements.txt`. To install it on a Mac for local testing:
 
 ```bash
 sudo apt-get update && sudo apt-get install -y python3-venv python3-pip git
 python3 -m venv ~/dock && source ~/dock/bin/activate
-pip install -U numpy scipy rdkit vina meeko gemmi prody posebusters
+pip install -U numpy scipy rdkit vina meeko gemmi pdbfixer posebusters
 python -c "import vina, rdkit; print(vina.__version__, rdkit.__version__)"
 ```
 
@@ -281,10 +281,40 @@ Avoid the 20S proteasome (5LF3 and similar), XPO1, and any entry where the drug 
 **C3. Prepare a receptor** with `worker/prepare.py`. Run it once per structure and commit the outputs to `worker/structures/{PDB}/`.
 
 1. Download `https://files.rcsb.org/download/{PDB}.pdb`.
-2. Keep the chosen chain. Remove waters, ions and all ligands, using gemmi or ProDy.
-3. Add hydrogens and write the receptor PDBQT with Meeko's `mk_prepare_receptor.py`. Follow the Vina "basic docking" tutorial for the flags that match the installed Meeko version (`mk_prepare_receptor.py --help`).
-4. Download the crystal ligand pose from `https://models.rcsb.org/v1/{PDB}/ligand?label_comp_id={COMP}&encoding=sdf`. The box centre is the ligand's heavy-atom centroid; the box is a 25 Å cube.
-5. Write `meta.json` containing `pdb_id`, `chain`, `uniprot`, `symbol`, `ligand_comp_id`, `box_center`, `box_size` and `control_smiles`.
+2. Keep the chosen chain. Remove waters, ions, all ligands and alternate conformations with gemmi.
+3. Rebuild truncated side chains (`REMARK 470`); Meeko's template matching rejects them, and 6WTO has 34. Without the restrained minimisation, rebuilt atoms clash and Meeko still fails. `replaceNonstandardResidues` turns 6WTO's phosphotyrosines (PTR 1007-1008) into TYR; record that in `meta.json`. Checked on 6WTO; the minimisation takes about 20 seconds:
+
+   ```python
+   from openmm import CustomExternalForce, LocalEnergyMinimizer, Platform, VerletIntegrator, unit
+   from openmm.app import ForceField, HBonds, NoCutoff, PDBFile, Simulation
+   from pdbfixer import PDBFixer
+
+   f = PDBFixer(filename="receptor_clean.pdb")
+   f.findMissingResidues(); f.missingResidues = {}  # leave unresolved loops alone
+   f.findNonstandardResidues(); f.replaceNonstandardResidues()
+   f.findMissingAtoms(); f.addMissingAtoms(seed=42); f.addMissingHydrogens(7.4)
+
+   crystal = {(a.residue.chain.id, a.residue.id, a.name)
+              for a in PDBFixer(filename="receptor_clean.pdb").topology.atoms()}
+   system = ForceField("amber14-all.xml").createSystem(f.topology, nonbondedMethod=NoCutoff, constraints=HBonds)
+   pin = CustomExternalForce("k*periodicdistance(x,y,z,x0,y0,z0)^2")
+   pin.addGlobalParameter("k", 1000.0 * unit.kilojoules_per_mole / unit.nanometer**2)
+   for p in ("x0", "y0", "z0"):
+       pin.addPerParticleParameter(p)
+   for atom, pos in zip(f.topology.atoms(), f.positions):
+       if atom.element.symbol != "H" and (atom.residue.chain.id, atom.residue.id, atom.name) in crystal:
+           pin.addParticle(atom.index, pos.value_in_unit(unit.nanometer))
+   system.addForce(pin)
+   sim = Simulation(f.topology, system, VerletIntegrator(0.001), Platform.getPlatformByName("CPU"))
+   sim.context.setPositions(f.positions)
+   LocalEnergyMinimizer.minimize(sim.context, 10.0, 2000)
+   positions = sim.context.getState(getPositions=True).getPositions()
+   PDBFile.writeFile(f.topology, positions, open("receptor.pdb", "w"), keepIds=True)
+   ```
+
+4. Write the receptor PDBQT with Meeko's `mk_prepare_receptor.py`. Follow the Vina "basic docking" tutorial for the flags that match the installed Meeko version (`mk_prepare_receptor.py --help`).
+5. Download the crystal ligand pose from `https://models.rcsb.org/v1/{PDB}/ligand?label_comp_id={COMP}&encoding=sdf`. The box centre is the ligand's heavy-atom centroid; the box is a 25 Å cube.
+6. Write `meta.json` containing `pdb_id`, `chain`, `uniprot`, `symbol`, `ligand_comp_id`, `box_center`, `box_size` and `control_smiles`.
 
 **C4. Prepare a ligand.** Take the SMILES from ChEMBL (`molecule_structures.canonical_smiles`):
 
@@ -316,7 +346,7 @@ energies = v.energies(n_poses=9)  # column 0 is the total score per pose
 
 - Convert poses to SDF with `mk_export.py poses.pdbqt -s poses.sdf`.
 - Write `scores.json` and `log.txt` alongside.
-- Before wiring the queue, measure runtime on the VM at exhaustiveness 8, 16 and 32. Pick the highest setting that stays well inside the job timeout.
+- Runtime for baricitinib into 6WTO on the 4-core codespace (24 Oct 2026): 10.8 s at exhaustiveness 8, 21.9 s at 16 and 43.6 s at 32. All are well inside the 180-second job timeout. Pick the highest setting that still leaves room for receptor and ligand preparation.
 
 **C6. Redocking control.** Ship it as a visible feature.
 
@@ -332,6 +362,8 @@ energies = v.energies(n_poses=9)  # column 0 is the total score per pose
    pose = Chem.RemoveHs(next(Chem.SDMolSupplier("poses.sdf")))
    rmsd = rdMolAlign.CalcRMS(pose, Chem.RemoveHs(ref))  # success if rmsd <= 2.0
    ```
+
+   First run (24 Oct 2026, C3 preparation above, seed 42): the top pose was 2.44 Å from the crystal pose at exhaustiveness 8 and 16, and 2.90 Å at 32. **That fails the 2.0 Å threshold.** Look at the receptor preparation and the ligand's protonation before showing the control card.
 
 3. Run PoseBusters: `bust poses.sdf -l crystal_ligand.sdf -p receptor.pdb`. Show pass or fail per check group.
 4. **Negative control:** dock an unrelated approved drug into the same box. The viewer still draws a convincing-looking pose, which shows why a pose is not evidence.
