@@ -67,6 +67,7 @@
   summary{cursor:pointer;color:#3659b8}
   pre{max-height:360px;overflow:auto;background:#f6f8fc;border:1px solid #e4e8ef;border-radius:6px;padding:10px;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
   .loading{color:#5c6878;font-size:14px}
+  code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
   @media(max-width:860px){.grid{grid-template-columns:1fr}}
   @media(max-width:560px){main{padding:0 14px;margin-top:22px}.drug-head{grid-template-columns:1fr}dl{grid-template-columns:1fr}dd{margin-bottom:6px}.sources li{grid-template-columns:16px minmax(0,1fr)}.sources li>:nth-child(n+3){grid-column:2}}
 </style>
@@ -74,6 +75,7 @@
   <div class="tag">LOCAL DATA-SOURCE TEST BENCH</div>
   <h1>Pull live data from Open Targets, ChEMBL and PubChem</h1>
   <p class="muted">Search a disease, pick it to see linked proteins and drugs from Open Targets, then pick a drug to load its ChEMBL record and PubChem structure. All data is live from the public APIs; nothing is saved. Results are research evidence, not treatment advice.</p>
+  <p class="error" id="file-warning" role="alert" hidden>This page was opened as a file, so it cannot reach its local server. In a terminal, run <code>node demos/data-sources/server.mjs</code>, then open <a href="http://127.0.0.1:8787">http://127.0.0.1:8787</a>.</p>
 
   <section class="panel" aria-labelledby="search-title">
     <h2 id="search-title">1. Find a disease <span class="muted small">Open Targets</span></h2>
@@ -98,17 +100,34 @@
 const $ = (id) => document.getElementById(id);
 const escape = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-const stageLabel = (stage) => (stage ?? "UNKNOWN").replaceAll("_", " ").toLowerCase().replace(/^./, (c) => c.toUpperCase());
+// IND is an acronym (investigational new drug: cleared to start human trials), so it keeps its capitals.
+// Combined phases read the standard way: PHASE_1_2 becomes "Phase 1/2".
+const stageLabel = (stage) =>
+  stage === "IND"
+    ? "IND"
+    : (stage ?? "UNKNOWN").replace(/_(\d)_(\d)$/, "_$1/$2").replaceAll("_", " ").toLowerCase().replace(/^./, (c) => c.toUpperCase());
 const phaseLabel = (phase) =>
   phase === null || phase === undefined ? "unknown" : phase === 4 ? "4, approved" : String(phase);
 const plural = (count, word) => `${count.toLocaleString()} ${word}${count === 1 ? "" : "s"}`;
 const reveal = (id) => $(id).scrollIntoView({ behavior: "smooth", block: "start" });
 
+// The API is served by server.mjs, so a page opened straight from disk has nothing to call.
+const openedAsFile = location.protocol === "file:";
+$("file-warning").hidden = !openedAsFile;
+const serverUnreachable = openedAsFile
+  ? "Searching needs the local server. Start it as described above, then use the page at http://127.0.0.1:8787."
+  : "The local server did not answer. Check that node demos/data-sources/server.mjs is still running, then try again.";
+
 // Each request carries a token so a slow, superseded response never overwrites a newer one.
 const latest = {};
 async function getJson(slot, path) {
   const token = (latest[slot] = Symbol(slot));
-  const response = await fetch(path + (path.includes("?") ? "&" : "?") + "raw=1");
+  let response;
+  try {
+    response = await fetch(path + (path.includes("?") ? "&" : "?") + "raw=1");
+  } catch {
+    return latest[slot] === token ? { ok: false, body: { error: serverUnreachable, sources: [] } } : null;
+  }
   const body = await response.json().catch(() => ({ error: `Local server returned HTTP ${response.status}`, sources: [] }));
   if (latest[slot] !== token) return null;
   return { ok: response.ok, body };
@@ -121,7 +140,8 @@ function sourcesHtml(sources = []) {
       (s) => `<li><span class="${s.ok ? "good" : "bad"}" aria-label="${s.ok ? "succeeded" : "failed"}">${s.ok ? "✓" : "✕"}</span>
         <span>${escape(s.name)}</span><span class="muted">${s.status ?? "no reply"} · ${s.ms ?? "?"} ms</span>
         <a href="${escape(s.url)}" target="_blank" rel="noreferrer">${escape(s.url)}</a>
-        ${s.error ? `<span class="bad reason">${escape(s.error)}</span>` : ""}</li>`,
+        ${s.error ? `<span class="bad reason">${escape(s.error)}${s.attempts > 1 ? ` (after ${s.attempts} tries)` : ""}</span>` : ""}
+        ${!s.error && s.attempts > 1 ? `<span class="muted reason">Answered on try ${s.attempts}, after a dropped connection or gateway error.</span>` : ""}</li>`,
     )
     .join("")}</ul></div>`;
 }

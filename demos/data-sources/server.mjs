@@ -55,17 +55,43 @@ class RequestError extends Error {
   }
 }
 
+// Every upstream call only reads data, so a dropped connection or a gateway error is safe to retry.
+// Connection resets do happen in practice (seen from Open Targets' Google front end).
+const RETRYABLE_CODES = new Set(["ECONNRESET", "EPIPE", "ETIMEDOUT", "EAI_AGAIN", "UND_ERR_SOCKET"]);
+const RETRYABLE_STATUSES = new Set([502, 503, 504]);
+const RETRY_DELAYS_MS = [250, 750];
+
+const isRetryable = (error) => RETRYABLE_CODES.has(error.cause?.code);
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Fetch, retrying transient failures within one shared deadline. */
+async function fetchWithRetry(url, init, record) {
+  const signal = AbortSignal.timeout(TIMEOUT_MS);
+  for (let attempt = 0; ; attempt++) {
+    record.attempts = attempt + 1;
+    const lastAttempt = attempt === RETRY_DELAYS_MS.length;
+    try {
+      const response = await fetch(url, { ...init, signal });
+      if (lastAttempt || !RETRYABLE_STATUSES.has(response.status)) return response;
+      await response.body?.cancel();
+    } catch (error) {
+      if (lastAttempt || !isRetryable(error)) throw error;
+    }
+    await wait(RETRY_DELAYS_MS[attempt]);
+  }
+}
+
 /** Fetch JSON from one upstream source and record what happened in `sources`. */
 async function fetchSource(sources, name, url, init = {}) {
   const started = performance.now();
-  const record = { name, url, status: null, ms: null, ok: false };
+  const record = { name, url, status: null, ms: null, ok: false, attempts: 0 };
   sources.push(record);
   try {
-    const response = await fetch(url, {
-      ...init,
-      headers: { accept: "application/json", ...init.headers },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const response = await fetchWithRetry(
+      url,
+      { ...init, headers: { accept: "application/json", ...init.headers } },
+      record,
+    );
     record.status = response.status;
     const body = await response.json().catch(() => null);
     if (!response.ok) {
@@ -332,6 +358,15 @@ const server = createServer(async (request, response) => {
     const status = error instanceof RequestError ? error.status : 502;
     send(response, status, { error: error.message, sources });
   }
+});
+
+server.on("error", (error) => {
+  if (error.code !== "EADDRINUSE") throw error;
+  console.error(
+    `Port ${PORT} is already in use. The demo may already be running at http://${HOST}:${PORT}; ` +
+      `otherwise start it on another port, for example PORT=${PORT + 1} node demos/data-sources/server.mjs`,
+  );
+  process.exit(1);
 });
 
 server.listen(PORT, HOST, () => {

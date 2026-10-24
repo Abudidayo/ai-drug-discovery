@@ -18,6 +18,8 @@ node demos/data-sources/server.mjs
 
 Open <http://127.0.0.1:8787>. Set `PORT` to use another port. The server only listens on this machine.
 
+Opening `index.html` directly from disk does not work: the page gets its data from the server's `/api` endpoints, so it shows a notice explaining how to start the server instead.
+
 ## Endpoints
 
 Each endpoint returns `{ data, sources }`. `sources` lists every upstream call with its URL, HTTP status, time in milliseconds and any error. Add `raw=1` to also get the untouched upstream JSON.
