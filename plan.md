@@ -73,7 +73,7 @@ flowchart TD
 
 | Thing | Our ID | Format | Example | Other IDs, used only for lookups |
 |---|---|---|---|---|
-| Disease | Open Targets disease ID, exactly as the API returns it | `^[A-Za-z]+_[0-9]+$` (underscore) | `MONDO_0009693` (plasma cell myeloma) | ChEMBL writes `MONDO:0009693`: replace `:` with `_` before joining |
+| Disease | Open Targets disease ID, exactly as the API returns it | `^[A-Za-z]+_[A-Za-z0-9]+$` (underscore) | `MONDO_0009693` (plasma cell myeloma), `NCIT_C74532` | ChEMBL writes `MONDO:0009693`: replace `:` with `_` before joining |
 | Protein (Target, and every network node) | Ensembl gene ID | `^ENSG[0-9]{11}$` | `ENSG00000162434` (JAK1) | UniProt `P23458` for ChEMBL and RCSB lookups; STRING `9606.ENSP00000499900` while building the network only |
 | Drug (Candidate) | ChEMBL parent molecule ID | `^CHEMBL[0-9]+$` | `CHEMBL2105759` (baricitinib) | Salt and hydrate records, e.g. `CHEMBL1795071` (ruxolitinib phosphate), kept in `source_chembl_ids`; PubChem CID only for drawings |
 | ChEMBL target (bioactivity only) | Not stored: converted to a protein ID straight away | `^CHEMBL[0-9]+$` | `CHEMBL2835` (JAK1, single protein) → `ENSG00000162434` | — |

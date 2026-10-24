@@ -18,7 +18,7 @@ FILES = {
         "evidence_packet", "jury_result",
     )
 }
-DISEASE = r"[A-Za-z]+_[0-9]+"
+DISEASE = r"[A-Za-z]+_[A-Za-z0-9]+"
 TARGET = r"ENSG[0-9]{11}"
 DRUG = r"CHEMBL[0-9]+"
 EVIDENCE = r"E[0-9]+"
