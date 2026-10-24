@@ -33,10 +33,9 @@ the complete bundle and say: **Read `skills.md` and set everything up.**
 The included `.agents/install-skills.py` copies all supporting files,
 keeps identical existing skills, reports conflicting definitions before copying,
 and creates Claude Code aliases (or copies if symlinks are unavailable).
-It also appends a normal Caveman default to the project's `AGENTS.md`, which
+It also appends a Trail reply preference to the project's `AGENTS.md`, which
 `CLAUDE.md` imports with `@AGENTS.md`, preserving existing content and avoiding
-duplicate blocks.
-The same files suppress Trail closing lines. A shared standing preference is
+duplicate blocks. It suppresses Trail closing lines. A shared standing preference is
 also installed in `.trail/learnings/` so Trail's startup guidance carries the
 team's choice. Existing learnings are never overwritten. Restart existing
 agent sessions to load it; Trail's code map and learning workflows stay active.
@@ -94,10 +93,8 @@ Runtime notes:
   the command skill; the plugin's always-on hooks and personal plugin data
   are not included.
 - Caveman includes the upstream `caveman` skill and its license notices.
-  The installer makes normal Caveman automatic in project sessions through
-  `AGENTS.md`, which `CLAUDE.md` imports; no command or global hook is needed.
-  Requests for detail remain supported. Say `stop caveman` or `normal mode`
-  to disable it for the current session. Its optional
+  It is off by default because full replies are easier to read. Say
+  `/caveman` to use it in a session and `stop caveman` to turn it off. Its optional
   `ultracave` and `megacave` sibling skills, runtime, proxy and startup hooks
   are not part of this pack.
 - Trail-Code is installed separately on each teammate's machine. The bundled

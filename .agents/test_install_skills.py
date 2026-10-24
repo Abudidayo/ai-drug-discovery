@@ -103,8 +103,8 @@ class InstallerChecks(unittest.TestCase):
         for filename, content in originals.items():
             result = (self.project / filename).read_bytes()
             self.assertTrue(result.startswith(content))
-            self.assertIn(b'.agents/skills/caveman/SKILL.md', result)
-            self.assertIn(b'stop caveman', result)
+            self.assertIn(installer.TRAIL_START.encode(), result)
+            self.assertNotIn(b'shared-skills:caveman', result)
         before = installer.fingerprint(self.project)
         self.run_installer()
         self.assertEqual(installer.fingerprint(self.project), before)
@@ -113,27 +113,30 @@ class InstallerChecks(unittest.TestCase):
         (self.project / 'CLAUDE.md').write_text('@AGENTS.md\n')
         self.run_installer()
         self.assertEqual((self.project / 'CLAUDE.md').read_text(), '@AGENTS.md\n')
-        self.assertIn('stop caveman', (self.project / 'AGENTS.md').read_text())
+        self.assertIn(installer.TRAIL_START, (self.project / 'AGENTS.md').read_text())
 
     def test_fresh_claude_md_only_imports_agents_md(self):
         self.run_installer()
         self.assertEqual((self.project / 'CLAUDE.md').read_text(), '@AGENTS.md\n')
-        self.assertEqual((self.project / 'AGENTS.md').read_text().count(installer.CAVEMAN_START), 1)
+        agents = (self.project / 'AGENTS.md').read_text()
+        self.assertEqual(agents.count(installer.TRAIL_START), 1)
+        self.assertNotIn('shared-skills:caveman', agents)
 
     def test_ambiguous_instruction_block_stops_before_copying(self):
-        (self.project / 'AGENTS.md').write_text(installer.CAVEMAN_START + '\nCustomized rules')
+        (self.project / 'AGENTS.md').write_text(installer.TRAIL_START + '\nCustomized rules')
         before = installer.fingerprint(self.project)
         result = self.run_installer(expected=2)
         self.assertIn('instructions need review', result.stderr)
         self.assertEqual(installer.fingerprint(self.project), before)
 
-    def test_existing_caveman_default_gains_quiet_policy_without_being_rewritten(self):
-        original = '# Team instructions\n\n' + installer.CAVEMAN_DEFAULT
+    def test_old_caveman_block_is_left_alone_and_gains_quiet_policy(self):
+        original = ('# Team instructions\n\n<!-- shared-skills:caveman:start -->\nOld default\n'
+                    '<!-- shared-skills:caveman:end -->\n')
         (self.project / 'AGENTS.md').write_text(original)
         self.run_installer()
         result = (self.project / 'AGENTS.md').read_text()
         self.assertTrue(result.startswith(original))
-        self.assertEqual(result.count(installer.CAVEMAN_START), 1)
+        self.assertEqual(result.count('<!-- shared-skills:caveman:start -->'), 1)
         self.assertEqual(result.count(installer.TRAIL_START), 1)
         learning = self.project / installer.QUIET_LEARNING
         self.assertEqual(learning.read_bytes(), installer.QUIET_PREFERENCE.read_bytes())
@@ -152,7 +155,7 @@ class InstallerChecks(unittest.TestCase):
         (self.project / 'CLAUDE.md').symlink_to('AGENTS.md')
         self.run_installer()
         self.assertTrue((self.project / 'CLAUDE.md').is_symlink())
-        self.assertEqual((self.project / 'AGENTS.md').read_text().count(installer.CAVEMAN_START), 1)
+        self.assertEqual((self.project / 'AGENTS.md').read_text().count(installer.TRAIL_START), 1)
         self.run_installer()
 
     def test_codex_override_is_covered_and_new_claude_file_imports_shared_guidance(self):
@@ -160,7 +163,7 @@ class InstallerChecks(unittest.TestCase):
         override.write_text('# Private project overrides\n')
         self.run_installer()
         self.assertTrue(override.read_text().startswith('# Private project overrides\n'))
-        self.assertIn('.agents/skills/caveman/SKILL.md', override.read_text())
+        self.assertIn(installer.TRAIL_START, override.read_text())
         self.assertTrue((self.project / 'CLAUDE.md').read_text().startswith('@AGENTS.md\n'))
         before = installer.fingerprint(self.project)
         self.run_installer()

@@ -17,18 +17,6 @@ SKILLS = (
     "ui-engineering-principles",
 )
 SOURCE = Path(__file__).resolve().parent / "skills"
-CAVEMAN_START = "<!-- shared-skills:caveman:start -->"
-CAVEMAN_END = "<!-- shared-skills:caveman:end -->"
-CAVEMAN_DEFAULT = f"""{CAVEMAN_START}
-## Chat style
-
-At the start of each session, read `.agents/skills/caveman/SKILL.md` and use
-normal Caveman for chat by default, without waiting for a command.
-Keep technical facts, uncertainty, numbers and units explicit. Honor requests
-for more detail and the user's chosen language. Use normal prose in documents.
-`stop caveman` or `normal mode` disables this default for the rest of the session.
-{CAVEMAN_END}
-"""
 TRAIL_START = "<!-- shared-skills:trail-replies:start -->"
 TRAIL_END = "<!-- shared-skills:trail-replies:end -->"
 TRAIL_DEFAULT = f"""{TRAIL_START}
@@ -114,7 +102,6 @@ def install(target, dry_run):
             continue
         missing = []
         for label, start, end, block in (
-            ("Caveman", CAVEMAN_START, CAVEMAN_END, CAVEMAN_DEFAULT),
             ("Trail reply", TRAIL_START, TRAIL_END, TRAIL_DEFAULT),
         ):
             if start in contents or end in contents:
@@ -204,7 +191,7 @@ def install(target, dry_run):
             raise RuntimeError(f"Installed skill failed verification: {name}")
     print(f"Ready: all {len(SKILLS)} skills installed and verified in {target}")
     print(f"Added {len(operations)} entries; identical existing skills were preserved.")
-    print("Normal Caveman is the project default in AGENTS.md, which CLAUDE.md imports; existing instructions were kept.")
+    print("Caveman is installed for on-demand use and is not a default; existing instructions were kept.")
     print("Trail closing lines are disabled by project guidance and a shared standing preference.")
     print("Available on the next agent turn; start a new session if discovery has not refreshed.")
     return 0

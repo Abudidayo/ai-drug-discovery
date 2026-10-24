@@ -18,13 +18,11 @@ Do not ask them to choose skills.
    CLI if missing, preview the changes, then run its bundled setup helper.
    Each teammate needs this once per machine and checkout. An existing
    `.trail/` folder does not mean their local setup is ready.
-4. Read `.agents/skills/caveman/SKILL.md` and use normal Caveman for chat now.
-   The installer adds this default to `AGENTS.md` for future sessions;
-   `CLAUDE.md` imports it with `@AGENTS.md`. Existing instructions are kept. No manual trigger is needed.
-   Keep Trail's savings, credit and promotional closing lines out of replies.
-   The installer saves this as a shared standing preference too. Restart
+4. Keep Trail's savings, credit and promotional closing lines out of replies.
+   The installer adds this to `AGENTS.md`, which `CLAUDE.md` imports with
+   `@AGENTS.md`, and saves it as a shared standing preference too. Restart
    existing sessions to load it.
-5. Verify the skills, automatic Caveman default and Trail setup. Report the
+5. Verify the skills and Trail setup. Report the
    installed count and any required agent restart. If anything fails or
    conflicts, name the problem;
    do not overwrite existing work or claim full success.
@@ -54,15 +52,14 @@ Trail's helper uses `--no-global` to keep agent settings within the project.
 | `code-review` | Check code against the spec |
 | `break-ui` | Find UI edge cases |
 | `i-have-adhd` | Clear, action-first responses |
-| `caveman` | Automatic concise answers with technical details preserved |
+| `caveman` | Concise answers on request, with technical details preserved |
 
 ## Use a skill
 
 Claude Code uses `/skill-name`; Codex uses `$skill-name`.
-Caveman starts automatically after setup. Use normal Caveman for clear team
-communication. Ultra strips more grammar and is not the default or bundled.
-Ask for more detail whenever needed. Say `stop caveman` to disable it for
-the current session.
+Caveman is off by default because full replies are easier to read. Say
+`/caveman` to use it in a session and `stop caveman` to turn it off. Ultra is
+not bundled.
 
 ## Trail sharing
 
