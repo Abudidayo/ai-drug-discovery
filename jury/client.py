@@ -264,14 +264,32 @@ def _numbers(text, identifiers):
     # Only source-grounded identifiers are exempt; an unknown dose-99 stays checked.
     text = text.translate(str.maketrans({"\u2010": "-", "\u2011": "-"}))
     known = {identifier.casefold() for identifier in identifiers}
+    # Expanded protein families can share a word prefix: phosphodiesterase 3
+    # and 4. Every expanded member must be present in the source lexicon.
+    prefixes = {m[1] for name in known if (m := re.fullmatch(r"(.+ )([0-9]+)", name))}
+    for prefix in sorted(prefixes, key=len, reverse=True):
+        def expanded_family(match):
+            members = re.split(r"\s*(?:/|,|and|or)\s*", match[1], flags=re.I)
+            return " " if all(prefix + member in known for member in members) else match[0]
+        text = re.sub(r"(?<!\w)" + re.escape(prefix) + r"([0-9]+(?:\s*(?:/|,|and|or)\s*[0-9]+)+)(?!\w)",
+                      expanded_family, text, flags=re.I)
     def family_list(match):
         prefix, members = match.groups()
         if prefix.casefold() not in {"c", "e"} and all(
                 (prefix + member).casefold() in known for member in members.split("/")):
             return " "
         return match[0]
-    text = re.sub(r"(?<!\w)([A-Za-z]+|[0-9]+-[A-Za-z]+)([0-9]+[A-Za-z]*(?:/[0-9]+[A-Za-z]*)+)(?!\w)",
+    text = re.sub(r"(?<!\w)([A-Za-z]+-?|[0-9]+-[A-Za-z]+)([0-9]+[A-Za-z]*(?:/[0-9]+[A-Za-z]*)+)(?!\w)",
                   family_list, text)
+    def family_range(match):
+        prefix, start, end = match.groups()
+        first, last = int(start), int(end)
+        if prefix.casefold() not in {"c", "e"} and 0 < last-first < 50 and all(
+                (prefix + str(member)).casefold() in known for member in range(first, last+1)):
+            return " "
+        return match[0]
+    text = re.sub(r"(?<!\w)([A-Za-z]+-?|[0-9]+-[A-Za-z]+)([0-9]+)-([0-9]+)(?!\w)",
+                  family_range, text)
     for identifier in sorted(identifiers, key=lambda value: (-len(value), value)):
         text = re.sub(r"(?<!\w)" + re.escape(identifier) + r"(?!\w)", " ", text, flags=re.I)
     pattern = r"[+\-−]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:[eE][+\-]?\d+)?|[+\-−]?\.\d+(?:[eE][+\-]?\d+)?"
@@ -315,7 +333,10 @@ def _name_identifiers(packet):
     # Family shorthand also occurs in mechanism text, e.g. 5-HT2a → 5-HT2.
     for identifier in tuple(identifiers):
         family = re.fullmatch(r"([A-Za-z0-9-]*[0-9]+)[A-Za-z]+", identifier)
-        if family:
+        if family and re.search(r"[A-Za-z]", family[1]):
+            identifiers.add(family[1])
+        family = re.fullmatch(r"(.+[A-Za-z])[0-9]+", identifier)
+        if family and re.search(r"[0-9]", family[1]):
             identifiers.add(family[1])
     # Short Disease names and their initials: type 2 diabetes [mellitus], T2D[M].
     words = packet["disease"]["name"].split()
@@ -336,7 +357,7 @@ def _unique_object(pairs):
     return value
 
 
-def validate_reply(raw, packet):
+def validate_reply(raw, packet, *, name_aliases=()):
     """Return enriched reviews or no vote, with fixture-shaped validation flags."""
     validation = dict(schema=False, unique_ranks=None, evidence_ids_exist=None,
                       numbers_match=None, errors=[])
@@ -362,7 +383,20 @@ def validate_reply(raw, packet):
     reviews = value["reviews"]
     candidates = {c["label"]: c for c in packet["candidates"]}
     items = {e["id"]: e for e in packet["evidence"]}
-    identifiers = _name_identifiers(packet)
+    # Optional source lexicon is validation metadata, never model input.
+    if any(not isinstance(alias, str) or not alias.strip() for alias in name_aliases):
+        raise ValueError("Name aliases must be nonempty source strings")
+    extra_names = set(name_aliases)
+    if any(re.fullmatch(r"[+\-]?[0-9]+(?:\.[0-9]+)?", name) for name in extra_names):
+        raise ValueError("A bare numeric value is not a name alias")
+    for name in tuple(extra_names):
+        family = re.fullmatch(r"([A-Za-z0-9-]*[0-9]+)[A-Za-z]+", name)
+        if family and re.search(r"[A-Za-z]", family[1]):
+            extra_names.add(family[1])
+        family = re.fullmatch(r"(.+[A-Za-z])[0-9]+", name)
+        if family and re.search(r"[0-9]", family[1]):
+            extra_names.add(family[1])
+    identifiers = _name_identifiers(packet) | extra_names
     validation["unique_ranks"] = (
         Counter(r["label"] for r in reviews) == Counter(candidates.keys())
         and sorted(r["rank"] for r in reviews) == list(range(1, len(candidates) + 1))

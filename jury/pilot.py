@@ -1,8 +1,9 @@
-"""Frozen single-model pilot; at most 25 requests, including all retries.
+"""Frozen pilots: v1 allows 25 requests; v2 allows 60, including retries.
 
 Prepare: python -m pipeline.panels
 Run: python -m jury.pilot --live
 Re-score without network: python -m jury.pilot
+V2: python -m pipeline.panels --v2; python -m jury.pilot --v2 --live
 """
 
 import argparse
@@ -383,11 +384,317 @@ def score(output):
     return result
 
 
+V2_MODELS = ["claude-opus-5-5", "openai-gpt-5.4", "glm-5.3", "kimi-k3"]
+V2_CONDITIONS = ("named", "blind")
+V2_JURIES = {"opus_gpt_glm": V2_MODELS[:3],
+             "opus_gpt_kimi": [V2_MODELS[0], V2_MODELS[1], V2_MODELS[3]]}
+
+
+def v2_lexicon(packet, identities):
+    """Same source-grounded numeric-name exemptions for both conditions."""
+    names = {name for c in packet["candidates"] for name in identities["drug_aliases"][c["candidate_id"]]}
+    for c in packet["candidates"]:
+        for target in c["targets"]:
+            names.update(identities["target_name_aliases"].get(target["id"], []))
+    return sorted(name for name in names if re.search(r"[0-9]", name)
+                  and (re.search(r"[A-Za-z]", name) or re.fullmatch(r"[0-9]{2,7}-[0-9]{2}-[0-9]", name)))
+
+
+def v2_jobs(output):
+    from pipeline.panels import blind_prompt_leaks
+    output = Path(output)
+    panels = json.loads((output / "panels.json").read_text())["panels"]
+    identities = json.loads((output / "identities.json").read_text())
+    suffix = "Keep each rationale and objection concise (one short sentence each). Avoid quoting numeric measurements. Obey decision order across ranks."
+    jobs = []
+    for index, panel in enumerate(panels):
+        did = panel["disease"]["id"]
+        packets = {condition: json.loads((output / f"{'packet' if condition == 'named' else 'blind'}-{did}.json").read_text()) for condition in V2_CONDITIONS}
+        expected = {d["drug_id"] for d in [panel["true_drug"], *panel["decoys"]]}
+        if any(len(p["candidates"]) != 15 or {c["candidate_id"] for c in p["candidates"]} != expected for p in packets.values()):
+            raise ValueError("Each condition must contain exactly the frozen 15-drug panel")
+        for model_index, model in enumerate(V2_MODELS):
+            order = [c["label"] for c in packets["named"]["candidates"]]
+            random.Random(SEED + index*len(V2_MODELS)+model_index).shuffle(order)
+            for condition in V2_CONDITIONS:
+                packet = packets[condition]
+                validate_packet(packet)
+                prompt = build_prompt(packet, order) + "\n" + suffix
+                if condition == "blind":
+                    aliases = [a for c in packet["candidates"] for a in identities["drug_aliases"][c["candidate_id"]]]
+                    leaks = blind_prompt_leaks(prompt, aliases)
+                    if leaks:
+                        raise ValueError(f"Drug identity in blind prompt: {leaks}")
+                jobs.append({"disease_id": did, "condition": condition, "model": model,
+                    "packet": packet, "presented_order": order, "prompt": prompt,
+                    "name_aliases": v2_lexicon(packet, identities),
+                    "path": str(output / "runs" / f"{did}-{model}-{condition}.json")})
+    random.Random(SEED).shuffle(jobs)
+    return jobs
+
+
+def freeze_v2(output):
+    output = Path(output)
+    jobs = v2_jobs(output)
+    if len(jobs) != 48:
+        raise ValueError("V2 needs exactly six panels × four models × two conditions")
+    paths = [output / "panels.json", output / "identities.json", *sorted(output.glob("packet-*.json")), *sorted(output.glob("blind-*.json"))]
+    declaration = {"version": 2, "models": V2_MODELS, "conditions": V2_CONDITIONS,
+        "juries": V2_JURIES, "seed": SEED, "max_live_calls": 60, "max_attempts_per_job": 2,
+        "workers": 4, "reasoning_effort": json.loads(os.environ.get("SNOWFLAKE_REASONING_EFFORT", "{}")),
+        "transport": {"temperature": 0, "anthropic_temperature": "omitted/provider default", "anthropic_max_tokens": 12000, "sdk_retries": 0},
+        "selection": "Six areas; newest FDA ORIG/AP date among mapped regulator-backed drugs with ChEMBL first_approval >=2024. Seven count-matched top-50 plausible decoys selected by strongest direct evidence; seven other matched decoys. Any Disease clinical record excludes a decoy. Fame proxy: recent first US approval, narrow indication breadth, fewer clinical reports than most-recorded approved comparator; not measured name familiarity.",
+        "design": "Same panel and presented order per named/blind pair; same instructions and evidence values. Independent model/Disease orders. Fixed seeded interleaving of conditions, four separate worker processes; stateless single-message requests.",
+        "retry_policy": "All 48 first attempts before any retry. At most one retry per job; first 12 unsuccessful jobs in the same frozen order if all fail. Every request reserved durably before dispatch. An interrupted reservation consumes a slot.",
+        "metrics": "Valid jobs / 6 per model/condition; Hits@5 and MRR over all six Diseases with invalid/failed votes zero. Per-panel true ranks. Median active response time per job including retries, token totals and medians. Named-minus-blind paired deltas, plus both-valid paired subset. No confidence or clinical efficacy claims from six panels.",
+        "jury_policy": "Both declared juries reuse the single-model outputs; Borda competition ranks and Kendall W per Disease/condition. Require all three valid jurors for scored recovery and W; otherwise zero recovery and null W.",
+        "baseline": "Same packet evidence: max assigned target_association evidence_only_score per Candidate, same 8-significant-digit values shown to jurors. Order descending score, ChEMBL ID tie-break. Missing association ranks with zero sentinel, not proof of biological zero. All candidate Target associations supplied, not just top 50.",
+        "gap_interpretation": "Named-minus-blind estimates name-visibility effect, not pure memory. Target/mechanism fingerprints, numbers, warnings and literature may still identify compounds.",
+        "inputs_sha256": {p.name: sha256(p.read_bytes()).hexdigest() for p in paths},
+        "source_sha256": {name: sha256(Path(__file__).with_name(name).read_bytes()).hexdigest() for name in ("client.py", "pilot.py")},
+        "jobs": [{k: job[k] for k in ("disease_id", "model", "condition", "presented_order")} | {"prompt_sha256": sha256(job["prompt"].encode()).hexdigest()} for job in jobs]}
+    amendment = output / "protocol_amendment.json"
+    if amendment.exists():
+        declaration["protocol_amendment_sha256"] = sha256(amendment.read_bytes()).hexdigest()
+        declaration["prior_calls_not_in_active_runs"] = json.loads(amendment.read_text())["prior_calls_not_in_active_runs"]
+    path = output / "preregistered.json"
+    if path.exists():
+        old = json.loads(path.read_text())["declaration"]
+        if old != json.loads(json.dumps(declaration)):
+            raise ValueError("Frozen v2 inputs, rules or source code changed")
+    else:
+        write_json(path, {"frozen_at": datetime.now(timezone.utc).isoformat(), "declaration": declaration})
+    prompts = output / "prompts"
+    prompts.mkdir(exist_ok=True)
+    for job in jobs:
+        (prompts / (Path(job["path"]).stem + ".txt")).write_text(job["prompt"])
+    return declaration
+
+
+def v2_live_attempt(job):
+    """One request in an isolated process; no credential enters a job argument."""
+    path = Path(job["path"])
+    run = json.loads(path.read_text())
+    attempt = run["attempts"][-1]
+    attempt["dispatched_at"] = datetime.now(timezone.utc).isoformat()
+    write_json(path, run)
+    previous = os.environ.get("SNOWFLAKE_MODELS")
+    os.environ["SNOWFLAKE_MODELS"] = json.dumps([job["model"]])
+    client = None
+    started = perf_counter()
+    try:
+        client = CortexModel()
+        reply = call_model(client, job["model"], job["prompt"])
+        attempt.update(raw_output=reply.text, input_tokens=reply.input_tokens, output_tokens=reply.output_tokens)
+        reviews, flags = validate_reply(reply.text, job["packet"], name_aliases=job["name_aliases"])
+        attempt.update(status="valid" if reviews is not None else "invalid", reviews=reviews, validation=flags)
+    except Exception as exc:
+        attempt.update(status="failed", error={"type": type(exc).__name__, "http_status": getattr(exc, "status_code", None)})
+    finally:
+        if client:
+            client.close()
+        if previous is None:
+            os.environ.pop("SNOWFLAKE_MODELS", None)
+        else:
+            os.environ["SNOWFLAKE_MODELS"] = previous
+        if attempt["status"] == "reserved":
+            attempt.update(status="failed", error={"type": "InterruptedRequest", "http_status": None})
+        attempt["latency_ms"] = round((perf_counter()-started)*1000)
+        write_json(path, run)
+    return {k: run[k] for k in ("model", "condition", "disease_id")} | {"status": attempt["status"], "attempt": attempt["attempt"]}
+
+
+def run_v2(output, attempt_call=v2_live_attempt):
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+    output = Path(output)
+    declaration = freeze_v2(output)
+    jobs = v2_jobs(output)
+    (output / "runs").mkdir(exist_ok=True)
+    def record(job):
+        path = Path(job["path"])
+        return json.loads(path.read_text()) if path.exists() else {
+            **{k: job[k] for k in ("model", "condition", "disease_id", "presented_order")}, "attempts": []}
+    used = declaration.get("prior_calls_not_in_active_runs", 0) + sum(len(record(job)["attempts"]) for job in jobs)
+    if used > 60:
+        raise ValueError("Existing v2 journal exceeds 60-call budget")
+    with ProcessPoolExecutor(max_workers=4) as pool:
+        for number in (1, 2):
+            pending = {}
+            for job in jobs:
+                run = record(job)
+                if used >= 60:
+                    break
+                if len(run["attempts"]) != number-1 or final_attempt(run):
+                    continue
+                run["attempts"].append({"attempt": number, "status": "reserved", "raw_output": None,
+                    "reviews": None, "validation": None, "input_tokens": None, "output_tokens": None,
+                    "latency_ms": None, "started_at": datetime.now(timezone.utc).isoformat(),
+                    "prompt_sha256": sha256(job["prompt"].encode()).hexdigest()})
+                write_json(Path(job["path"]), run)
+                used += 1
+                pending[pool.submit(attempt_call, job)] = job
+            for future in as_completed(pending):
+                job = pending[future]
+                try:
+                    result = future.result()
+                except Exception as exc:
+                    run = record(job)
+                    run["attempts"][-1].update(status="failed", error={"type": type(exc).__name__, "http_status": None})
+                    write_json(Path(job["path"]), run)
+                    result = {k: job[k] for k in ("model", "condition", "disease_id")} | {"status": "failed"}
+                print(json.dumps(result), flush=True)
+
+
+def score_v2(output):
+    output = Path(output)
+    panels = json.loads((output / "panels.json").read_text())["panels"]
+    jobs = v2_jobs(output)
+    runs = {(j["disease_id"], j["model"], j["condition"]): json.loads(Path(j["path"]).read_text()) for j in jobs}
+    if len(runs) != 48 or any(not r["attempts"] for r in runs.values()):
+        raise ValueError("Need all 48 v2 jobs")
+    baseline = []
+    by_model = {}
+    identities = json.loads((output / "identities.json").read_text())
+    from pipeline.panels import blind_prompt_leaks
+    leakage = []
+    for panel in panels:
+        did = panel["disease"]["id"]
+        packet = json.loads((output / f"packet-{did}.json").read_text())
+        evidence = {e["id"]: e for e in packet["evidence"]}
+        values = []
+        for c in packet["candidates"]:
+            scores = [evidence[e]["values"]["evidence_only_score"] for e in c["evidence_ids"] if evidence[e]["kind"] == "target_association"]
+            values.append({"candidate_id": c["candidate_id"], "score": max(scores, default=0), "observed_associations": len(scores)})
+        values.sort(key=lambda r: (-r["score"], r["candidate_id"]))
+        ranking = [{**r, "rank": i} for i, r in enumerate(values, 1)]
+        baseline.append({"disease_id": did, **recovery(ranking, panel["true_drug"]["drug_id"]), "ranking": ranking})
+    for model in V2_MODELS:
+        by_model[model] = {}
+        for condition in V2_CONDITIONS:
+            selected = [runs[(p["disease"]["id"], model, condition)] for p in panels]
+            attempts = [a for r in selected for a in r["attempts"]]
+            results = []
+            for panel, run in zip(panels, selected):
+                final = final_attempt(run)
+                results.append({"disease_id": run["disease_id"], "status": "valid" if final else "invalid_or_failed",
+                    **recovery(final["reviews"] if final else None, panel["true_drug"]["drug_id"])})
+                forbidden = [name for c in [panel["true_drug"], *panel["decoys"]] for name in identities["drug_aliases"][c["drug_id"]]]
+                for attempt in run["attempts"]:
+                    if condition == "blind" and attempt["raw_output"]:
+                        # Output identities are findings, not grounds for discarding a ballot.
+                        hits = blind_prompt_leaks(attempt["raw_output"], forbidden)
+                        if hits:
+                            leakage.append({"model": model, "disease_id": run["disease_id"], "attempt": attempt["attempt"],
+                                "valid_final": attempt is final, "name_or_id_mentions": hits})
+            summary = {"valid_runs": sum(r["status"]=="valid" for r in results), "runs": 6,
+                "valid_reply_rate": sum(r["status"]=="valid" for r in results)/6,
+                "attempts": len(attempts), "hits_at_5": sum(r["hits_at_5"] for r in results)/6,
+                "mrr": sum(r["reciprocal_rank"] for r in results)/6, "per_panel": results,
+                "median_latency_ms": median(sum(a["latency_ms"] or 0 for a in r["attempts"]) for r in selected),
+                "input_tokens": sum(a["input_tokens"] or 0 for a in attempts),
+                "output_tokens": sum(a["output_tokens"] or 0 for a in attempts),
+                "median_input_tokens": median(sum(a["input_tokens"] or 0 for a in r["attempts"]) for r in selected),
+                "median_output_tokens": median(sum(a["output_tokens"] or 0 for a in r["attempts"]) for r in selected),
+                "median_first_attempt_latency_ms": median(r["attempts"][0]["latency_ms"] or 0 for r in selected),
+                "first_attempt_input_tokens": sum(r["attempts"][0]["input_tokens"] or 0 for r in selected),
+                "first_attempt_output_tokens": sum(r["attempts"][0]["output_tokens"] or 0 for r in selected),
+                "valid_attempt_rate": sum(a["status"] == "valid" for a in attempts)/len(attempts),
+                "missing_usage_attempts": sum(a["input_tokens"] is None or a["output_tokens"] is None for a in attempts),
+                "rejections": rejection_counts(attempts)}
+            by_model[model][condition] = summary
+    juries = {}
+    for name, models in V2_JURIES.items():
+        juries[name] = {}
+        for condition in V2_CONDITIONS:
+            rows = []
+            for panel in panels:
+                did = panel["disease"]["id"]
+                packet = json.loads((output / f"packet-{did}.json").read_text())
+                finals = [final_attempt(runs[(did, m, condition)]) for m in models]
+                votes = [{"status": "valid" if a else "failed", "reviews": a["reviews"] if a else None} for a in finals]
+                c = consensus(packet, votes)
+                complete = all(finals)
+                if not complete:
+                    c["kendalls_w"] = None
+                rows.append({"disease_id": did, "complete": complete,
+                    **recovery(c["ranking"] if complete else None, panel["true_drug"]["drug_id"]), "consensus": c})
+            juries[name][condition] = {"models": models, "complete_panels": sum(r["complete"] for r in rows),
+                "hits_at_5": sum(r["hits_at_5"] for r in rows)/6, "mrr": sum(r["reciprocal_rank"] for r in rows)/6, "per_panel": rows}
+    gaps = {}
+    for name, conditions in {**by_model, **juries}.items():
+        named, blind = conditions["named"], conditions["blind"]
+        nrows = named.get("per_panel");brows = blind.get("per_panel")
+        both = [(n,b) for n,b in zip(nrows,brows) if n["rank"] is not None and b["rank"] is not None]
+        gaps[name] = {"hits_at_5_named_minus_blind": named["hits_at_5"]-blind["hits_at_5"],
+            "mrr_named_minus_blind": named["mrr"]-blind["mrr"], "both_valid_panels": len(both),
+            "paired_rr_gaps": [{"disease_id": n["disease_id"], "delta": n["reciprocal_rank"]-b["reciprocal_rank"]} for n,b in zip(nrows,brows)],
+            "both_valid_mrr_gap": sum(n["reciprocal_rank"]-b["reciprocal_rank"] for n,b in both)/len(both) if both else None}
+        gaps[name]["both_valid_hits_at_5_gap"] = sum(n["hits_at_5"]-b["hits_at_5"] for n,b in both)/len(both) if both else None
+    result = {"version": 2, "models": by_model, "juries": juries, "named_minus_blind": gaps,
+        "direct_baseline": {"hits_at_5": sum(r["hits_at_5"] for r in baseline)/6, "mrr": sum(r["reciprocal_rank"] for r in baseline)/6, "per_panel": baseline},
+        "chance": {"hits_at_5": 5/15, "mrr": sum(1/i for i in range(1,16))/15},
+        "total_attempts": sum(len(r["attempts"]) for r in runs.values()), "blind_output_identity_mentions": leakage,
+        "interpretation": "Six-Disease retrospective pilot. Name masking does not mask Target/mechanism fingerprints. A paired name-visibility gap is not a pure measure of memory. Decoys are unlabelled, not known ineffective.",
+        "manual_citation_audit": "not performed", "credit_cost": None}
+    amendment = output / "protocol_amendment.json"
+    if amendment.exists():
+        result["protocol_amendment"] = json.loads(amendment.read_text())
+        result["active_attempts"] = result["total_attempts"]
+        result["total_attempts"] += result["protocol_amendment"]["prior_calls_not_in_active_runs"]
+    write_json(output / "scores.json", result)
+    lines = ["# Harder pilot v2", "", "This is a retrospective recovery test on six Diseases, not a clinical prediction test. Panels, Candidate order and recovery scoring were fixed before calls; masking and validator corrections are documented below. The same Candidate order is used in each named/blind pair. No v1 artifact was overwritten.", "",
+        "## Panels to exclude from the final test", "", "| Disease | Area | True drug | First US approval | Plausible decoys |", "|---|---|---|---|---:|"]
+    for p in panels:
+        lines.append(f"| {p['disease']['name']} ({p['disease']['id']}) | {p['disease']['area']} | {p['true_drug']['name']} ({p['true_drug']['drug_id']}) | {p['true_drug']['first_approval']['date']} | {sum(d['plausible'] for d in p['decoys'])}/14 |")
+    lines += ["", "Approval dates come from FDA ORIG/AP submissions joined through application IDs in Open Targets regulator reports. ChEMBL 37's eligible dated recent cohort ends in 2024. These are first US dates, not claims about first approval anywhere in the world. 'Less famous' means recent first US approval, narrow indication breadth and fewer source clinical reports than the most-recorded approved comparator; actual familiarity was not measured. All seven required plausible decoys share an exact top-50 Target; no broad protein-family fallback was used. All decoys have no Disease clinical record at any stage across parent and included salts.", "",
+        "## Summary", "", "| Model | Condition | Valid | Attempts | Hits@5 | MRR | Median seconds | Median input/output tokens | Total input/output tokens |", "|---|---|---:|---:|---:|---:|---:|---:|---:|"]
+    for model, conditions in by_model.items():
+        for condition, v in conditions.items():
+            lines.append(f"| {model} | {condition} | {v['valid_runs']}/6 | {v['attempts']} | {v['hits_at_5']:.1%} | {v['mrr']:.3f} | {v['median_latency_ms']/1000:.1f} | {v['median_input_tokens']}/{v['median_output_tokens']} | {v['input_tokens']}/{v['output_tokens']} |")
+    lines += ["", "Latency includes the request and local validation, with retries summed within a job. Token totals and medians cover active corrected-experiment attempts; all historical spending and unknown interrupted usage are recorded separately in cost_accounting.json. First-attempt latency and tokens are also in scores.json."]
+    lines += ["", f"Chance: Hits@5 33.3%, MRR {result['chance']['mrr']:.3f}. Direct-evidence baseline: Hits@5 {result['direct_baseline']['hits_at_5']:.1%}, MRR {result['direct_baseline']['mrr']:.3f}. It uses the best Target score actually present in each packet. All Candidate Target associations are supplied; the top-50 limit only defines plausibility. A missing association uses zero for ordering and is not proof of no biological link. Ties in this baseline use ChEMBL ID order.", "",
+        "## Jury results", "", "| Jury | Condition | Complete panels | Hits@5 | MRR | W by panel in listed order |", "|---|---|---:|---:|---:|---|"]
+    for name, conditions in juries.items():
+        for condition,v in conditions.items():
+            lines.append(f"| {name} | {condition} | {v['complete_panels']}/6 | {v['hits_at_5']:.1%} | {v['mrr']:.3f} | {', '.join(str(r['consensus']['kendalls_w']) for r in v['per_panel'])} |")
+    lines += ["", "W describes agreement, not correctness. Invalid jobs score zero; no missing juror is fabricated. The two juries reuse the same single-model calls.", "", "## Named minus blind", "", "| Model/jury | Hits@5 gap | MRR gap | Both-valid paired panels |", "|---|---:|---:|---:|"]
+    for name,v in gaps.items():lines.append(f"| {name} | {v['hits_at_5_named_minus_blind']:+.1%} | {v['mrr_named_minus_blind']:+.3f} | {v['both_valid_panels']}/6 |")
+    lines += ["", "Positive gaps favour visible names. This measures name visibility under this setup, not memory alone: the preserved Targets, mechanisms, activity values and warnings can still identify a drug. Invalid blind replies also inflate this gap. Both-valid paired results below remove that failure difference, while selecting a smaller subset.", "", "| Model/jury | Both-valid panels | Hits@5 gap in subset | MRR gap in subset |", "|---|---:|---:|---:|"]
+    for name,v in gaps.items():
+        lines.append(f"| {name} | {v['both_valid_panels']}/6 | {v['both_valid_hits_at_5_gap']:+.1%} | {v['both_valid_mrr_gap']:+.3f} |" if v['both_valid_panels'] else f"| {name} | 0/6 | — | — |")
+    lines += ["", "Raw paired reciprocal-rank differences are in scores.json.", "", "## Per-panel true ranks", "", "A dash is an invalid/failed job. Named/blind are paired within each cell. These six observations are shown instead of claiming precise population effects.", "", "| Disease | Direct | Opus N/B | GPT N/B | GLM N/B | Kimi N/B |", "|---|---:|---:|---:|---:|---:|"]
+    for i,p in enumerate(panels):
+        cells=[str(baseline[i]["rank"])]
+        for model in V2_MODELS:
+            cells.append('/'.join(str(by_model[model][c]['per_panel'][i]['rank'] or '—') for c in V2_CONDITIONS))
+        lines.append('| '+p['disease']['name']+' | '+' | '.join(cells)+' |')
+    lines += ["", "## Leakage and limits", "", f"All blind prompts passed a source-alias and ChEMBL-ID scan before dispatch. {len(leakage)} blind-output attempts mentioned a panel identity alias or ID; these flags require inspection because short aliases can be ambiguous. See scores.json. No output was discarded merely for revealing an identity. Indication/trial labels and clinical/cancer-biomarker association contributions are excluded from packets; literature co-mentions and model knowledge remain risks.",
+        "Names and synonyms were collected from the pinned ChEMBL and Open Targets parent/verified-salt records. This does not guarantee absence of an unknown or unrecorded synonym. The blinding checks preserve structured Target names, action types and all numeric evidence. Drug identities and dates are evaluation metadata, never part of a blind prompt.",
+        "Only six Diseases were tested. Recent first approval and a low report count are imperfect familiarity proxies; targets may make a true drug distinctive even among plausible decoys. Do not treat high recovery as proof of novelty, future efficacy or absence of memorization. Actual credit costs and independent citation validity remain unverified.", ""]
+    if amendment.exists():
+        lines += ["## Protocol correction", "", f"The initial batch was interrupted after 30 dispatched calls, including four interrupted requests. Ten superseded or interrupted calls remain charged to the budget; twenty replies with unchanged prompts were retained and uniformly revalidated. The corrected experiment used {result['active_attempts']} active attempts; total live calls including the ten archived calls: {result['total_attempts']}/60. The model table reports attempts, latency and tokens for the corrected experiment; archived cost and missing interrupted usage are in protocol_amendment.json.",
+            "Blanket synonym replacement had changed biological Target descriptions in nine mechanism statements. The corrected blind statements express the same ID-mapped Targets using their gene symbols and the same recorded action type. Structured Target names, action types and evidence values remain unchanged. Four blind panels were corrected; their old replies were excluded regardless of rank or validity. Source-grounded MAP2K shorthand, FGFR1-3 ranges and expanded phosphodiesterase family lists were repaired in the numeric validator and applied uniformly; actual measurements still require exact cited values. One GLM retry was caused by a false family rejection before the final repair; it stays charged to the budget. Original prompts, outputs and receipt flags remain in superseded-masking/. See validator_amendment.json for before/after counts. No model outcome was used to change a panel, a true drug, a decoy or the scoring rule.", ""]
+    review_path = output / "leakage_review.json"
+    if review_path.exists():
+        result["leakage_review"] = json.loads(review_path.read_text())
+        lines += ["## Inspected leakage", "", result['leakage_review']['summary'], ""]
+        write_json(output / "scores.json", result)
+    (output / "summary.md").write_text('\n'.join(lines)+'\n')
+    return result
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true")
+    parser.add_argument("--v2", action="store_true")
     parser.add_argument("--output", type=Path, default=Path("data/pilot"))
     args = parser.parse_args()
+    if args.v2:
+        output = Path("data/pilot/v2") if args.output == Path("data/pilot") else args.output
+        if args.live:
+            run_v2(output)
+        score_v2(output)
+        raise SystemExit(0)
     if args.live:
         declaration = freeze(args.output)
         client = CortexModel()

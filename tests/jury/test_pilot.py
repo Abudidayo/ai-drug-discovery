@@ -185,3 +185,146 @@ def test_uniform_revalidation_preserves_receipt_verdict(tmp_path):
     first = path.read_bytes()
     revalidate_runs(tmp_path)
     assert path.read_bytes() == first
+
+
+def _v2_fixture(tmp_path):
+    from pipeline.panels import blind_packet
+    packet = deepcopy(PACKET)
+    packet['candidates'] = []
+    aliases = {}
+    for i in range(15):
+        c = deepcopy(PACKET['candidates'][i % 4])
+        old_name = c['name']
+        c.update(candidate_id=f'CHEMBL{7000000+i}', label=f'C{i+1}', name=f'MockDrug{i+1}')
+        packet['candidates'].append(c)
+        aliases[c['candidate_id']] = [c['name'], f'MockTrade{i+1}', c['candidate_id'], old_name]
+    panels = []
+    for i in range(6):
+        did = f'MONDO_{9000000+i}'
+        named = deepcopy(packet)
+        named['disease'] = {'id': did, 'name': f'Synthetic Disease {i}'}
+        (tmp_path / f'packet-{did}.json').write_text(json.dumps(named))
+        (tmp_path / f'blind-{did}.json').write_text(json.dumps(blind_packet(named, aliases)))
+        rows = [{'drug_id': c['candidate_id'], 'name': c['name'], 'plausible': True} for c in named['candidates']]
+        rows[0]['first_approval'] = {'date': '2024-01-01'}
+        panels.append({'disease': {**named['disease'], 'area': f'mock{i}'}, 'true_drug': rows[0], 'decoys': rows[1:]})
+    (tmp_path / 'panels.json').write_text(json.dumps({'version': 2, 'panels': panels}))
+    (tmp_path / 'identities.json').write_text(json.dumps({'drug_aliases': aliases, 'target_name_aliases': {}}))
+
+
+def _v2_mock_valid(job):
+    from jury.pilot import write_json
+    path = Path(job['path'])
+    run = json.loads(path.read_text())
+    raw = mock_model(job['model'], job['prompt'].rsplit('\n', 1)[0], 0)
+    reviews, flags = validate_reply(raw, job['packet'], name_aliases=job['name_aliases'])
+    assert reviews is not None, flags
+    run['attempts'][-1].update(status='valid', reviews=reviews, validation=flags,
+        raw_output=raw, input_tokens=10, output_tokens=20, latency_ms=1)
+    write_json(path, run)
+    return {'model': job['model'], 'condition': job['condition'], 'status': 'valid'}
+
+
+def _v2_mock_fail(job):
+    from jury.pilot import write_json
+    path = Path(job['path']);run = json.loads(path.read_text())
+    run['attempts'][-1].update(status='failed', error={'type': 'SyntheticFailure', 'http_status': None}, latency_ms=1)
+    write_json(path, run)
+    return {'model': job['model'], 'condition': job['condition'], 'status': 'failed'}
+
+
+def test_v2_blind_identity_scan_keeps_biology_values_and_synonyms(tmp_path):
+    from pipeline.panels import blind_packet, blind_prompt_leaks
+    from jury.client import build_prompt
+    packet = deepcopy(PACKET)
+    aliases = {c['candidate_id']: [c['name'], c['candidate_id'], f'Trade {c["label"]}'] for c in packet['candidates']}
+    c = packet['candidates'][0]
+    packet['evidence'][0]['statement'] += f" {c['name']}'s Trade {c['label']} identity is {c['candidate_id']}."
+    blind = blind_packet(packet, aliases)
+    prompt = build_prompt(blind, [c['label'] for c in blind['candidates']])
+    assert blind_prompt_leaks(prompt, [a for v in aliases.values() for a in v]) == []
+    assert [c['targets'] for c in blind['candidates']] == [c['targets'] for c in packet['candidates']]
+    assert [e['values'] for e in blind['evidence']] == [e['values'] for e in packet['evidence']]
+    assert blind_prompt_leaks(prompt + ' CHEMBL1234567', []) == ['CHEMBL1234567']
+
+
+def test_v2_paired_orders_score_both_juries_and_gap_offline(tmp_path):
+    from jury.pilot import freeze_v2, v2_jobs, run_v2, score_v2
+    _v2_fixture(tmp_path)
+    freeze_v2(tmp_path)
+    jobs = v2_jobs(tmp_path)
+    assert len(jobs) == 48
+    orders = {}
+    for j in jobs:
+        key = (j['disease_id'], j['model'])
+        if key in orders: assert orders[key] == j['presented_order']
+        orders[key] = j['presented_order']
+    run_v2(tmp_path, _v2_mock_valid)
+    s = score_v2(tmp_path)
+    assert s['total_attempts'] == 48
+    assert all(v['valid_runs'] == 6 for c in s['models'].values() for v in c.values())
+    assert all(j['complete_panels'] == 6 for c in s['juries'].values() for j in c.values())
+    assert all(v['mrr_named_minus_blind'] == 0 for v in s['named_minus_blind'].values())
+    run_v2(tmp_path, _v2_mock_valid)
+    assert score_v2(tmp_path)['total_attempts'] == 48
+
+
+def test_v2_sixty_call_budget_survives_resume(tmp_path):
+    from jury.pilot import run_v2, score_v2
+    _v2_fixture(tmp_path)
+    run_v2(tmp_path, _v2_mock_fail)
+    result = score_v2(tmp_path)
+    assert result['total_attempts'] == 60
+    assert all(v['mrr'] == 0 for c in result['models'].values() for v in c.values())
+    run_v2(tmp_path, _v2_mock_fail)
+    assert score_v2(tmp_path)['total_attempts'] == 60
+
+
+def test_v2_superseded_calls_are_charged_to_the_same_budget(tmp_path):
+    from jury.pilot import run_v2, score_v2
+    _v2_fixture(tmp_path)
+    (tmp_path / 'protocol_amendment.json').write_text(json.dumps({'prior_calls_not_in_active_runs': 10}))
+    run_v2(tmp_path, _v2_mock_fail)
+    result = score_v2(tmp_path)
+    assert result['active_attempts'] == 50 and result['total_attempts'] == 60
+    run_v2(tmp_path, _v2_mock_fail)
+    assert score_v2(tmp_path)['total_attempts'] == 60
+
+
+def test_numeric_family_cannot_exempt_a_bare_measurement():
+    from jury.client import _name_identifiers, _numbers
+    packet = deepcopy(PACKET)
+    packet['evidence'][0]['statement'] += ' Serotonin 1a receptor is a source name.'
+    assert '1' not in _name_identifiers(packet)
+    assert _numbers('Uncited measurement 1', _name_identifiers(packet))
+
+
+@pytest.mark.parametrize('case_name', ['v2_map2k', 'v2_fgfr_range', 'v2_expanded_family'])
+def test_recorded_v2_source_families_are_not_measurements(case_name):
+    from jury.client import validate_reply
+    case = json.loads((Path(__file__).parent / f'data/pilot_v2/{case_name}.json').read_text())
+    assert validate_reply(case['raw_output'], case['packet'], name_aliases=case['name_aliases'])[0] is not None
+    raw = json.loads(case['raw_output'])
+    raw['reviews'][0]['rationale'] += ' Uncited measurement 99.123456789.'
+    reviews, flags = validate_reply(json.dumps(raw), case['packet'], name_aliases=case['name_aliases'])
+    assert reviews is None and not flags['numbers_match']
+    if case_name == 'v2_expanded_family':
+        changed = case['raw_output'].replace('phosphodiesterase 3 and 4', 'phosphodiesterase 3 and 99')
+        assert changed != case['raw_output']
+        reviews, flags = validate_reply(changed, case['packet'], name_aliases=case['name_aliases'])
+        assert reviews is None and not flags['numbers_match']
+
+
+def test_blinding_preserves_receptor_biology_when_a_synonym_overlaps():
+    from pipeline.panels import blind_packet, blind_prompt_leaks
+    packet = deepcopy(PACKET)
+    candidate = packet['candidates'][0]
+    aliases = {c['candidate_id']: [c['name'], c['candidate_id']] for c in packet['candidates']}
+    aliases[candidate['candidate_id']].append('insulin')
+    item = packet['evidence'][0]
+    item.update(kind='mechanism', statement=f"ChEMBL records {candidate['name']}'s mechanism as Insulin receptor agonist.")
+    blind = blind_packet(packet, aliases, {item['id']: 'INSR agonist'})
+    assert blind['evidence'][0]['statement'].endswith('mechanism as INSR agonist.')
+    assert blind_prompt_leaks(blind['evidence'][0]['statement'], ['insulin',candidate['name']]) == []
+    assert [c['targets'] for c in blind['candidates']] == [c['targets'] for c in packet['candidates']]
+    assert [e['values'] for e in blind['evidence']] == [e['values'] for e in packet['evidence']]
