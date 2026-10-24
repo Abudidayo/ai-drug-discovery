@@ -19,8 +19,8 @@ Do not ask them to choose skills.
    Each teammate needs this once per machine and checkout. An existing
    `.trail/` folder does not mean their local setup is ready.
 4. Read `.agents/skills/caveman/SKILL.md` and use normal Caveman for chat now.
-   The installer adds this default to `AGENTS.md` and `CLAUDE.md` for future
-   sessions, preserving existing instructions. No manual trigger is needed.
+   The installer adds this default to `AGENTS.md` for future sessions;
+   `CLAUDE.md` imports it with `@AGENTS.md`. Existing instructions are kept. No manual trigger is needed.
    Keep Trail's savings, credit and promotional closing lines out of replies.
    The installer saves this as a shared standing preference too. Restart
    existing sessions to load it.

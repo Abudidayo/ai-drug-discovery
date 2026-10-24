@@ -109,6 +109,17 @@ class InstallerChecks(unittest.TestCase):
         self.run_installer()
         self.assertEqual(installer.fingerprint(self.project), before)
 
+    def test_claude_md_that_imports_agents_md_gets_no_repeated_defaults(self):
+        (self.project / 'CLAUDE.md').write_text('@AGENTS.md\n')
+        self.run_installer()
+        self.assertEqual((self.project / 'CLAUDE.md').read_text(), '@AGENTS.md\n')
+        self.assertIn('stop caveman', (self.project / 'AGENTS.md').read_text())
+
+    def test_fresh_claude_md_only_imports_agents_md(self):
+        self.run_installer()
+        self.assertEqual((self.project / 'CLAUDE.md').read_text(), '@AGENTS.md\n')
+        self.assertEqual((self.project / 'AGENTS.md').read_text().count(installer.CAVEMAN_START), 1)
+
     def test_ambiguous_instruction_block_stops_before_copying(self):
         (self.project / 'AGENTS.md').write_text(installer.CAVEMAN_START + '\nCustomized rules')
         before = installer.fingerprint(self.project)
