@@ -53,7 +53,7 @@ export function NetworkPanel({ experiment, step, view, focusId, hidden }: Networ
 
   // The network persists across steps; on a step change it glides to its new cell.
   return (
-    <ViewTransition name="network-panel">
+    <ViewTransition name="network-panel" default={hidden ? "none" : "auto"}>
       <Panel area="net" hidden={hidden} title={title} label={copy.network.title}>
         {lede !== null && <p className={styles.lede}>{lede}</p>}
         {(!empty || step === "biology") && (

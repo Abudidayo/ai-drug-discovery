@@ -196,6 +196,42 @@ function liveContexts(page: Page): Promise<number> {
   );
 }
 
+test("a hidden network cannot delay leaving a pose while native snapshot capture stalls", async ({
+  page,
+}) => {
+  const id = await readyExperiment(page);
+  await page.goto(`/e/${id}/pose`);
+  const view = page.getByRole("img", {
+    name: "Baricitinib in JAK2, in 3D. Drag to rotate, scroll to zoom.",
+  });
+  await expect(view).toHaveAttribute("data-ready", "true", { timeout: 15_000 });
+  await expect(view).toHaveAttribute("data-surface", "on", { timeout: 20_000 });
+  await page.evaluate(() => {
+    const start = document.startViewTransition.bind(document);
+    let starts = 0;
+    Object.assign(window, { nativeTransitionStarts: () => starts });
+    document.startViewTransition = (options) => {
+      starts += 1;
+      const update = typeof options === "function" ? options : options?.update;
+      return start({
+        update: async () => {
+          // Slow GPU snapshot capture must never hold up a step whose network is hidden.
+          await new Promise<void>((resolve) => setTimeout(resolve, 10_000));
+          await update?.();
+        },
+      });
+    };
+  });
+  await page.getByRole("link", { name: "History", exact: true }).click();
+  await expectStep(page, "History");
+  await expect(view).toHaveCount(0);
+  expect(
+    await page.evaluate(() =>
+      (window as unknown as { nativeTransitionStarts: () => number }).nativeTransitionStarts(),
+    ),
+  ).toBe(0);
+});
+
 test("a student shows baricitinib's binding pose and checks it against the crystal", async ({
   page,
 }, testInfo) => {
