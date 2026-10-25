@@ -54,34 +54,9 @@ flowchart LR
 
 Drug B's target is one step from a disease protein, so it's visited most. Drug A is close behind. Drug C is far away and scores lowest.
 
-```mermaid
-flowchart TD
-    S["Start: probability spread evenly<br/>over the disease's proteins"] --> W["Each step:<br/>70% move to a random neighbour<br/>30% jump back to a disease protein"]
-    W --> C{"Changed by less<br/>than 1e-12?"}
-    C -- no --> W
-    C -- yes --> R["Read the probability<br/>at each drug's target proteins"]
-    R --> M["Drug score = average over<br/>its targets; rank all 1,956 drugs"]
-```
+Unlike a single shortest path, the walk counts every route between a drug and the disease.
 
-The update, repeated until it stops changing:
-
-$$p_{t+1} = 0.7\,P^{\top} p_t + 0.3\,p_0 \qquad \text{score(drug)} = \operatorname{mean}_{g \,\in\, \text{drug targets}} \; p_\infty[g]$$
-
-- $P$: row-normalised adjacency matrix of the protein network (each protein splits its probability evenly between its neighbours).
-- $p_0$: uniform over the disease's proteins that are in the network.
-- $p_\infty$: the stable visit probability of every protein.
-
-| Setting | Value |
-|---|---|
-| Network | STRING 12.5 physical interactions, combined score ≥ 700, direct experiments ≥ 400 |
-| Size | 19,199 genes, 113,969 edges; largest connected part 12,834 genes |
-| Seeds | Top 50 disease proteins from Open Targets (clinical and cancer-biomarker evidence removed) |
-| Restart probability | 0.3 |
-| Stop rule | L1 change < 1e-12, at most 1,000 steps (converges in about 60) |
-| Drug targets | ChEMBL mechanisms + potent bioactivity (median pChEMBL ≥ 7) |
-| No targets in the network | No score (never scored as zero) |
-
-**Why a random walk?** The older method only uses the single shortest path between a drug and the disease. The walk counts every route, so a drug linked to the disease through many proteins scores higher than one linked by a single thin path. The older score (shortest-path distance, compared with random protein sets of matched connectivity) is kept for comparison.
+**More detail:** the maths, settings and test results are in [`ranking/RWR.md`](ranking/RWR.md).
 
 **The shortlist.** The top 10 drugs by walk score, plus the top 5 by direct evidence (their targets are themselves disease proteins), make 15. Shortest paths from each drug's targets to the disease's proteins are saved as the explanation.
 
