@@ -49,6 +49,8 @@ Unlike a single shortest path, the walk counts every route between a drug and th
 
 **The jury's checks.** Each reply must be valid JSON, rank every Candidate once, cite only real evidence IDs, and quote numbers exactly as the evidence states them. Failed or refused replies are recorded, never filled in. Votes are combined by Borda count over the valid jurors (at least two).
 
+![Model jury checks and Borda count](docs/images/jury-checks.gif)
+
 ## Results
 
 To check the method works, we hide what we already know. For each disease, we take drugs that regulators have already approved for it, and see whether our method ranks them near the top without being told. Rules, seeds and inputs were frozen before each test ran. Full protocols are in [`results/`](results/).
