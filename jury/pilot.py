@@ -400,7 +400,7 @@ def v2_lexicon(packet, identities):
                   and (re.search(r"[A-Za-z]", name) or re.fullmatch(r"[0-9]{2,7}-[0-9]{2}-[0-9]", name)))
 
 
-def v2_jobs(output):
+def v2_jobs(output, *, conditions=V2_CONDITIONS):
     from pipeline.panels import blind_prompt_leaks
     output = Path(output)
     panels = json.loads((output / "panels.json").read_text())["panels"]
@@ -409,14 +409,14 @@ def v2_jobs(output):
     jobs = []
     for index, panel in enumerate(panels):
         did = panel["disease"]["id"]
-        packets = {condition: json.loads((output / f"{'packet' if condition == 'named' else 'blind'}-{did}.json").read_text()) for condition in V2_CONDITIONS}
+        packets = {condition: json.loads((output / f"{'packet' if condition == 'named' else 'blind'}-{did}.json").read_text()) for condition in conditions}
         expected = {d["drug_id"] for d in [panel["true_drug"], *panel["decoys"]]}
         if any(len(p["candidates"]) != 15 or {c["candidate_id"] for c in p["candidates"]} != expected for p in packets.values()):
             raise ValueError("Each condition must contain exactly the frozen 15-drug panel")
         for model_index, model in enumerate(V2_MODELS):
-            order = [c["label"] for c in packets["named"]["candidates"]]
+            order = [c["label"] for c in next(iter(packets.values()))["candidates"]]
             random.Random(SEED + index*len(V2_MODELS)+model_index).shuffle(order)
-            for condition in V2_CONDITIONS:
+            for condition in conditions:
                 packet = packets[condition]
                 validate_packet(packet)
                 prompt = build_prompt(packet, order) + "\n" + suffix

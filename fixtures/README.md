@@ -62,9 +62,9 @@ the degree-matched null has no spread; its `network` stays populated.
 `selected_by` contains
 `network` and/or `evidence`; Target `support` contains `mechanism` and/or
 `bioactivity`. Mapping `status` is `mapped`, `unmapped` or `ambiguous`, with a
-reason for either non-mapped status. Evidence `source` is `open_targets` or
-`chembl`; `kind` is `target_association`, `mechanism`, `bioactivity`, `approval`
-or `warning`. Safety is `warnings_recorded` or `unknown`, never safe.
+reason for either non-mapped status. Evidence `source` is `open_targets`, `chembl` or `string`; `kind` is
+`target_association`, `mechanism`, `bioactivity`, `approval`, `warning` or
+`network_path`. Safety is `warnings_recorded` or `unknown`, never safe.
 Juror `status` is `valid`, `invalid` or `failed`; `decision` is `investigate`,
 `watch` or `deprioritise`; `direction` is `supported`, `contradicted` or `unknown`.
 The live mechanism action type here is `INHIBITOR`.
@@ -129,3 +129,25 @@ Run `.venv/bin/python -m pytest -q`. No live APIs or model calls are needed
 for the fixture tests. Only Snowflake model availability remains unverified.
 Fictional numerical values and network outcomes are deliberately not verified
 against measurements. Downloaded source datasets remain under ignored `data/`.
+
+`network_path` evidence uses source `string`, release `string-12.5`, and
+`values: {"hops": n}`. One item represents one ID-resolved representative
+path; identical paths share an E ID. `source_id` is the ordered Ensembl gene
+IDs joined with `>`, then `@` and the pinned graph's SHA256. Symbols come from
+Open Targets target records joined by Ensembl ID. STRING links use mapped
+`9606.ENSP…` protein IDs and its documented `/cgi/network` endpoint
+([STRING API documentation](https://string-db.org/help/api/)). These pages show
+a network view; they do not reproduce the direct-experiment filter or provide
+individual edge citations. The graph artifact establishes the filtered path.
+
+E22 is a real zero-hop FGFR3 overlap from Zaid's myeloma path export
+(`data/a6_paths/MONDO_0009693/paths/shortlist.json`, nintedanib's FGFR3
+representative). Erdafitinib has the same ID-mapped Target. Its hop count and
+graph hash are measured, unlike the illustrative ranking numbers above.
+The graph is undirected, filtered at combined score ≥700 and direct
+experiments ≥400. A connection is an association, not a proven mechanism,
+causal direction, benefit or treatment evidence. Missing symbol/protein
+mappings are counted as unmapped outside the packet, never name-matched.
+No mean distance, z-score, rank or path-count metadata enters a packet.
+`jury-v5` explains these limits while retaining strict citation, numeric,
+complete-ballot and safety checks. No packet keys or value types changed.

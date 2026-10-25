@@ -42,7 +42,7 @@ def test_prompt_allowlist_and_no_input_ranking():
         assert set(c) == {"label", "name", "targets", "evidence_ids", "safety_status"}
         assert all(set(t) == {"name", "mechanism"} for t in c["targets"])
     assert all(set(e) == {"id", "kind", "statement", "values"} for e in visible["evidence"])
-    for forbidden in ("CHEMBL", "ENSG", "http", "source_id", "candidate_id", "network", "123", "secret"):
+    for forbidden in ("CHEMBL", "ENSG", "http", "source_id", "candidate_id", '"network":', "mean_distance", "degree_matched_z", "123", "secret"):
         assert forbidden not in prompt
     assert "rank" not in json.dumps(visible)
     assert "being investigated" in prompt and "do not endorse" in prompt
@@ -55,7 +55,7 @@ def test_seeded_orders_and_output_shape():
     assert set(result) == set(FIXTURE)
     assert result["jury"] == {**CONFIG, 'prompt_version': PROMPT_VERSION,
                               'reasoning_effort': {model: None for model in CONFIG['models']}}
-    assert PROMPT_VERSION == 'jury-v4'
+    assert PROMPT_VERSION == 'jury-v5'
     assert len(result["jurors"]) == 3
     for i, j in enumerate(result["jurors"]):
         order = [c["label"] for c in PACKET["candidates"]]
