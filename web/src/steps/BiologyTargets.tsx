@@ -1,3 +1,5 @@
+import { isBuilding } from "../api/queries";
+import { BuildLine } from "../app/ExperimentStatus";
 import type { DiseaseTarget, Experiment, TargetExcludedReason } from "../api/types";
 import { Panel } from "../app/Figure";
 import { useNetworkHover } from "../app/networkHover";
@@ -32,6 +34,7 @@ export function BiologyTargets({ experiment }: { experiment: Experiment }) {
 
   return (
     <Panel area="targets" label={copy.biology.targetsLabel}>
+      {isBuilding(experiment) && <BuildLine experiment={experiment} />}
       {used.length > 0 && (
         <div className={styles.chart}>
           {/* Focusable so keyboard users can scroll it when the list is longer than the panel. */}

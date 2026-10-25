@@ -1,4 +1,5 @@
 import { useOutletContext, useParams } from "react-router";
+import { hasEarlyResult } from "../../api/queries";
 import { isStepSlug } from "../../copy/en";
 import { BiologyTargets } from "../../steps/BiologyTargets";
 import { CandidatesStep } from "../../steps/CandidatesStep";
@@ -20,8 +21,11 @@ export function StepFigure() {
   switch (step) {
     case "disease":
       return <DiseaseSearch key={experiment?.id} current={experiment} />;
-    case "biology":
-      return ready && <BiologyTargets experiment={ready} />;
+    case "biology": {
+      // Drawn as soon as the build has saved the Targets, before the drugs are ready.
+      const drawn = ready ?? (experiment && hasEarlyResult(experiment) ? experiment : undefined);
+      return drawn && <BiologyTargets experiment={drawn} />;
+    }
     case "candidates":
       return ready && <CandidatesStep experiment={ready} />;
     case "evidence":

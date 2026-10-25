@@ -59,8 +59,23 @@
   border-color: var(--color-ink);
 }
 
+/* The one-line status beside an Experiment that is partly drawn. */
+.line {
+  display: flex;
+  gap: var(--space-12);
+  align-items: center;
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  color: var(--color-ink);
+}
+
+.line .marker {
+  border-color: var(--color-ink);
+}
+
 /* The current stage's ring turns slowly: one quiet sign of work in progress. */
-.stage[data-state="current"] .marker::after {
+.stage[data-state="current"] .marker::after,
+.line .marker::after {
   position: absolute;
   inset: -1.5px;
   border: 1.5px solid transparent;
