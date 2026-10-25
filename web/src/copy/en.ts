@@ -1,5 +1,6 @@
 import type { components } from "../api/schema";
 import type { UnsupportedReason } from "../lib/docking";
+import type { FailedCheck } from "../lib/jury";
 import { listOf } from "../lib/format";
 
 type BuildStage = components["schemas"]["BuildStage"];
@@ -219,6 +220,17 @@ export const copy = {
       failed: "Didn’t answer",
     } satisfies Record<JurorStatus, string>,
     unavailable: "Review unavailable",
+    /** After a failed review: why a model's answers didn't pass, completing `jurorStatus.invalid`. */
+    failedCheck: {
+      refused: "it declined to review the evidence",
+      ranking: "it didn’t rank every drug exactly once",
+      unknownEvidence: "it cited evidence that doesn’t exist",
+      otherDrug: "it cited another drug’s evidence",
+      uncited: "it mentioned evidence it didn’t cite",
+      safety: "it misreported the recorded warnings",
+      numbers: "it used numbers that aren’t in the evidence",
+    } satisfies Record<FailedCheck, string>,
+    invalidBecause: (reason: string) => `Its answers didn’t pass our checks: ${reason}.`,
     plotLabel: "Each model’s rank and decision for every drug",
     drug: "Drug",
     rank: "Rank by each model",

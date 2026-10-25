@@ -96,6 +96,40 @@ describe("Step 5, Model jury", () => {
     expect(screen.queryByText("Investigate")).not.toBeInTheDocument();
   });
 
+  it("says which check each model's answers failed when too few passed", async () => {
+    const experiment = covidWithJury("failed", 0);
+    const jury = experiment.jury ?? covidJury();
+    const errors: Record<string, string[]> = {
+      "claude-sonnet-5": [
+        "Attempt 1: C4: evidence belongs to another Candidate",
+        "Attempt 2: C4: unsupported or unparseable number in rationale",
+      ],
+      "openai-gpt-5.4": ["Attempt 2: C12: inline evidence must also appear in citation fields"],
+    };
+    experiment.jury = {
+      ...jury,
+      jurors: jury.jurors.map((juror) => {
+        const failed = errors[juror.model_id];
+        return failed
+          ? { ...juror, status: "invalid" as const, attempts: 2, errors: failed }
+          : { ...juror, status: "valid" as const };
+      }),
+    };
+    serveExperiment(experiment);
+    renderApp(`${E}/jury`);
+    const list = await screen.findByRole("list", { name: copy.jury.progressLabel });
+    expect(
+      within(list)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual([
+      `Claude Sonnet 5${copy.jury.invalidBecause(copy.jury.failedCheck.numbers)}`,
+      `GPT-5.4${copy.jury.invalidBecause(copy.jury.failedCheck.uncited)}`,
+      `GLM-5.3${copy.jury.jurorStatus.valid}`,
+    ]);
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
   it("leaves out a model whose answers failed the checks, and says so once", async () => {
     const experiment = covidWithJury("done");
     const jury = experiment.jury ?? covidJury();

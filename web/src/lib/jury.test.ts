@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { covidExperiment, covidJury } from "../test/fixtures";
-import { countedJurors, excludedJurors, featuredObjection, juryRows, retriedCount } from "./jury";
+import {
+  countedJurors,
+  excludedJurors,
+  failedCheck,
+  featuredObjection,
+  juryRows,
+  retriedCount,
+} from "./jury";
 
 describe("the recorded COVID-19 jury", () => {
   const { candidates } = covidExperiment();
@@ -39,5 +46,31 @@ describe("the recorded COVID-19 jury", () => {
     const s = sums.reduce((total, sum) => total + (sum - (3 * (n + 1)) / 2) ** 2, 0);
     expect(jury.agreement).toBeCloseTo((12 * s) / (9 * (n ** 3 - n)), 4);
     expect(jury.agreement).toBeCloseTo(0.6167, 4);
+  });
+});
+
+describe("failedCheck", () => {
+  it("names the check the last attempt failed", () => {
+    expect(
+      failedCheck([
+        "Attempt 1: C2: evidence belongs to another Candidate",
+        "Attempt 2: C9: unsupported or unparseable number in objection",
+      ]),
+    ).toBe("numbers");
+  });
+
+  it("names the most basic failure when one attempt failed several checks", () => {
+    expect(
+      failedCheck([
+        "Attempt 1: C3: unsupported or unparseable number in rationale",
+        "Attempt 1: C5: unknown evidence ID",
+      ]),
+    ).toBe("unknownEvidence");
+  });
+
+  it("recognises refusals, and names nothing for errors it doesn't know", () => {
+    expect(failedCheck(["Attempt 1: refused (provider stop_reason=refusal)"])).toBe("refused");
+    expect(failedCheck(["Attempt 1: call failed (TimeoutError)"])).toBeNull();
+    expect(failedCheck([])).toBeNull();
   });
 });

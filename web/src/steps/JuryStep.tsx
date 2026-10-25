@@ -10,6 +10,7 @@ import { drugName, listOf } from "../lib/format";
 import {
   countedJurors,
   excludedJurors,
+  failedCheck,
   featuredObjection,
   juryRows,
   retriedCount,
@@ -19,7 +20,7 @@ import styles from "./JuryStep.module.css";
 /**
  * Step 5: the Model jury. Before it is asked, one button; while it reviews, each model's
  * progress; once done, the dot plot, the agreement between models and one objection. A failed
- * review says so plainly and never shows votes it doesn't have.
+ * review says so plainly, shows how each model fared and never shows votes it doesn't have.
  */
 export function JuryStep({ experiment }: { experiment: Experiment }) {
   const { jury } = experiment;
@@ -30,6 +31,7 @@ export function JuryStep({ experiment }: { experiment: Experiment }) {
         <div className={styles.status} role="alert">
           <p className={styles.headline}>{copy.jury.unavailable}</p>
           {jury.error !== null && <p className={styles.detail}>{jury.error}</p>}
+          <JurorList jury={jury} />
         </div>
       </Panel>
     );
@@ -94,19 +96,32 @@ function JuryProgress({ jury }: { jury: JuryRun }) {
           {copy.jury.queued}
         </p>
       )}
-      <ol className={styles.jurors} aria-label={copy.jury.progressLabel} aria-live="polite">
-        {jury.models.map((model, index) => {
-          const status = jury.jurors[index]?.status ?? "pending";
-          return (
-            <li key={model.id} className={styles.juror} data-state={status}>
-              <span className={styles.ring} aria-hidden="true" />
-              <span className={styles.jurorName}>{model.display_name}</span>
-              <span className={styles.jurorStatus}>{copy.jury.jurorStatus[status]}</span>
-            </li>
-          );
-        })}
-      </ol>
+      <JurorList jury={jury} />
     </div>
+  );
+}
+
+/** One line per model: its state, and for answers that failed the checks, which check. */
+function JurorList({ jury }: { jury: JuryRun }) {
+  return (
+    <ol className={styles.jurors} aria-label={copy.jury.progressLabel} aria-live="polite">
+      {jury.models.map((model) => {
+        const juror = jury.jurors.find((j) => j.model_id === model.id);
+        const status = juror?.status ?? "pending";
+        const check = status === "invalid" && juror ? failedCheck(juror.errors) : null;
+        return (
+          <li key={model.id} className={styles.juror} data-state={status}>
+            <span className={styles.ring} aria-hidden="true" />
+            <span className={styles.jurorName}>{model.display_name}</span>
+            <span className={styles.jurorStatus}>
+              {check === null
+                ? copy.jury.jurorStatus[status]
+                : copy.jury.invalidBecause(copy.jury.failedCheck[check])}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

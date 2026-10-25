@@ -299,8 +299,8 @@ class StreamAJury:
         mapped = map_jury_result(result, packet)
         if mapped.outcome is None:
             raise JuryUnavailable(
-                "Fewer than two jurors returned a review that passed the checks, so there is "
-                "no consensus. Each juror's errors say why."
+                "Fewer than two models gave answers that passed our checks, so there is no "
+                "combined ranking."
             )
         return mapped.outcome
 

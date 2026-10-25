@@ -57,7 +57,7 @@
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
-  align-items: center;
+  align-items: start;
 }
 
 .jurorName {
@@ -66,6 +66,7 @@
 
 .jurorStatus {
   color: var(--color-grey-1);
+  text-wrap: pretty;
 }
 
 .juror[data-state="pending"] .jurorName,
@@ -78,10 +79,12 @@
 }
 
 /* A ring per model: filled when done, turning while it reviews, empty while it waits. */
+/* Centred on the first line, so a status that wraps leaves the ring beside the name. */
 .ring {
   position: relative;
   width: 12px;
   height: 12px;
+  margin-top: calc((1lh - 12px) / 2);
   border: 1.5px solid var(--color-edge);
   border-radius: 50%;
 }

@@ -40,6 +40,31 @@ export function excludedJurors(jury: JuryRun): { juror: Juror; status: "invalid"
   });
 }
 
+/** Which of stream A's checks a model's answer failed, in the order they are worth naming. */
+export type FailedCheck =
+  "refused" | "ranking" | "unknownEvidence" | "otherDrug" | "uncited" | "safety" | "numbers";
+
+const CHECKS: [FailedCheck, RegExp][] = [
+  ["refused", /refused/],
+  ["ranking", /Expected every Candidate once|Decisions must not improve/],
+  ["unknownEvidence", /unknown evidence ID/],
+  ["otherDrug", /evidence belongs to another Candidate/],
+  ["uncited", /inline evidence must also appear in citation fields/],
+  ["safety", /warnings may only be cited in safety|safety does not match packet warnings/],
+  ["numbers", /unsupported or unparseable number/],
+];
+
+/**
+ * The check a model's last answer failed, from its errors (stream A writes one line per
+ * failure, each starting "Attempt n:"). Null when no known check is named.
+ */
+export function failedCheck(errors: readonly string[]): FailedCheck | null {
+  const attempt = (error: string) => Number(/^Attempt (\d+):/.exec(error)?.[1] ?? 0);
+  const last = Math.max(0, ...errors.map(attempt));
+  const final = errors.filter((error) => attempt(error) === last);
+  return CHECKS.find(([, pattern]) => final.some((error) => pattern.test(error)))?.[0] ?? null;
+}
+
 /** How many counted models needed a second attempt before their answer passed the checks. */
 export function retriedCount(jury: JuryRun): number {
   return jury.jurors.filter((juror) => juror.status === "valid" && juror.attempts > 1).length;
