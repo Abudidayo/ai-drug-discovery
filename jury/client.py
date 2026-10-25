@@ -16,7 +16,8 @@ REVIEW_KEYS = {
     "label", "rank", "decision", "direction", "rationale", "objection",
     "missing_evidence", "supporting_evidence_ids", "contradicting_evidence_ids", "safety",
 }
-# Open Targets 26.09 symbolSynonyms; provenance: data/pilot/name_aliases.json.
+# Open Targets 26.09 symbolSynonyms; provenance: data/pilot/name_aliases.json
+# and data/a6/MONDO_*/source_aliases.json (PI3K and VEGFR2).
 # Lexical name exemptions only, not evidence of biological entailment.
 NUMERIC_TARGET_ALIASES = {'ENSG00000001626': ['ABC35', 'ABCC7', 'MRP7', 'dJ760C5.1'],
  'ENSG00000010322': ['I-1', 'I-1 receptor candidate protein', 'I1R', 'I1R candidate protein', 'IR1',
@@ -59,9 +60,11 @@ NUMERIC_TARGET_ALIASES = {'ENSG00000001626': ['ABC35', 'ABCC7', 'MRP7', 'dJ760C5
  'ENSG00000116478': ['GON-10', 'HD1', 'KDAC1', 'RPD3', 'RPD3L1'],
  'ENSG00000118298': ['UNQ690/PRO1335'],
  'ENSG00000120907': ['ADRA1C', 'ADRA1L1', 'ALPHA1AAR', 'Alpha-1A adrenoceptor'],
+ 'ENSG00000121879': ['PI3K', 'PI3K-alpha', 'PI3Kalpha', 'p110-alpha', 'p110alpha'],
  'ENSG00000121989': ['ACVR2'],
  'ENSG00000126351': ['AR7', 'CHNG6', 'EAR-7', 'EAR-7.1/EAR-7.2', 'EAR7', 'ERB-T-1', 'ERBA1', 'NR1A1', 'THRA1',
                      'THRA2', 'THRA3', 'THRalpha1', 'THRalpha2', 'TRalpha1', 'TRalpha2', 'c-ERBA-1'],
+ 'ENSG00000128052': ['CD309', 'FLK-1', 'FLK1', 'VEGFR-2', 'VEGFR2'],
  'ENSG00000129521': ['HIF-PH3', 'HIF-prolyl hydroxylase 3', 'HIFP4H3', 'HIFPH3', 'HPH-3', 'PHD3'],
  'ENSG00000133019': ['HM3', 'm3AChR'],
  'ENSG00000135766': ['C1orf12', 'ECYT3', 'HIF-PH2', 'HIF-prolyl hydroxylase 2', 'HIFPH2', 'HPH-2', 'HPH2',
@@ -429,7 +432,15 @@ def validate_reply(raw, packet, *, name_aliases=()):
         candidate = candidates.get(label)
         biological = review["supporting_evidence_ids"] + review["contradicting_evidence_ids"]
         cited = biological + review["safety"]["evidence_ids"]
-        prose = " ".join([review["rationale"], review["objection"], *review["missing_evidence"]])
+        texts = [review["rationale"], review["objection"], *review["missing_evidence"]]
+        # E3 in an assigned ligase mechanism is a protein name, not a citation.
+        # Inspect a copy; explicit citation arrays and original prose stay exact.
+        ligase = r"\bE3\s+(?:ubiquitin\s+)?ligase\b"
+        if candidate and any(items[e]["kind"] == "mechanism"
+                             and re.search(ligase, items[e]["statement"], re.I)
+                             for e in candidate["evidence_ids"]):
+            texts = [re.sub(ligase, "ligase", text, flags=re.I) for text in texts]
+        prose = " ".join(texts)
         inline_ids = set(re.findall(r"\bE[0-9]+\b", prose))
         if not (set(cited) | inline_ids) <= items.keys():
             validation["evidence_ids_exist"] = False
@@ -449,9 +460,10 @@ def validate_reply(raw, packet, *, name_aliases=()):
             validation["errors"].append(f"{label}: safety does not match packet warnings")
         allowed = {Decimal(str(v)) for e in set(cited) if e in items
                    for v in items[e]["values"].values()}
-        for field in ("rationale", "objection"):
+        fields = ["rationale", "objection"] + ["missing_evidence"] * len(review["missing_evidence"])
+        for field, text in zip(fields, texts):
             try:
-                numbers_match = all(number in allowed for number in _numbers(review[field], identifiers))
+                numbers_match = all(number in allowed for number in _numbers(text, identifiers))
             except (DecimalException, ValueError, OverflowError):
                 numbers_match = False
             if not numbers_match:
@@ -504,7 +516,7 @@ class ModelReply:
 class CortexModel:
     """One SDK request per attempt; our runner owns the bounded retry budget."""
 
-    def __init__(self, timeout=None):
+    def __init__(self, timeout=None, *, reasoning_effort=None):
         from openai import OpenAI
 
         account = os.environ.get("SNOWFLAKE_ACCOUNT", "")
@@ -520,7 +532,9 @@ class CortexModel:
             f"https://{account}.snowflakecomputing.com/api/v2/cortex/v1"),
             max_retries=0, timeout=timeout)
         # Optional per-model reasoning effort, e.g. {"kimi-k3": "low"}; recorded with the jury settings.
-        self.reasoning_effort = json.loads(os.environ.get("SNOWFLAKE_REASONING_EFFORT", "{}"))
+        self.reasoning_effort = (json.loads(os.environ["SNOWFLAKE_REASONING_EFFORT"])
+                                 if "SNOWFLAKE_REASONING_EFFORT" in os.environ
+                                 else reasoning_effort or {})
 
     def __call__(self, model, prompt, temperature):
         if model.startswith("claude-"):
@@ -535,7 +549,7 @@ class CortexModel:
                 "output_config": {"format": {
                     "type": "json_schema", "schema": RESPONSE_FORMAT["json_schema"]["schema"],
                 }, **({"effort": self.reasoning_effort[model]}
-                      if model in self.reasoning_effort else {})},
+                      if self.reasoning_effort.get(model) is not None else {})},
             }, options={"headers": {"anthropic-version": "2023-06-01"}})
             usage = response.get("usage") or {}
             return ModelReply(
@@ -550,7 +564,7 @@ class CortexModel:
         response = self.client.chat.completions.create(
             model=model, messages=[{"role": "user", "content": prompt}], **sampling,
             response_format=RESPONSE_FORMAT,
-            **({"reasoning_effort": self.reasoning_effort[model]} if model in self.reasoning_effort else {}))
+            **({"reasoning_effort": effort} if effort is not None else {}))
         return ModelReply(response.choices[0].message.content,
                           getattr(response.usage, "prompt_tokens", None),
                           getattr(response.usage, "completion_tokens", None))
@@ -577,11 +591,16 @@ def mock_model(model, prompt, temperature):
 
 def validate_config(config):
     expected = {"models", "prompt_version", "temperature", "max_attempts", "shuffle_seed"}
-    if set(config) != expected:
+    if set(config) - {"reasoning_effort"} != expected:
         raise ValueError("Jury configuration must match the fixture keys")
     models = config["models"]
     if not _string_list(models) or len(models) != 3 or len(set(models)) != 3 or not all(models):
         raise ValueError("Configure three distinct model IDs from three model families")
+    effort = config.get("reasoning_effort", {})
+    if (not isinstance(effort, dict) or not set(effort) <= set(models)
+            or any(value is not None and (not isinstance(value, str) or not value.strip())
+                   for value in effort.values())):
+        raise ValueError("reasoning_effort must map configured models to nonempty strings or null")
     if not isinstance(config["prompt_version"], str) or not config["prompt_version"]:
         raise ValueError("prompt_version must be a nonempty string")
     if type(config["max_attempts"]) is not int or config["max_attempts"] < 1:
@@ -595,8 +614,12 @@ def validate_config(config):
 def run_jury(packet, config, model_call, *, max_calls=None):
     validate_packet(packet)
     validate_config(config)
+    effort = (model_call.reasoning_effort if isinstance(model_call, CortexModel)
+              else config.get("reasoning_effort", {}))
     # The implementation owns the version of the prompt it actually sends.
-    config = {**config, "prompt_version": PROMPT_VERSION}
+    config = {**config, "prompt_version": PROMPT_VERSION,
+              "reasoning_effort": {model: effort.get(model) for model in config["models"]}}
+    validate_config(config)
     if max_calls is not None and (type(max_calls) is not int or max_calls < len(config["models"])):
         raise ValueError("Call budget must allow at least one attempt per juror")
     remaining = max_calls if max_calls is not None else len(config["models"]) * config["max_attempts"]

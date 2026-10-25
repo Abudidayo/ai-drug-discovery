@@ -31,6 +31,21 @@ def shape(actual, examples, key=""):
         assert isinstance(actual, list)
         assert all(isinstance(v, str) and re.fullmatch(r"E[0-9]+", v) for v in actual)
         return
+    if key == "reasoning_effort":
+        assert isinstance(actual, dict)
+        assert all(isinstance(k, str) and k for k in actual)
+        assert all(v is None or isinstance(v, str) and v.strip() for v in actual.values())
+        return
+    if key == "token_usage":
+        assert isinstance(actual, list)
+        required = {"attempt", "input_tokens", "output_tokens"}
+        for attempt, usage in enumerate(actual, 1):
+            assert required <= usage.keys() <= required | {"max_output_tokens", "stop_reason"}
+            assert type(usage["attempt"]) is int and usage["attempt"] == attempt
+            assert all(v is None or type(v) is int and v >= 0 for k, v in usage.items()
+                       if k in {"input_tokens", "output_tokens", "max_output_tokens"})
+            assert usage.get("stop_reason") is None or isinstance(usage["stop_reason"], str)
+        return
     if key == "values":
         assert isinstance(actual, dict)
         assert all(type(v) in (int, float) and math.isfinite(v) for v in actual.values())
@@ -57,19 +72,32 @@ def shape(actual, examples, key=""):
         assert any(type(e) is type(actual) for e in examples), key
 
 
-def assert_outputs(out, drugs, string_map):
+def assert_outputs(out, drugs, string_map, *, legacy_jury=False):
     """Generalize test_fixtures' invariants without its fictional measurements."""
     contract = runpy.run_path(str(ROOT / "tests/test_fixtures.py"))
     names = ("disease_targets", "candidates", "evidence_packet", "jury_result")
     files = {name: read_json(out / f"{name}.json") for name in names}
     for name, actual in files.items():
-        shape(actual, [read_json(ROOT / "fixtures" / f"{name}.json")])
+        example = read_json(ROOT / "fixtures" / f"{name}.json")
+        if name == "jury_result" and legacy_jury:
+            # Historical artifacts predate these additive contract fields.
+            if "reasoning_effort" not in actual["jury"]:
+                example["jury"].pop("reasoning_effort")
+            if all("token_usage" not in j for j in actual["jurors"]):
+                for juror in example["jurors"]:
+                    juror.pop("token_usage")
+        shape(actual, [example])
         assert (out / f"{name}.json").read_text() == json.dumps(actual, ensure_ascii=False, indent=2) + "\n"
     # Reuse A0's ID, release and shared Experiment checks verbatim.
     files.update(drug_targets=drugs, string_id_map=string_map)
     contract["test_ids_and_releases"].__globals__["FILES"] = files
     contract["test_ids_and_releases"]()
     targets, candidates, packet, result = (files[n] for n in names)
+    if "reasoning_effort" in result["jury"]:
+        assert set(result["jury"]["reasoning_effort"]) == set(result["jury"]["models"])
+    for juror in result["jurors"]:
+        if "token_usage" in juror:
+            assert len(juror["token_usage"]) == juror["attempts"]
     validate_packet(packet)
     assert targets["rule"] == {"score": "evidence_only", "top_n": 50,
                               "excluded_datasources": ["clinical_precedence", "cancer_biomarkers"]}
@@ -208,6 +236,8 @@ def test_recorded_end_to_end(tmp_path, monkeypatch):
     monkeypatch.setattr(a1, "load_diseases", lambda _: [("MONDO_0009693", "plasma cell myeloma", [])])
     out = tmp_path / "output"
     run_experiment("MONDO_0009693", out, data_dir=input_dir, offline=True)
+    saved_jury = read_json(out / "jury_result.json")
+    assert {j["model"]: j["token_usage"] for j in saved_jury["jurors"]} == read_json(out / "jury_usage.json")
     files = assert_outputs(out, drugs, string_map)
     assert len(files["candidates"]["candidates"]) == 1
     assert all(j["status"] == "valid" for j in files["jury_result"]["jurors"])
@@ -239,7 +269,8 @@ def test_saved_real_outputs(folder):
     if not all(p.exists() for p in required):
         pytest.skip("Local real-data run not present")
     try:
-        files = assert_outputs(out, read_json(ROOT / "data/drug_targets.json"), read_json(ROOT / "data/string_id_map.json"))
+        files = assert_outputs(out, read_json(ROOT / "data/drug_targets.json"),
+                               read_json(ROOT / "data/string_id_map.json"), legacy_jury=True)
     except FileNotFoundError:
         pytest.skip("Local real-data source cache not present")
     assert len(files["disease_targets"]["targets"]) == 50
