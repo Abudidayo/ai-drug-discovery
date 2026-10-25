@@ -1,0 +1,140 @@
+{
+  "code": {
+    "__init__.py": {
+      "bytes": 81,
+      "sha256": "76dffeb04dc7ae0cf205693de319772ac52711c8a3acf36fe45f4fd1bbbe76ee"
+    },
+    "__main__.py": {
+      "bytes": 7627,
+      "sha256": "544b83b1c914e72fa5773ca0e865ee4a90a30932e388405bfb11a381f5b15551"
+    },
+    "artifacts.py": {
+      "bytes": 7846,
+      "sha256": "8e1f9b0ba8916145426f5c9220970c5789dc6bad25fc285ec5f17299bd7775f5"
+    },
+    "cohort.py": {
+      "bytes": 23814,
+      "sha256": "67ac1e799b2da54c7b9bcf6357951cfe591b19cadb243884d952ad9c6c917133"
+    },
+    "cohort_report.py": {
+      "bytes": 25226,
+      "sha256": "27bbac320d8130f88c72f17dfdb252268a571ca21ead113937cbe0aeb0e78457"
+    },
+    "data.py": {
+      "bytes": 6874,
+      "sha256": "5f38b29e5a6de52453e3244aa18d46a36c1af7be4e64566cc3d76ff3de1b7c63"
+    },
+    "evaluation.py": {
+      "bytes": 13360,
+      "sha256": "378b436fcdc4cec3a447aace0002864b41f8cf8ca1922d103c07d8b1eebb3fc1"
+    },
+    "evaluation_io.py": {
+      "bytes": 11156,
+      "sha256": "e543caa6341cc72640ed1809044b70d4d127e4babcc0102b9f3bdec69d65cca1"
+    },
+    "functional_graph.py": {
+      "bytes": 9611,
+      "sha256": "65893280894f0861d4e2deb4e7fc58a3aa66b6e6247fd2e11ae1d8fb6ab8f029"
+    },
+    "integration.py": {
+      "bytes": 6816,
+      "sha256": "bbb3a1b1fc9eb4d0089cb20caff5ff9693d28cabe30d868097f836cdf3cbe4c8"
+    },
+    "network.py": {
+      "bytes": 11810,
+      "sha256": "3912f2ca062d96aebd96397874fa2819a290378f92fcd02682548bd93c64555c"
+    },
+    "paths.py": {
+      "bytes": 15832,
+      "sha256": "c4d2cad5f90f524e7b69a278757e49f6bf6f7b67b668e859e8b1cd737907abf4"
+    },
+    "proximity.py": {
+      "bytes": 4507,
+      "sha256": "7968c76aad768c0242434cb5fcc67eda41bac5c981e52fe615492896c0ffd8fb"
+    },
+    "references.py": {
+      "bytes": 3313,
+      "sha256": "d0deb6fde9946a37a1d623ca12699146ca6873f96b58488bac2b5d54306bbacf"
+    },
+    "rwr.py": {
+      "bytes": 11063,
+      "sha256": "f9b9d86eda462d740312df718084c2e092a2bf8a69ef6e7116844718983cf2dd"
+    },
+    "rwr_evaluation.py": {
+      "bytes": 27634,
+      "sha256": "4f5e7d083bc7b790cfa085b98d6f822e83b5056c8a6690f281c77e4eda976973"
+    },
+    "scoring.py": {
+      "bytes": 13310,
+      "sha256": "3ead2d135a75a1dfdb125f7b33e5ea6ef6650fb8c2005d5611722074437019e8"
+    },
+    "shortlist.py": {
+      "bytes": 9671,
+      "sha256": "75b9ed6cae96506d4a5c85edf3c3f57218b4b743a3b93147bf911f7117ed85da"
+    },
+    "shortlist_comparison.py": {
+      "bytes": 20354,
+      "sha256": "d7160788ee95115a242d30d601e93e5e31d38e4a5945e2e762983360d61c7c06"
+    },
+    "shortlist_examples.py": {
+      "bytes": 5395,
+      "sha256": "41e2775edeb8303f2e2eae9e6a23ce3acfe3d3032e9f361cea96a7bd10cc66ff"
+    }
+  },
+  "contract": "oxhack.shortlist-comparison-implementation.v1",
+  "format_version": 1,
+  "implementation_sha256": "4bd5d2d6d217321f1922459fe06b22ca1f40af15f243bb1dc421d47c84ad535f",
+  "label_policy": "No reference labels are opened or accepted by seal. Score both methods before parsing labels.",
+  "missing_score_policy": "Unavailable network scores cannot enter the network lane; positive evidence remains eligible. All eligible references stay in recall denominators.",
+  "official_replication": "awaiting supplied frozen 14-Disease list, Targets, versioned references and published protocol",
+  "settings": {
+    "evaluation": {
+      "bootstrap_samples": 1000,
+      "missing_score_policy": "unretrieved",
+      "seed": 0
+    },
+    "expected_case_count": 14,
+    "physical_graph": {
+      "filters": {
+        "combined_score_min": 700,
+        "direct_experiments_column": "experiments",
+        "experiments_min": 400,
+        "transferred_experiments_used_as_direct": false
+      },
+      "network_kind": "human_physical_gene_undirected_unweighted",
+      "version": "string-12.5"
+    },
+    "ranking": {
+      "evidence_slots": 5,
+      "min_bin_size": 100,
+      "network_slots": 10,
+      "randomisations": 200,
+      "seed": 0,
+      "top_targets": 50
+    },
+    "rwr": {
+      "max_iterations": 1000,
+      "restart_probability": 0.3,
+      "tolerance": 1e-12,
+      "top_targets": 50
+    },
+    "shortlists": {
+      "physical_rwr": {
+        "evidence_slots": 5,
+        "method": "physical_rwr",
+        "network_slots": 10
+      },
+      "zscore": {
+        "evidence_slots": 5,
+        "method": "zscore",
+        "network_slots": 10
+      }
+    }
+  },
+  "software": {
+    "numpy": "2.4.6",
+    "python": "3.12.15",
+    "scipy": "1.17.1"
+  },
+  "uncertainty": "Paired Disease bootstrap percentile 95% interval, 1000 resamples, PCG64 seed 0; descriptive, small-cohort caution."
+}
