@@ -455,3 +455,11 @@ def test_optional_pathways_update_candidates_and_count_unmapped(inputs, sources)
     for update in updates:
         candidate = next(c for c in packet['candidates'] if c['candidate_id']==update['candidate_id'])
         assert update['evidence']==[items[e] for e in candidate['evidence_ids']]
+
+
+def test_packet_accepts_alphanumeric_disease_id(inputs, sources, monkeypatch):
+    disease, drugs, candidates = deepcopy(inputs)
+    disease['disease_id'] = 'NCIT_C74532'
+    monkeypatch.setattr(sources, 'associations', lambda _: {})
+    _, packet = build((disease, drugs, candidates), sources)
+    assert packet['disease']['id'] == 'NCIT_C74532'

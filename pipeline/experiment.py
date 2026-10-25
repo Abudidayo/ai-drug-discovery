@@ -239,6 +239,8 @@ def run_experiment(disease_id, out, *, jury="mock", data_dir=ROOT / "data", offl
         rank = ids.index("CHEMBL2105759") + 1 if "CHEMBL2105759" in ids else None
         known_answer = f"\nKnown-answer observation only: baricitinib (CHEMBL2105759) shortlist rank: {rank if rank else 'absent'}. No injection or tuning.\n"
     cross_value_status = "BLOCKED by upstream disagreement" if differences else "passed"
+    consensus_note = (f"Consensus unavailable: {result['consensus_status']['reason']}. "
+                      if result['consensus'] is None else "")
     report = (
         f"# {targets['disease_name']} ({targets['disease_id']})\n\n"
         f"{FALLBACK}. Stand-in: best Target evidence-only score, top 15, ties by ChEMBL ID. "
@@ -256,8 +258,8 @@ def run_experiment(disease_id, out, *, jury="mock", data_dir=ROOT / "data", offl
         f"across {len({d['candidate_id'] for d in differences})} drugs (consistency.json). "
         f"Complete fixture-style cross-value validation: {cross_value_status}.\n"
         f"- A5: {jury} jury; statuses {statuses}; models {config['models']}; "
-        f"{result['consensus']['jurors_counted']} votes counted in jury_result.json. "
-        f"Provider usage is in jury_usage.json to preserve the fixture shape.\n\n"
+        f"{result['consensus_status']['jurors_counted']} votes counted in jury_result.json. "
+        f"{consensus_note}Provider usage is in jury_usage.json to preserve the fixture shape.\n\n"
         f"Releases: {', '.join(releases)}. New HTTP responses retain release and retrieval time under cache/. "
         "Existing caches were read in place. PubChem uses dated snapshots.\n\n"
         "Wiring fixes: retain A1's complete association set for baseline scoring; reuse A1's checked scores in A4 "

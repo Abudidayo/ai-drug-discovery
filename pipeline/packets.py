@@ -25,6 +25,8 @@ from uuid import UUID
 import duckdb
 import httpx
 
+from pipeline.drugs import is_disease_id
+
 OT_RELEASE = "opentargets-26.09"
 CHEMBL_RELEASE = "chembl-37"
 OT_URL = "https://api.platform.opentargets.org/api/v4/graphql"
@@ -337,7 +339,7 @@ def build_evidence_packet(disease, candidate_ids, disease_targets, drug_targets,
     Sources.coverage exposes unmapped records without adding packet keys.
     """
     UUID(str(experiment_id))
-    if not re.fullmatch(r"[A-Za-z]+_[0-9]+", disease["id"]):
+    if not is_disease_id(disease["id"]):
         raise ValueError("Expected a current Open Targets Disease ID")
     if disease_targets["disease_id"] != disease["id"]:
         raise ValueError("Disease Target input belongs to another Disease")

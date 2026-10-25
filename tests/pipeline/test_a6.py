@@ -72,6 +72,7 @@ def test_candidate_projection_matches_fixture_without_changing_stream_b():
         c["coverage"] = {"total": 99}
         if c["network"]:
             c["network"]["randomisation_mean"] = 99
+            c["network"]["warning"] = None
     before = deepcopy(network)
     assert a6.candidate_payload(network, fixture["candidates"], packet) == fixture
     assert network == before
@@ -184,9 +185,37 @@ def test_distance_only_candidate_retains_distance_without_a_z_score():
     candidate = next(c for c in network['candidates'] if c['status'] == 'scored')
     candidate['status'] = 'distance_only'
     candidate['network']['degree_matched_z'] = None
+    candidate['network']['warning'] = 'zero_null_variance'
     projected = a6.candidate_payload(network, fixture['candidates'], packet)
     row = next(c for c in projected['candidates'] if c['candidate_id'] == candidate['candidate_id'])
     assert row['status'] == 'distance_only'
     assert row['network']['mean_distance'] == candidate['network']['mean_distance']
     assert row['network']['degree_matched_z'] is None
+    assert row['network']['warning'] == 'zero_null_variance'
     assert set(row) == set(next(c for c in fixture['candidates'] if c['candidate_id'] == row['candidate_id']))
+
+
+def test_prepare_cli_uses_configured_scorer_root(tmp_path, monkeypatch):
+    monkeypatch.setenv('RANKING_ROOT', str(tmp_path / 'configured'))
+    monkeypatch.setattr('sys.argv', ['a6', '--prepare'])
+    calls = []
+    monkeypatch.setattr(a6, 'prepare', lambda data, output, root: calls.append(root))
+    a6.main()
+    assert calls == [tmp_path / 'configured']
+    monkeypatch.setattr('sys.argv', ['a6', '--prepare', '--zaid', str(tmp_path / 'explicit')])
+    a6.main()
+    assert calls[-1] == tmp_path / 'explicit'
+
+
+@pytest.mark.parametrize('warning,status', [('unknown_warning', 'distance_only'),
+                                          ('zero_null_variance', 'scored')])
+def test_candidate_projection_rejects_invalid_network_warning(warning, status):
+    fixture = a6.read(ROOT / 'fixtures/candidates.json')
+    packet = a6.read(ROOT / 'fixtures/evidence_packet.json')
+    network = {'candidates': deepcopy(fixture['candidates']),
+               'shortlist': [c['candidate_id'] for c in fixture['candidates']]}
+    candidate = next(c for c in network['candidates'] if c['network'])
+    candidate['status'] = status
+    candidate['network']['warning'] = warning
+    with pytest.raises(ValueError, match='network warning'):
+        a6.candidate_payload(network, fixture['candidates'], packet)

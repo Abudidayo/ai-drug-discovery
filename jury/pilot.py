@@ -21,7 +21,7 @@ from time import perf_counter
 
 from jury.client import (CortexModel, ModelReply, RESPONSE_FORMAT, build_prompt,
                          consensus, validate_packet, validate_reply)
-from pipeline.panels import SEED
+from pipeline.panels import SEED, ranking_source_paths
 
 MODELS = ["claude-opus-5-5", "claude-sonnet-5", "openai-gpt-5.4", "glm-5.3", "kimi-k3"]
 JURY = ["claude-opus-5-5", "openai-gpt-5.4", "glm-5.3"]
@@ -76,7 +76,8 @@ def call_model(client, model, prompt):
         }, options={"headers": {"anthropic-version": "2023-06-01"}})
         usage = response.get("usage") or {}
         return ModelReply("".join(b["text"] for b in response.get("content", []) if b.get("type") == "text"),
-                          usage.get("input_tokens"), usage.get("output_tokens"))
+                          usage.get("input_tokens"), usage.get("output_tokens"),
+                          stop_reason=response.get("stop_reason"))
     return client(model, prompt, 0)
 
 
@@ -123,8 +124,8 @@ def run_pilot(output, model_call, declaration):
             try:
                 reply = model_call(record["model"], prompt)
                 attempt.update(raw_output=reply.text, input_tokens=reply.input_tokens,
-                               output_tokens=reply.output_tokens)
-                reviews, validation = validate_reply(reply.text, packet)
+                               output_tokens=reply.output_tokens, stop_reason=reply.stop_reason)
+                reviews, validation = validate_reply(reply.text, packet, stop_reason=reply.stop_reason)
                 attempt.update(reviews=reviews, validation=validation,
                                status="valid" if reviews is not None else "invalid")
             except Exception as exc:
@@ -170,7 +171,7 @@ def revalidate_runs(output):
             if "validation_at_receipt" not in attempt:
                 attempt["validation_at_receipt"] = attempt["validation"]
                 attempt["status_at_receipt"] = attempt["status"]
-            reviews, flags = validate_reply(attempt["raw_output"], packet)
+            reviews, flags = validate_reply(attempt["raw_output"], packet, stop_reason=attempt.get("stop_reason"))
             attempt.update(reviews=reviews, validation=flags,
                            status="valid" if reviews is not None else "invalid",
                            validated_with_sha256=validator_hash)
@@ -485,8 +486,10 @@ def v2_live_attempt(job):
     try:
         client = CortexModel()
         reply = call_model(client, job["model"], job["prompt"])
-        attempt.update(raw_output=reply.text, input_tokens=reply.input_tokens, output_tokens=reply.output_tokens)
-        reviews, flags = validate_reply(reply.text, job["packet"], name_aliases=job["name_aliases"])
+        attempt.update(raw_output=reply.text, input_tokens=reply.input_tokens,
+                       output_tokens=reply.output_tokens, stop_reason=reply.stop_reason)
+        reviews, flags = validate_reply(reply.text, job["packet"], name_aliases=job["name_aliases"],
+                                       stop_reason=reply.stop_reason)
         attempt.update(status="valid" if reviews is not None else "invalid", reviews=reviews, validation=flags)
     except Exception as exc:
         attempt.update(status="failed", error={"type": type(exc).__name__, "http_status": getattr(exc, "status_code", None)})
@@ -753,7 +756,7 @@ def replication_input_paths(output, report_dir):
     return inputs
 
 
-def freeze_b(output='data/experiment_b', report_dir='results/experiment_b', *, replication=False):
+def freeze_b(output='data/experiment_b', report_dir='results/experiment_b', *, replication=False, ranking_root=None):
     """Seal protocol, inputs, prompts and code before the first model request."""
     from pipeline.panels import B_SEED
     output, report_dir = Path(output), Path(report_dir)
@@ -766,12 +769,13 @@ def freeze_b(output='data/experiment_b', report_dir='results/experiment_b', *, r
     jobs = b_jobs(output, replication=True) if replication else b_jobs(output)
     if len(jobs) != 42:
         raise ValueError('Expected 33 primary and nine ablation jobs')
-    source_paths = [Path(p) for p in ['jury/client.py', 'jury/pilot.py', 'pipeline/panels.py',
-                                     'pipeline/packets.py', 'pipeline/pathways.py']]
-    source_paths += sorted(Path('/Users/jessicamak/oxhack-workers/zaid-ro/ranking').glob('*.py'))
+    repo_root = Path(__file__).resolve().parents[1]
+    source_paths = [repo_root / p for p in ['jury/client.py', 'jury/pilot.py', 'pipeline/panels.py',
+                                          'pipeline/packets.py', 'pipeline/pathways.py']]
+    source_paths += ranking_source_paths(ranking_root)
     inputs = [p for p in output.glob('*.json') if p.name != 'preregistered.json']
     if replication:
-        source_paths += [Path(p) for p in ['pipeline/disease_targets.py', 'pipeline/opentargets.py']]
+        source_paths += [repo_root / p for p in ['pipeline/disease_targets.py', 'pipeline/opentargets.py']]
         inputs += replication_input_paths(output, report_dir)
     declaration = {'protocol_sha256': sha256(protocol.read_bytes()).hexdigest(),
         'models': B_MODELS, 'reasoning_effort': B_EFFORT, 'max_live_calls': 60 if replication else B_MAX_CALLS,
@@ -820,7 +824,8 @@ def b_live_attempt(job, model_call=None):
         attempt.update(raw_output=reply.text, input_tokens=reply.input_tokens,
                        output_tokens=reply.output_tokens, max_output_tokens=reply.max_output_tokens,
                        stop_reason=reply.stop_reason)
-        reviews, flags = validate_reply(reply.text, job['packet'], name_aliases=job['name_aliases'])
+        reviews, flags = validate_reply(reply.text, job['packet'], name_aliases=job['name_aliases'],
+                                       stop_reason=reply.stop_reason)
         attempt.update(status='valid' if reviews is not None else 'invalid', reviews=reviews, validation=flags)
     except Exception as exc:
         attempt.update(status='failed', error={'type': type(exc).__name__, 'http_status': getattr(exc, 'status_code', None)})

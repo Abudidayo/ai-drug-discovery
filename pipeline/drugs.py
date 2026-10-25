@@ -242,6 +242,11 @@ def parent_groups(molecules: list[dict], chembl_molecules: list[dict]) -> tuple[
     return dict(groups), problems
 
 
+def is_disease_id(value):
+    """Plan §3: letters-only ontology prefix and an alphanumeric local ID."""
+    return isinstance(value, str) and re.fullmatch(r"[A-Za-z]+_[A-Za-z0-9]+", value) is not None
+
+
 def approval_rows(indications: list[dict], reports: list[dict]) -> dict:
     """A6: the indication stage AND an attached regulator report are required."""
     reports_by_id = {row["id"]: row for row in reports}
@@ -258,7 +263,7 @@ def approval_rows(indications: list[dict], reports: list[dict]) -> dict:
         approval = approvals[row["drugId"]]
         approval["sources"].update(sources)
         disease_id = (row.get("diseaseId") or "").replace(":", "_")
-        if re.fullmatch(r"[A-Za-z]+_[0-9]+", disease_id):
+        if is_disease_id(disease_id):
             approval["disease_ids"].add(disease_id)
         else:
             approval["unmapped"].append({
@@ -282,7 +287,7 @@ def load_approval_overrides(path: Path = Path(__file__).with_name("approval_over
         if (not isinstance(row, dict) or set(row) != required
                 or any(not isinstance(value, str) or not value.strip() for value in row.values())
                 or not re.fullmatch(r"CHEMBL[0-9]+", row["drug_id"])
-                or not re.fullmatch(r"[A-Za-z]+_[A-Za-z0-9]+", row["disease_id"])
+                or not is_disease_id(row["disease_id"])
                 or row["regulator"] not in hosts):
             raise ValueError("Invalid approval override record")
         for key in ("url", "approval_url"):

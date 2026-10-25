@@ -20,7 +20,7 @@ from uuid import NAMESPACE_URL, uuid5
 
 from jury.client import CortexModel, ModelReply, PROMPT_VERSION, consensus, run_jury, validate_packet, validate_reply
 from pipeline.packets import build_evidence_packet
-from pipeline.panels import PilotSources, packet_leakage
+from pipeline.panels import PilotSources, packet_leakage, resolve_ranking_root
 from pipeline.drugs import PARENT_OVERRIDES
 
 DISEASES = ("MONDO_0009693", "MONDO_0100096")
@@ -96,6 +96,11 @@ def candidate_payload(network, updates, packet):
         row.update({k: update[k] for k in ("name", "targets", "evidence", "warnings", "safety_status", "dockable", "pubchem_cid")})
         row["network"] = ({k: original["network"][k] for k in (
             "rank", "mean_distance", "degree_matched_z", "graph_version")} if original["network"] else None)
+        if original["network"] and original["network"].get("warning") is not None:
+            if (row["status"] != "distance_only"
+                    or original["network"]["warning"] != "zero_null_variance"):
+                raise ValueError("Invalid network warning")
+            row["network"]["warning"] = original["network"]["warning"]
         if row["status"] == "not_scorable":
             row["unscorable_reason"] = original["unscorable_reason"]
         candidates.append(row)
@@ -412,14 +417,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, default=Path("data"))
     parser.add_argument("--output", type=Path, default=Path("data/a6"))
-    parser.add_argument("--zaid", type=Path, default=Path("/Users/jessicamak/oxhack-workers/zaid-ro"))
+    parser.add_argument("--zaid", type=Path, default=None,
+                        help="Ranking checkout (default: RANKING_ROOT or this repository)")
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--prepare", action="store_true")
     action.add_argument("--live", action="store_true")
     action.add_argument("--report", action="store_true")
     args = parser.parse_args()
     if args.prepare:
-        prepare(args.data, args.output, args.zaid)
+        prepare(args.data, args.output, resolve_ranking_root(args.zaid))
     elif args.live:
         live(args.output)
     else:
