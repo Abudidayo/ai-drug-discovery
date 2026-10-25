@@ -1,19 +1,26 @@
-/* The pose viewer: its controls and key in a row above the view, then the view down to the
-   panel's foot. Nothing is laid over the 3D drawing. */
+/* The pose viewer: the view takes the panel's whole height, its controls and key in a quiet bar
+   along its top edge, just inside the rule. On phones the bar sits above the view. */
 .viewer {
+  position: relative;
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: var(--space-12);
   min-height: 0;
 }
 
 .toolbar {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  left: 0;
+  z-index: 1;
   display: flex;
-  flex: none;
   flex-wrap: wrap;
-  gap: var(--space-8) var(--space-24);
+  gap: 0 var(--space-24);
   align-items: center;
+  padding: var(--space-4) var(--space-12);
+  border-bottom: 1px solid var(--color-rule);
+  background: color-mix(in srgb, var(--color-paper) 88%, transparent);
 }
 
 .toggle {
@@ -152,4 +159,15 @@
 
 .swatch[data-key="drug"] {
   background: var(--color-ink);
+}
+
+@media (max-width: 720px) {
+  .toolbar {
+    position: static;
+    gap: var(--space-8) var(--space-24);
+    margin-bottom: var(--space-12);
+    padding: 0;
+    border-bottom: 0;
+    background: none;
+  }
 }

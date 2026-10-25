@@ -133,20 +133,24 @@ export interface Framing {
 /**
  * Where the camera goes so that, turned by `turn`, the `subject` sits in the middle of a view of
  * this `aspect` (width over height) and it and its `surroundings` fill the view up to FILL on the
- * tighter side. Exact for a perspective camera with a vertical field of view of `fov` degrees: a
- * point nearer the reader looks bigger, so each point is checked at its own depth.
+ * tighter side. `inset` is the share of the view's height covered at its top (by its controls);
+ * as much is kept clear at the bottom, so the subject stays in the middle. Exact for a
+ * perspective camera with a vertical field of view of `fov` degrees: a point nearer the reader
+ * looks bigger, so each point is checked at its own depth.
  */
 export function frame(
   subject: readonly Vector3[],
   surroundings: readonly Vector3[],
   turn: Quaternion,
   aspect: number,
+  inset = 0,
   fov = FIELD_OF_VIEW,
 ): Framing {
   const turnPoint = (point: Vector3) => point.clone().applyQuaternion(turn);
   const middle = new Box3().setFromPoints(subject.map(turnPoint)).getCenter(new Vector3());
-  const tanY = Math.tan((fov * Math.PI) / 360);
-  const tanX = tanY * aspect;
+  const tanView = Math.tan((fov * Math.PI) / 360);
+  const tanX = tanView * aspect;
+  const tanY = tanView * Math.max(0.2, 1 - 2 * inset);
   let distance = MIN_HALF_HEIGHT / tanY;
   for (const point of [...subject, ...surroundings]) {
     const offset = turnPoint(point).sub(middle);
@@ -164,6 +168,7 @@ interface ViewerInternals {
 
 export class PoseScene {
   private readonly holder: HTMLElement;
+  private readonly covered: () => number;
   private readonly viewer: GLViewer;
   private readonly receptor: GLModel;
   private readonly ligand: GLModel;
@@ -178,8 +183,16 @@ export class PoseScene {
   private spinFrame = 0;
   private disposed = false;
 
-  /** Draws `files` into a new layer inside `host`, or returns null when 3Dmol can't start. */
-  static create(host: HTMLElement, layerClass: string, files: PoseFiles): PoseScene | null {
+  /**
+   * Draws `files` into a new layer inside `host`, or returns null when 3Dmol can't start.
+   * `covered` says how many pixels at the top of the view its controls cover.
+   */
+  static create(
+    host: HTMLElement,
+    layerClass: string,
+    files: PoseFiles,
+    covered: () => number,
+  ): PoseScene | null {
     const holder = document.createElement("div");
     holder.className = layerClass;
     host.prepend(holder);
@@ -193,11 +206,17 @@ export class PoseScene {
       holder.remove();
       return null;
     }
-    return new PoseScene(holder, viewer, files);
+    return new PoseScene(holder, viewer, files, covered);
   }
 
-  private constructor(holder: HTMLElement, viewer: GLViewer, files: PoseFiles) {
+  private constructor(
+    holder: HTMLElement,
+    viewer: GLViewer,
+    files: PoseFiles,
+    covered: () => number,
+  ) {
     this.holder = holder;
+    this.covered = covered;
     this.viewer = viewer;
     this.crystal = files.crystal;
 
@@ -323,12 +342,20 @@ export class PoseScene {
   }
 
   /**
-   * Back to the opening view: the drug in the middle, its pocket around it, framed anew for the
-   * view's current shape.
+   * Back to the opening view: the drug in the middle, its pocket around it clear of the controls,
+   * framed anew for the view's current shape.
    */
   reset(): void {
-    const aspect = this.holder.clientWidth / Math.max(1, this.holder.clientHeight) || 1;
-    const { centre, distance } = frame(this.drugPoints, this.surroundings, this.turn, aspect);
+    const height = Math.max(1, this.holder.clientHeight);
+    const aspect = this.holder.clientWidth / height || 1;
+    const inset = this.covered() / height;
+    const { centre, distance } = frame(
+      this.drugPoints,
+      this.surroundings,
+      this.turn,
+      aspect,
+      inset,
+    );
     this.viewer.setPerceivedDistance(distance);
     const depth = (this.viewer.getView() as number[])[3];
     const { x, y, z, w } = this.turn;

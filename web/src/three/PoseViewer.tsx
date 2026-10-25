@@ -52,10 +52,10 @@ function Toggle({ pressed, onToggle, swatch, children }: ToggleProps) {
 
 /**
  * A docking result in 3D (3Dmol.js): the protein's backbone, the pocket and the drug's pose. Four
- * controls sit above the view, never over it: the pocket surface, the drug's crystal position,
- * spin and reset; the key shares their row, so the view takes the rest of the height. Spin starts
- * on unless the reader asks for reduced motion. The viewer and its WebGL context are released on
- * unmount.
+ * controls (the pocket surface, the drug's crystal position, spin and reset) and the key share a
+ * quiet bar along the view's top edge, so the view takes the panel's whole height; the drug is
+ * framed clear of the bar. On phones the bar sits above the view instead. Spin starts on unless
+ * the reader asks for reduced motion. The viewer and its WebGL context are released on unmount.
  */
 export function PoseViewer({ files, label }: PoseViewerProps) {
   const [receptor, poses, crystal] = useQueries({
@@ -73,6 +73,7 @@ export function PoseViewer({ files, label }: PoseViewerProps) {
   const spin = spinChoice ?? !reduced;
 
   const hostRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<PoseScene | null>(null);
   // The controls' latest values, for a scene that is built after they changed.
   const controlsRef = useRef({ surface, overlay, spin });
@@ -90,11 +91,12 @@ export function PoseViewer({ files, label }: PoseViewerProps) {
     const host = hostRef.current;
     if (!webgl || !host || receptorText === undefined || posesText === undefined) return;
     if (crystalText === undefined) return;
-    const scene = PoseScene.create(host, styles.layer ?? "", {
-      receptor: receptorText,
-      poses: posesText,
-      crystal: crystalText,
-    });
+    const scene = PoseScene.create(
+      host,
+      styles.layer ?? "",
+      { receptor: receptorText, poses: posesText, crystal: crystalText },
+      () => coveredBy(toolbarRef.current, host),
+    );
     if (scene === null) return;
     sceneRef.current = scene;
     host.dataset.ready = "true";
@@ -152,7 +154,7 @@ export function PoseViewer({ files, label }: PoseViewerProps) {
 
   return (
     <div className={styles.viewer}>
-      <div className={styles.toolbar}>
+      <div ref={toolbarRef} className={styles.toolbar}>
         <Toggle
           pressed={surface}
           onToggle={() => {
@@ -204,6 +206,12 @@ export function PoseViewer({ files, label }: PoseViewerProps) {
       </div>
     </div>
   );
+}
+
+/** How far `cover` reaches down over the top of `view`, in pixels: none when it sits above. */
+function coveredBy(cover: HTMLElement | null, view: HTMLElement): number {
+  if (cover === null) return 0;
+  return Math.max(0, cover.getBoundingClientRect().bottom - view.getBoundingClientRect().top);
 }
 
 /** Applies the surface toggle and marks on the host when it is drawn or gone. */

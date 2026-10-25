@@ -76,7 +76,7 @@
 .footer {
   display: flex;
   justify-content: flex-end;
-  padding: var(--space-16) var(--page-gutter) var(--space-24);
+  padding: var(--footer-gap) var(--page-gutter) var(--space-24);
 }
 
 @media (max-width: 1360px) {

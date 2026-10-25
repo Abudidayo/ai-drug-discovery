@@ -36,11 +36,12 @@
   grid-template-areas: "ballot reading";
 }
 
-/* The binding pose takes the stage; what it means and what is missing sit beside it, in a column
-   only as wide as its reading needs. */
+/* The binding pose takes the stage; what it means and what is missing sit beside it, in a narrow
+   column that wraps its text. */
 .grid[data-layout="pose"] {
-  grid-template-columns: minmax(0, 1fr) clamp(320px, 32%, 480px);
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 22%, 400px);
   grid-template-areas: "pose scores";
+  column-gap: var(--space-40);
 }
 
 /* No protein network for this Experiment: the step's own panels take its cell. */
@@ -120,8 +121,11 @@
   grid-area: reading;
 }
 
+/* The pose runs on past the grid's foot, beside the step's Back and Next (which sit under the
+   narrow column), down to the level of their bottom edge. */
 .panel[data-area="pose"] {
   grid-area: pose;
+  margin-bottom: calc(-1 * (var(--space-8) + var(--footer-gap) + var(--control-height)));
 }
 
 .panel[data-area="scores"] {
@@ -216,6 +220,12 @@
   .grid {
     row-gap: var(--space-24);
   }
+
+  /* Short windows: the pose's side column takes a little more width, so its numbers and caveat
+     still fit its height. */
+  .grid[data-layout="pose"] {
+    grid-template-columns: minmax(0, 1fr) clamp(340px, 26%, 400px);
+  }
 }
 
 /* Mid widths: the evidence step stacks its molecule over the network, beside the list. */
@@ -284,6 +294,7 @@
   /* Tall enough, under its wrapped controls, for a view about as tall as it is wide. */
   .panel[data-area="pose"] {
     min-height: 600px;
+    margin-bottom: 0;
   }
 
   .panel[data-area="net"] {

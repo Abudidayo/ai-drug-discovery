@@ -46,8 +46,8 @@ describe("frame", () => {
   const pocket = [new Vector3(0, -6, 0), new Vector3(28, 0, 0), new Vector3(10, 14, -6)];
 
   /** Where each point lands in the view, as a fraction of its half-width and half-height. */
-  function onScreen(points: Vector3[], turn: Quaternion, aspect: number) {
-    const { centre, distance } = frame(drug, pocket, turn, aspect, FOV);
+  function onScreen(points: Vector3[], turn: Quaternion, aspect: number, inset = 0) {
+    const { centre, distance } = frame(drug, pocket, turn, aspect, inset, FOV);
     return points.map((point) => {
       const offset = point.clone().sub(centre).applyQuaternion(turn);
       const depth = distance - offset.z;
@@ -80,14 +80,28 @@ describe("frame", () => {
     );
     expect(reach).toBeGreaterThan(0.85);
     expect(reach).toBeLessThan(0.95);
-    const narrow = frame(drug, pocket, new Quaternion(), 0.6, FOV).distance;
-    const wide = frame(drug, pocket, new Quaternion(), 2, FOV).distance;
+    const narrow = frame(drug, pocket, new Quaternion(), 0.6, 0, FOV).distance;
+    const wide = frame(drug, pocket, new Quaternion(), 2, 0, FOV).distance;
     expect(wide).toBeLessThan(narrow);
+  });
+
+  it("keeps the drug in the middle and the pocket clear of controls over the view's top", () => {
+    const points = onScreen(
+      [new Vector3(10, 0.5, 0.5), ...drug, ...pocket],
+      new Quaternion(),
+      3,
+      0.1,
+    );
+    expect(points[0]?.y).toBeCloseTo(0, 6);
+    // The top tenth is covered, and as much is kept clear at the bottom.
+    const reach = Math.max(...points.map(({ y }) => Math.abs(y)));
+    expect(reach).toBeLessThan(0.8);
+    expect(reach).toBeGreaterThan(0.7);
   });
 
   it("doesn't blow a lone fragment up to fill the view", () => {
     const atom = [new Vector3(1, 2, 3)];
-    const { centre, distance } = frame(atom, [], new Quaternion(), 1, FOV);
+    const { centre, distance } = frame(atom, [], new Quaternion(), 1, 0, FOV);
     expect(centre.toArray()).toEqual([1, 2, 3]);
     expect(distance * tan).toBeGreaterThan(5);
   });

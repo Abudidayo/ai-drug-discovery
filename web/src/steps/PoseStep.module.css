@@ -12,15 +12,13 @@
   color: var(--color-grey-1);
 }
 
-/* Where the 3D view sits, or will: ruled above and below, in the same box as the viewer's
-   (below its row of controls and key). */
+/* Where the 3D view sits, or will: ruled above and below, in the same box as the viewer's. */
 .stage {
   display: flex;
   flex: 1;
   align-items: center;
   justify-content: center;
   min-height: 0;
-  margin-top: 44px;
   border-top: 1px solid var(--color-rule);
   border-bottom: 1px solid var(--color-rule);
 }

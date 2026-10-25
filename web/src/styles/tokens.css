@@ -69,6 +69,8 @@
   --page-max-width: 1920px;
   --header-height: 64px;
   --control-height: 40px;
+  /* The space above a step's Back and Next in the footer. */
+  --footer-gap: var(--space-16);
   --radius-control: 2px;
   --measure: 68ch;
 
