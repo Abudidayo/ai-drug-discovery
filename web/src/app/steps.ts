@@ -1,11 +1,11 @@
 import { stepIndex, stepSlugs, type StepSlug } from "../copy/en";
 
-/** The landing page is step 1 before any Experiment exists. */
-export const HOME_PATH = "/";
+/** Step 1 before any Experiment exists: the disease search that the introduction leads to. */
+export const EXPLORE_PATH = "/explore";
 
-/** Where a step lives. Without an Experiment only step 1 has a page: the landing page. */
+/** Where a step lives. Without an Experiment only step 1 has a page: the disease search. */
 export function stepPath(experimentId: string | undefined, slug: StepSlug): string | undefined {
-  if (experimentId === undefined) return slug === "disease" ? HOME_PATH : undefined;
+  if (experimentId === undefined) return slug === "disease" ? EXPLORE_PATH : undefined;
   return `/e/${encodeURIComponent(experimentId)}/${slug}`;
 }
 

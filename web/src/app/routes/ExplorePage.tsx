@@ -3,10 +3,10 @@ import { FigureGrid } from "../Figure";
 import { Shell } from "../Shell";
 
 /**
- * `/`: step 1 before any Experiment is on screen. It opens the first common Disease at once, so
- * its network shows straight away and Next can carry on; the reader can choose another instead.
+ * `/explore`: step 1 before any Experiment is on screen. It opens the first common Disease at
+ * once, so its network shows straight away and Next can carry on; the reader can choose another.
  */
-export function LandingPage() {
+export function ExplorePage() {
   return (
     <Shell step="disease">
       <FigureGrid layout="search">

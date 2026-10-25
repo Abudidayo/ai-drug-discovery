@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { copy, stepSlugs, type StepSlug } from "../copy/en";
 import { covidExperiment, EXPERIMENT_ID } from "../test/fixtures";
 import { renderApp } from "../test/render";
+import { EXPLORE_PATH } from "./steps";
 import { fakeApi, http, networkError, server, serveExperiment } from "../test/server";
 import { Shell } from "./Shell";
 
@@ -125,10 +126,10 @@ describe("Shell", () => {
   });
 });
 
-describe("Landing page", () => {
+describe("Step 1 before an Experiment", () => {
   it("opens the first common disease's saved Experiment on step 1, without building again", async () => {
     const created = fakeApi.created;
-    const router = renderAt("/");
+    const router = renderAt(EXPLORE_PATH);
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(`${E}/disease`);
       expect(screen.getByRole("button", { name: copy.next })).toBeEnabled();
@@ -142,7 +143,7 @@ describe("Landing page", () => {
   it("stays step 1 with no Experiment when the API can't be reached: Back and Next disabled", async () => {
     server.use(http.untyped.get("*/api/diseases/common", networkError));
     const user = userEvent.setup();
-    const router = renderAt("/");
+    const router = renderAt(EXPLORE_PATH);
     expectOnStep("disease");
     expect(screen.getByRole("button", { name: copy.back })).toBeDisabled();
     expect(screen.getByRole("button", { name: copy.next })).toBeDisabled();
@@ -152,7 +153,7 @@ describe("Landing page", () => {
     expect(within(nav).getByText(titleOf("biology"))).toHaveAttribute("aria-disabled", "true");
 
     await user.keyboard("{ArrowDown}");
-    expect(router.state.location.pathname).toBe("/");
+    expect(router.state.location.pathname).toBe(EXPLORE_PATH);
   });
 });
 

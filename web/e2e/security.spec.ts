@@ -6,7 +6,7 @@ test("anonymous browsers keep private histories and cannot access each other's e
   context,
   browser,
 }) => {
-  await page.goto("/");
+  await page.goto("/explore");
   await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}\/disease$/);
   const ownerId = new URL(page.url()).pathname.split("/")[2] ?? "";
   expect(ownerId).toBeTruthy();
@@ -25,7 +25,7 @@ test("anonymous browsers keep private histories and cannot access each other's e
   const other = await browser.newContext({ baseURL: new URL(page.url()).origin });
   try {
     const otherPage = await other.newPage();
-    await otherPage.goto("/");
+    await otherPage.goto("/explore");
     await expect(otherPage).toHaveURL(/\/e\/[0-9a-f-]{36}\/disease$/);
     const otherId = new URL(otherPage.url()).pathname.split("/")[2];
     expect(otherId).not.toBe(ownerId);
