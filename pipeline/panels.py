@@ -656,7 +656,7 @@ def unblindable_candidates(packet, aliases, target_symbols):
 
 
 def prepare_experiment_b(data_dir='data', output='data/experiment_b', *,
-                         ranking_root='/Users/jessicamak/oxhack-workers/zaid-ro', offline=False):
+                         ranking_root='/Users/jessicamak/oxhack-workers/zaid-ro', offline=False, diseases=None):
     """Reuse v2 selection, enrichment and blinding; Zaid's modules stay read-only."""
     import shutil
     import httpx
@@ -670,7 +670,8 @@ def prepare_experiment_b(data_dir='data', output='data/experiment_b', *,
     if (output / 'preregistered.json').exists():
         raise ValueError('Experiment B is frozen; do not rebuild its inputs')
     output.mkdir(parents=True, exist_ok=True)
-    for cache in [data_dir / 'pilot/v2/packets', data_dir / 'pilot/v2_paths/packets']:
+    for cache in [data_dir / 'pilot/v2/packets', data_dir / 'pilot/v2_paths/packets',
+                  *([data_dir / 'experiment_b/packets'] if diseases is not None else [])]:
         if cache.exists():
             shutil.copytree(cache, output / 'packets', dirs_exist_ok=True)
     seed_target_cache(data_dir, output)
@@ -710,7 +711,7 @@ def prepare_experiment_b(data_dir='data', output='data/experiment_b', *,
         indications = sources.table('clinical_indication')
         ot_parents = dict(sources.table('drug_molecule').select('id', 'parentId').fetchall())
         panels, checks = [], []
-        for index, (did, name, area) in enumerate(B_DISEASES):
+        for index, (did, name, area) in enumerate(B_DISEASES if diseases is None else diseases):
             top = disease_targets(CachedAssociations(sources), did)
             if top['disease_name'].casefold() != name.casefold():
                 raise ValueError('Disease catalogue label changed')
@@ -777,6 +778,104 @@ def prepare_experiment_b(data_dir='data', output='data/experiment_b', *,
                 break
     prepare_v2_identities(data_dir, output, offline=offline)
     return panels
+
+
+def replication_protocol(report_dir='results/experiment_b_replication'):
+    """The scientific protocol is immutable before even source collection."""
+    report_dir = Path(report_dir)
+    seal = json.loads((report_dir / 'protocol_frozen.json').read_text())
+    for filename, key in [('protocol.md', 'protocol_sha256'), ('candidates.json', 'candidates_sha256')]:
+        if sha256((report_dir / filename).read_bytes()).hexdigest() != seal[key]:
+            raise ValueError('Frozen replication protocol/candidates changed')
+    return seal
+
+
+def select_replication(data_dir='data', output='data/experiment_b_replication',
+                       report_dir='results/experiment_b_replication', *, offline=False):
+    """First fourteen suitable names; no ranking engine is used for this gate."""
+    import httpx
+    import shutil
+    from ranking.cohort import (resolve_name, alias_index, extract_labels,
+                                mechanism_scope, case_exclusions)
+    from ranking.data import load_drugs
+    replication_protocol(report_dir)
+    data_dir, output = Path(data_dir), Path(output)
+    output.mkdir(parents=True, exist_ok=True)
+    if (output / 'preregistered.json').exists():
+        raise ValueError('Replication inputs already sealed')
+    for cache in ['pilot/v2/packets', 'experiment_b/packets']:
+        shutil.copytree(data_dir / cache, output / 'packets', dirs_exist_ok=True)
+    specs = json.loads((Path(report_dir) / 'candidates.json').read_text())
+    protocol_path = Path('/Users/jessicamak/oxhack-workers/zaid-ro/ranking/cohort_protocol.json')
+    protocol = json.loads(protocol_path.read_text())
+    drugs = load_drugs(data_dir / 'drug_targets.json').drugs
+    by_id, aliases = {d.id: d for d in drugs}, alias_index(drugs)
+    index = json.loads((data_dir / 'a6/stage1/index.json').read_text())
+    lcc = set(index['distance_gene_ids'])
+    excluded = {d[0] for d in B_DISEASES} | {d['id'] for d in DISEASES + V2_DISEASES}
+    excluded |= {'MONDO_0009693', 'MONDO_0100096'}
+    sources = V2Sources(data_dir, output, offline=offline)
+    diseases_path = data_dir / 'ot/26.09/disease/00000000.parquet'
+    db = duckdb.connect()
+    relation = db.read_parquet(str(diseases_path)).select('id', 'name', 'exactSynonyms')
+    diseases = [dict(zip(relation.columns, row)) for row in relation.fetchall()]
+    db.close()
+    cases, selected, seen = [], [], set()
+    with httpx.Client(timeout=30, follow_redirects=True) as http:
+        sources.client = http
+        for spec in specs:
+            case = {**spec, 'included': False, 'exclusion_reasons': []}
+            try:
+                disease = resolve_name(spec['name'], diseases)
+            except ValueError as exc:
+                case['exclusion_reasons'] = [str(exc)]
+                cases.append(case)
+                continue
+            did = disease['id']
+            case.update(disease_id=did, resolved_name=disease['name'])
+            if did in excluded or did in seen:
+                case['exclusion_reasons'] = ['previously_used_or_duplicate_Disease']
+                cases.append(case)
+                continue
+            seen.add(did)
+            relation = sources.table('clinical_indication').filter(duckdb.ColumnExpression('diseaseId') == did)
+            indications = [dict(zip(relation.columns, row)) for row in relation.fetchall()]
+            report_ids = sorted({i for row in indications for i in row['clinicalReportIds']})
+            reports = {}
+            if report_ids:
+                relation = sources.table('clinical_report').filter(duckdb.ColumnExpression('id').isin(*report_ids))
+                reports = {r['id']: r for r in (dict(zip(relation.columns, row)) for row in relation.fetchall())}
+            parents = {}
+            for identifier in sorted({i['drugId'] for i in indications} - by_id.keys()):
+                if len(aliases.get(identifier, set())) == 1:
+                    molecule = sources.chembl(f'molecule/{identifier}.json')
+                    parents[identifier] = (molecule.get('molecule_hierarchy') or {}).get('parent_chembl_id')
+            accepted, rejected = extract_labels(indications, reports, set(by_id), aliases, parents, '26.09')
+            for row in accepted:
+                row['mechanism_scope'] = mechanism_scope(by_id.get(row['candidate_id']) if row['eligible'] else None)
+            # Fetch only pinned A1/A2 associations, never ranks or jury outcomes.
+            top = disease_targets(CachedAssociations(sources), did)
+            case.update(positive_evidence_targets=sum(t['evidence_only_score'] > 0 for t in top['targets']),
+                retained_targets=len({t['target_id'] for t in top['targets']} & lcc),
+                eligible_human_mechanism_references=len({r['candidate_id'] for r in accepted
+                    if r['eligible'] and r['mechanism_scope']['human_mechanism_targets']}),
+                accepted_labels=accepted, rejected_labels=rejected)
+            case['exclusion_reasons'] = case_exclusions(case, protocol)
+            case['included'] = not case['exclusion_reasons']
+            cases.append(case)
+            if case['included']:
+                selected.append((did, disease['name'], spec['area']))
+            document = {'cases': cases, 'selected': selected, 'excluded_disease_ids': sorted(excluded),
+                'cohort_protocol_sha256': sha256(protocol_path.read_bytes()).hexdigest(),
+                'disease_catalogue_sha256': sha256(diseases_path.read_bytes()).hexdigest(),
+                'selection_complete': len(selected) == 14}
+            (output / 'selection.json').write_text(json.dumps(document, indent=2)+'\n')
+            print(f"Selection {spec['name']}: included={case['included']}, positive={case['positive_evidence_targets']}, LCC={case['retained_targets']}, references={case['eligible_human_mechanism_references']}", flush=True)
+            if len(selected) == 14:
+                break
+    if len(selected) != 14 or len({d[2] for d in selected}) < 7:
+        raise ValueError('Frozen replication selection cannot supply fourteen Diseases in seven areas')
+    return selected
 
 
 if __name__ == "__main__":
