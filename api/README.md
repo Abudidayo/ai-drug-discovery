@@ -151,15 +151,75 @@ fails validation gets FastAPI's `{"detail": [...]}` list.
 | `POST /experiments/{id}/archive`, `/restore` | Hide from or return to history. Archive is refused while building or while a docking job is queued or running (409) |
 | `GET /structures` | The prepared docking structures and their redocking controls |
 | `POST /dock` `{experiment_id, candidate_id, structure_id}` | **202**, the docking job. An identical earlier computation is reused (`cached_from`). Unsupported pairs get 422 with the reason; archived Experiments 409 |
-| `GET /dock/{id}` | Job status, scores and failures |
+| `GET /dock/{id}` | Job status, scores and failures. A done job with files lists them in `files`: each one's URL and SHA-256 |
+| `GET /files/{job_id}/{name}` | One result file of a done docking job (see below) |
 | `GET /evaluation` | Frozen evaluation metrics |
+
+## Docking result files
+
+`GET /api/files/{job_id}/{name}` serves the files listed in a docking job's
+`files`. `DockJob.files` gives each file's URL (this route) and the SHA-256 of
+its bytes, so the web app can load them straight into the viewer.
+
+| Name | `files` field | Content type | Holds |
+|---|---|---|---|
+| `receptor.pdb` | `receptor` | `chemical/x-pdb` | The docked chain, protein atoms only |
+| `poses.sdf` | `poses` | `chemical/x-mdl-sdfile` | The poses, best first |
+| `crystal_ligand.sdf` | `crystal_ligand` | `chemical/x-mdl-sdfile` | The co-crystal ligand in its crystal position, to draw over a pose |
+| `scores.json` | `scores` | `application/json` | The per-pose scores |
+| `log.txt` | `log` | `text/plain; charset=utf-8` | What was run and how |
+
+- Only these five names are served. Any other name, including one that tries
+  to leave the folder (`..%2F...`), gets a plain-words 404; the name is
+  matched against this list before any path is built.
+- A job that reuses another job's result (`cached_from`) serves that job's
+  files, and its `files` URLs point there.
+- A job that is queued, running or failed, or a fixture result made up on
+  request (scores only, `files: null`), answers 404 with the reason.
+- Live docking jobs will keep their files in `$RESULTS_DIR/{job_id}/`
+  (docs/build-reference.md C7); in fixture mode they are in
+  `oxhack_api/fixtures/docking_files/{job_id}/`. The API hashes them when it
+  starts, and refreshes a saved demo job (and the jobs reusing it) whose
+  files changed.
+
+### How the fixture files were prepared
+
+Only the precomputed redock control (`6f1d2c1e-...0001`, baricitinib into
+6WTO chain A, `"result_files": true` in `docking.json`) has files. They were
+made on 2026-10-25 with plain Python, no RDKit, Vina or Meeko:
+
+```sh
+uv run python scripts/prepare_docking_files.py
+```
+
+- `receptor.pdb`: from `https://files.rcsb.org/download/6WTO.pdb`, chain A
+  only (2147 `ATOM` records). Left out: the 104 waters, baricitinib, two
+  ethylene glycols (`EDO`) and the second location of 11 atoms (Arg938,
+  Cys961). The phosphotyrosines `PTR` 1007 and 1008 (`MODRES`) are kept as
+  `HETATM`, as in the entry. No hydrogens are added. 172 KB.
+- `crystal_ligand.sdf`: baricitinib is residue `3JW` 1203 in chain A, the
+  only copy in the entry. Taken from the RCSB ModelServer
+  (`/v1/6WTO/ligand?auth_asym_id=A&label_comp_id=3JW&encoding=sdf`, bond
+  orders from the chemical component dictionary); the script checks its 26
+  heavy atoms against the entry's `HETATM` records. RDKit (run once, not a
+  dependency) reads it as the ChEMBL baricitinib SMILES. Its heavy-atom
+  centroid is the 6WTO docking box centre.
+- `poses.sdf`: **a copy of the crystal ligand as pose 1**, titled and tagged
+  `fixture: true`. No docking program was run, so it is not a Vina result.
+- `scores.json` and `log.txt`: the made-up score (`fixture: true`) and a
+  record of the sources, with the download's SHA-256.
+
+Requests for other pairs in fixture mode get made-up scores and no files. A
+second structure (6O0K or 7BQU) was not prepared: no precomputed job uses
+one, and copying a crystal ligand as a pose only stands in for that same drug.
 
 ## Fixtures
 
 `fixtures/MONDO_0100096/` holds the COVID-19 Experiment (`experiment.json`)
-and its recorded jury run (`jury.json`); `structures.json`, `docking.json` and
-`evaluation.json` are shared. Each file has a `fixture_note` saying which
-values are made up.
+and its recorded jury run (`jury.json`); `structures.json`, `docking.json`,
+`docking_files/` and `evaluation.json` are shared. Each JSON file has a
+`fixture_note` saying which values are made up; each docking file says so
+itself (`fixture: true`, or the first line of `log.txt`).
 
 **Real and checked on 2026-10-24/25:** Ensembl gene IDs (Ensembl REST
 `lookup/symbol`, cross-checked with Open Targets `targets`), ChEMBL parent IDs
@@ -175,7 +235,8 @@ and every evidence URL (each returned HTTP 200).
 **Made up:** every score, rank, distance, z-score, pChEMBL median, activity
 count, jury vote, latency, docking score and RMSD. The 9 Disease Targets are a
 sample, not the real top 50. The 6WTO redock RMSD is a placeholder marked
-`fixture: true`; the docking worker measures the real value.
+`fixture: true`; the docking worker measures the real value. The redock
+control's pose 1 is the crystal ligand itself (see "Docking result files").
 
 Findings while checking:
 

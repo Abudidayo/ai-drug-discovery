@@ -13,13 +13,16 @@ transaction.
 
 from __future__ import annotations
 
+from pathlib import Path
 from uuid import UUID, uuid4
 
 from ..errors import Conflict, NotFound, Unavailable, Unprocessable
 from ..jobs import JobRef, Runner, pending_jurors, utcnow
 from ..repo import AlreadyExists, DockInputs, DuplicateComputation, Repo
 from ..schemas import (
+    DOCK_FILE_NAMES,
     DiseaseSearchResult,
+    DockFileName,
     DockJob,
     DockRequest,
     Experiment,
@@ -31,6 +34,7 @@ from .jury import JuryBackend
 from .source import ExperimentSource, SourceError
 
 LIVE_DOCK_STATUSES = ("queued", "running")
+_DOCK_FILES: dict[str, DockFileName] = {name: name for name in DOCK_FILE_NAMES.values()}
 
 
 class ExperimentService:
@@ -234,3 +238,28 @@ class ExperimentService:
         if job is None:
             raise NotFound("There is no docking job with this ID.")
         return job
+
+    def dock_file(self, job_id: UUID, name: str) -> tuple[Path, DockFileName]:
+        """Where one of a docking job's result files is stored, and its name. A job that
+        reuses another job's result serves that job's files."""
+        job = self.get_dock_job(job_id)
+        known = _DOCK_FILES.get(name)
+        if known is None:
+            raise NotFound(
+                "Docking jobs have only these files: receptor.pdb, poses.sdf, "
+                "crystal_ligand.sdf, scores.json and log.txt."
+            )
+        if job.files is None:
+            raise NotFound(_no_files_reason(job))
+        path = self.docking.result_file(job.cached_from or job.id, known)
+        if path is None:
+            raise NotFound(f"This docking job's {known} is missing from the results folder.")
+        return path, known
+
+
+def _no_files_reason(job: DockJob) -> str:
+    if job.status in LIVE_DOCK_STATUSES:
+        return f"This docking job is still {job.status}. Its files appear when it is done."
+    if job.status == "failed":
+        return "This docking job failed, so it has no result files. Its error says why."
+    return "This result has scores only: no files were prepared for it."

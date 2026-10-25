@@ -21,6 +21,8 @@ from oxhack_api.app import build_components, create_app, open_repo
 from oxhack_api.deps import Components
 from oxhack_api.jobs import Job, JobFactory, JobRef
 from oxhack_api.repo import Repo
+from oxhack_api.schemas import DockJob
+from oxhack_api.services.docking import DockingFailed, DockSteps, FixtureDocking
 from oxhack_api.settings import FIXTURES_DIR, Settings
 
 COVID = "MONDO_0100096"
@@ -29,6 +31,14 @@ RUXOLITINIB = "CHEMBL1789941"
 TOCILIZUMAB = "CHEMBL1237022"
 REMDESIVIR = "CHEMBL4065616"
 THALIDOMIDE = "CHEMBL468"
+CONTROL_JOB = "6f1d2c1e-0a4b-4c55-9d0e-5b7a3c9e0001"
+"""The fixture's precomputed redock control: baricitinib into 6WTO, with result files."""
+
+
+class FailingDocking(FixtureDocking):
+    def dock(self, job: DockJob) -> DockSteps:
+        yield
+        raise DockingFailed("Vina timed out after 180 s.\nlast log line")
 
 
 class SteppedRunner:

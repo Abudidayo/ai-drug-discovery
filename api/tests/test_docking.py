@@ -8,10 +8,12 @@ from uuid import uuid4
 import pytest
 from conftest import (
     BARICITINIB,
+    CONTROL_JOB,
     REMDESIVIR,
     RUXOLITINIB,
     THALIDOMIDE,
     TOCILIZUMAB,
+    FailingDocking,
     SteppedRunner,
     create,
     dock,
@@ -22,15 +24,11 @@ from fastapi.testclient import TestClient
 from oxhack_api.repo import Repo
 from oxhack_api.schemas import DockJob, Structure
 from oxhack_api.services.docking import (
-    DockingFailed,
-    DockSteps,
     FixtureDocking,
     unsupported_reason,
 )
 from oxhack_api.services.source import FixtureSource
 from oxhack_api.settings import FIXTURES_DIR
-
-CONTROL_JOB = "6f1d2c1e-0a4b-4c55-9d0e-5b7a3c9e0001"
 
 
 def test_structures_lists_the_prepared_set(client: TestClient) -> None:
@@ -60,7 +58,8 @@ def test_a_cached_pair_is_done_at_once(client: TestClient, runner: SteppedRunner
     assert job["target_id"] == "ENSG00000096968"
     assert job["scores"][0] == {"pose": 1, "score": -10.2}
     assert job["fixture"] is True
-    assert job["files"] is None
+    assert job["files"] == client.get(f"/api/dock/{CONTROL_JOB}").json()["files"]
+    assert job["files"]["poses"]["url"] == f"/api/files/{CONTROL_JOB}/poses.sdf"
     assert not runner.jobs, "nothing is computed again"
     assert client.get(f"/api/dock/{job['id']}").json() == job
     listed = client.get(f"/api/experiments/{experiment_id}").json()["dock_jobs"]
@@ -84,6 +83,7 @@ def test_a_supported_pair_is_queued_then_done(client: TestClient, runner: Steppe
     assert seen == ["queued", "running", "running", "done"]
     done = client.get(f"/api/dock/{job['id']}").json()
     assert len(done["scores"]) == done["settings"]["n_poses"] == 9
+    assert done["files"] is None, "a result made up on request has scores only"
     assert done["started_at"]
     assert done["finished_at"]
     assert client.get("/api/experiments").json()["items"][0]["docked_count"] == 1
@@ -199,12 +199,6 @@ def test_archive_is_refused_while_a_dock_job_is_live(
     assert client.post(f"/api/experiments/{experiment_id}/archive").status_code == 409
     runner.drain()
     assert client.post(f"/api/experiments/{experiment_id}/archive").status_code == 200
-
-
-class FailingDocking(FixtureDocking):
-    def dock(self, job: DockJob) -> DockSteps:
-        yield
-        raise DockingFailed("Vina timed out after 180 s.\nlast log line")
 
 
 def test_a_failed_docking_job_reports_why_and_is_not_reused(

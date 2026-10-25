@@ -135,6 +135,10 @@ Direction = TypeAliasType("Direction", Literal["supported", "contradicted", "unk
 DockKind = TypeAliasType("DockKind", Literal["candidate", "redock_control", "negative_control"])
 DockStatus = TypeAliasType("DockStatus", Literal["queued", "running", "done", "failed"])
 ControlStatus = TypeAliasType("ControlStatus", Literal["not_measured", "passed", "failed"])
+DockFileName = TypeAliasType(
+    "DockFileName",
+    Literal["receptor.pdb", "poses.sdf", "crystal_ligand.sdf", "scores.json", "log.txt"],
+)
 EvaluationKind = TypeAliasType("EvaluationKind", Literal["retrieval", "reranking"])
 
 SHORTLIST_MAX = 15
@@ -726,11 +730,48 @@ class PoseScore(Model):
     )
 
 
+class DockFile(Model):
+    url: str = Field(
+        description=(
+            "Where to download the file: /api/files/{job_id}/{name}. A job that reuses another "
+            "job's result links to that job's files."
+        )
+    )
+    sha256: str = Field(
+        pattern=r"^[0-9a-f]{64}$", description="SHA-256 of the file's bytes, in hex."
+    )
+
+
 class DockFiles(Model):
-    receptor: str = Field(description="URL of the prepared receptor, PDB format.")
-    poses: str = Field(description="URL of the predicted poses, SDF format.")
-    scores: str = Field(description="URL of the per-pose scores, JSON.")
-    log: str = Field(description="URL of the docking log, plain text.")
+    """A finished job's files. Each field's file name is in `DOCK_FILE_NAMES`."""
+
+    receptor: DockFile = Field(
+        description="receptor.pdb: the docked protein chain, protein atoms only, PDB format."
+    )
+    poses: DockFile = Field(
+        description=(
+            "poses.sdf: the predicted poses, best first, SDF format. In fixture results pose 1 "
+            "is a labelled copy of the crystal ligand, not a docking result."
+        )
+    )
+    crystal_ligand: DockFile = Field(
+        description=(
+            "crystal_ligand.sdf: the structure's co-crystal ligand where the crystal shows it, "
+            "SDF format. Draw it over a pose to compare them (the redocking check)."
+        )
+    )
+    scores: DockFile = Field(description="scores.json: the per-pose scores, JSON.")
+    log: DockFile = Field(description="log.txt: what was run and how, plain text.")
+
+
+DOCK_FILE_NAMES: dict[str, DockFileName] = {
+    "receptor": "receptor.pdb",
+    "poses": "poses.sdf",
+    "crystal_ligand": "crystal_ligand.sdf",
+    "scores": "scores.json",
+    "log": "log.txt",
+}
+"""The file name of each `DockFiles` field."""
 
 
 class DockJob(Model):
@@ -750,7 +791,10 @@ class DockJob(Model):
     settings: DockSettings
     scores: list[PoseScore] | None = Field(description="Per-pose scores; null until done.")
     files: DockFiles | None = Field(
-        description="Result files; null until done, and null for fixture results."
+        description=(
+            "Result files; null until done. In fixture mode only the precomputed demo jobs "
+            "have files; results made up on request have scores only."
+        )
     )
     control_rmsd: float | None = Field(
         ge=0, description="Measured RMSD for a redock control job, in angstroms; else null."
@@ -772,6 +816,8 @@ class DockJob(Model):
             raise ValueError("a failed docking job needs an error")
         if self.status == "done" and self.scores is None:
             raise ValueError("a done docking job has scores")
+        if self.files is not None and self.status != "done":
+            raise ValueError("only a done docking job has result files")
         return self
 
 

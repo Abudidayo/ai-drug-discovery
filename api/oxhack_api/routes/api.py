@@ -6,6 +6,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Path, Query, status
+from fastapi.responses import FileResponse
 
 from .. import __version__
 from ..deps import ComponentsDep, ServiceDep
@@ -23,6 +24,7 @@ from ..schemas import (
     JuryRun,
     StructureList,
 )
+from ..services.docking import FILE_MEDIA_TYPES
 
 router = APIRouter(prefix="/api")
 
@@ -160,6 +162,49 @@ def request_dock(body: DockRequest, service: ServiceDep) -> DockJob:
 )
 def get_dock_job(job_id: UUID, service: ServiceDep) -> DockJob:
     return service.get_dock_job(job_id)
+
+
+_FILE_CONTENT: dict[str, dict[str, object]] = {
+    media_type.split(";")[0]: {
+        "schema": {"type": "object"} if media_type == "application/json" else {"type": "string"}
+    }
+    for media_type in FILE_MEDIA_TYPES.values()
+}
+
+
+@router.get(
+    # `:path` lets names holding a slash reach the allow-list, so they get a plain 404.
+    "/files/{job_id}/{name:path}",
+    tags=["docking"],
+    summary="Download one result file of a finished docking job",
+    response_class=FileResponse,
+    responses={
+        200: {"description": "The file, in its own format.", "content": _FILE_CONTENT},
+        **responses(404, 422),
+    },
+)
+def get_dock_file(
+    job_id: UUID,
+    service: ServiceDep,
+    name: Annotated[
+        str,
+        Path(
+            description=(
+                "receptor.pdb, poses.sdf, crystal_ligand.sdf, scores.json or log.txt. "
+                "The URLs are listed in the job's `files`."
+            )
+        ),
+    ],
+) -> FileResponse:
+    """A job that reuses another job's result (`cached_from`) serves that job's files."""
+    path, known = service.dock_file(job_id, name)
+    return FileResponse(
+        path,
+        media_type=FILE_MEDIA_TYPES[known],
+        filename=known,
+        content_disposition_type="inline",
+        headers={"X-Content-Type-Options": "nosniff"},
+    )
 
 
 # Molecules ---------------------------------------------------------------------

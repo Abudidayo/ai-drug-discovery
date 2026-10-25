@@ -3,6 +3,11 @@
 The live backend (phase 7) hands jobs to the Vina worker through `dock_jobs`.
 The fixture backend serves the prepared structure set from
 `fixtures/structures.json` and made-up scores from `fixtures/docking.json`.
+Its precomputed demo jobs also have result files, in
+`fixtures/docking_files/{job_id}/` (made by `scripts/prepare_docking_files.py`).
+
+A job's files are served from `/api/files/{job_id}/{name}`; `DockJob.files`
+carries those URLs and each file's SHA-256.
 """
 
 from __future__ import annotations
@@ -19,8 +24,12 @@ from pydantic import Field
 
 from ..repo.base import DockInputs
 from ..schemas import (
+    DOCK_FILE_NAMES,
     Candidate,
     CandidateId,
+    DockFile,
+    DockFileName,
+    DockFiles,
     DockJob,
     DockSettings,
     Model,
@@ -33,8 +42,34 @@ DockSteps = Generator[None, None, list[PoseScore]]
 """Yields while the job runs and returns the pose scores."""
 
 
+FILE_MEDIA_TYPES: dict[DockFileName, str] = {
+    "receptor.pdb": "chemical/x-pdb",
+    "poses.sdf": "chemical/x-mdl-sdfile",
+    "crystal_ligand.sdf": "chemical/x-mdl-sdfile",
+    "scores.json": "application/json",
+    "log.txt": "text/plain; charset=utf-8",
+}
+"""The content type each result file is served with."""
+
+
 class DockingFailed(Exception):
     """The docking run failed. The message is the tail of its log."""
+
+
+def file_url(job_id: UUID, name: DockFileName) -> str:
+    return f"/api/files/{job_id}/{name}"
+
+
+def describe_files(job_id: UUID, directory: Path) -> DockFiles:
+    """`DockJob.files` for a job whose files are all in `directory`."""
+    described: dict[str, DockFile] = {}
+    for field, name in DOCK_FILE_NAMES.items():
+        path = directory / name
+        if not path.is_file():
+            raise ValueError(f"docking job {job_id} has no {name} in {directory}")
+        sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+        described[field] = DockFile(url=file_url(job_id, name), sha256=sha256)
+    return DockFiles(**described)
 
 
 class DockingBackend(Protocol):
@@ -56,6 +91,11 @@ class DockingBackend(Protocol):
         ...
 
     def dock(self, job: DockJob) -> DockSteps: ...
+
+    def result_file(self, job_id: UUID, name: DockFileName) -> Path | None:
+        """Where the job's file is stored, or None when there is none. Only for a job
+        that computed its result itself (not one with `cached_from`)."""
+        ...
 
 
 def cache_key(structure: Structure, smiles: str, settings: DockSettings) -> str:
@@ -96,6 +136,10 @@ class _ControlFixture(Model):
     candidate_id: CandidateId
     control_rmsd: float | None
     scores: list[float]
+    result_files: bool = Field(
+        default=False,
+        description="True when docking_files/{id}/ holds this job's result files.",
+    )
 
 
 class _DockingSettingsFixture(Model):
@@ -130,6 +174,7 @@ class FixtureDocking:
         listing = json.loads((fixtures_dir / "structures.json").read_text())
         self._structures = [Structure.model_validate(s) for s in listing["structures"]]
         self._data = DockingFixture.model_validate_json((fixtures_dir / "docking.json").read_text())
+        self._files_dir = fixtures_dir / "docking_files"
 
     def structures(self) -> list[Structure]:
         return [structure.model_copy(deep=True) for structure in self._structures]
@@ -161,7 +206,11 @@ class FixtureDocking:
                 structure_id=structure.id,
                 settings=settings,
                 scores=[PoseScore(pose=i, score=s) for i, s in enumerate(control.scores, 1)],
-                files=None,
+                files=(
+                    describe_files(control.id, self._files_dir / str(control.id))
+                    if control.result_files
+                    else None
+                ),
                 control_rmsd=control.control_rmsd,
                 error=None,
                 cached_from=None,
@@ -185,3 +234,9 @@ class FixtureDocking:
             PoseScore(pose=i + 1, score=round(top + steps[i % len(steps)], 2))
             for i in range(n_poses)
         ]
+
+    def result_file(self, job_id: UUID, name: DockFileName) -> Path | None:
+        if name not in FILE_MEDIA_TYPES:  # never build a path from anything else
+            return None
+        path = self._files_dir / str(job_id) / name
+        return path if path.is_file() else None

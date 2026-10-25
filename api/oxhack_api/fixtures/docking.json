@@ -1,5 +1,5 @@
 {
-  "fixture_note": "Fixture data. Structures and SMILES are real; every docking score and RMSD is fictional. Real values are measured by the docking worker (docs/build-reference.md C6).",
+  "fixture_note": "Fixture data. Structures and SMILES are real; every docking score and RMSD is fictional. The redock control's result files (docking_files/{job_id}/) hold the real 6WTO receptor and crystal ligand; its pose 1 is a copy of the crystal ligand, not a docking result. Real values are measured by the docking worker (docs/build-reference.md C6).",
   "settings": {
     "engine": "vina",
     "engine_version": "1.2.7",
@@ -26,16 +26,9 @@
       "candidate_id": "CHEMBL2105759",
       "control_rmsd": 0.74,
       "scores": [
-        -10.2,
-        -9.6,
-        -9.1,
-        -8.8,
-        -8.5,
-        -8.1,
-        -7.9,
-        -7.6,
-        -7.2
-      ]
+        -10.2
+      ],
+      "result_files": true
     }
   ],
   "top_scores": {

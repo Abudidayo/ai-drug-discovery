@@ -76,8 +76,17 @@ def test_openapi_covers_every_route() -> None:
         "/api/structures",
         "/api/dock",
         "/api/dock/{job_id}",
+        "/api/files/{job_id}/{name}",
         "/api/molecules/{pubchem_cid}/conformer",
         "/api/evaluation",
     }
     assert set(paths["/api/experiments"]["post"]["responses"]) == {"202", "422", "503"}
     assert set(paths["/api/dock"]["post"]["responses"]) == {"202", "404", "409", "422"}
+    files = paths["/api/files/{job_id}/{name}"]["get"]["responses"]
+    assert set(files) == {"200", "404", "422"}
+    assert set(files["200"]["content"]) == {
+        "chemical/x-pdb",
+        "chemical/x-mdl-sdfile",
+        "application/json",
+        "text/plain",
+    }

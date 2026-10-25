@@ -74,16 +74,24 @@ def build_components(
 
 
 def seed_dock_jobs(repo: Repo, docking: DockingBackend) -> None:
-    """Save the docking results computed ahead of time, once."""
+    """Save the docking results computed ahead of time. A saved one that differs (its
+    files were prepared again, say) is refreshed, with the jobs that reuse it."""
     for job, inputs in docking.seed_jobs():
-        if repo.get_dock_job(job.id) is not None:
-            continue
-        try:
-            repo.add_dock_job(job, inputs)
-        except AlreadyExists:
-            # Another process (the API or the worker) saved it first, or another job
-            # already computes the same inputs.
-            log.info("docking job %s is already saved", job.id)
+        saved = repo.get_dock_job(job.id)
+        if saved is None:
+            try:
+                repo.add_dock_job(job, inputs)
+            except AlreadyExists:
+                # Another process (the API or the worker) saved it first, or another job
+                # already computes the same inputs.
+                log.info("docking job %s is already saved", job.id)
+        elif saved != job:
+            log.info("refreshing docking job %s from the fixtures", job.id)
+            shared = {"scores": job.scores, "files": job.files, "fixture": job.fixture}
+            with repo.transaction():
+                repo.update_dock_job(job)
+                for follower in repo.list_dock_jobs_cached_from(job.id):
+                    repo.update_dock_job(follower.model_copy(update=shared))
 
 
 def start_inprocess_worker(components: Components) -> PostgresWorker | None:

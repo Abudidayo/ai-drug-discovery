@@ -681,33 +681,57 @@
         "title": "DiseaseTarget",
         "type": "object"
       },
-      "DockFiles": {
+      "DockFile": {
         "additionalProperties": false,
         "properties": {
-          "log": {
-            "description": "URL of the docking log, plain text.",
-            "title": "Log",
+          "sha256": {
+            "description": "SHA-256 of the file's bytes, in hex.",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
             "type": "string"
+          },
+          "url": {
+            "description": "Where to download the file: /api/files/{job_id}/{name}. A job that reuses another job's result links to that job's files.",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "sha256"
+        ],
+        "title": "DockFile",
+        "type": "object"
+      },
+      "DockFiles": {
+        "additionalProperties": false,
+        "description": "A finished job's files. Each field's file name is in `DOCK_FILE_NAMES`.",
+        "properties": {
+          "crystal_ligand": {
+            "$ref": "#/components/schemas/DockFile",
+            "description": "crystal_ligand.sdf: the structure's co-crystal ligand where the crystal shows it, SDF format. Draw it over a pose to compare them (the redocking check)."
+          },
+          "log": {
+            "$ref": "#/components/schemas/DockFile",
+            "description": "log.txt: what was run and how, plain text."
           },
           "poses": {
-            "description": "URL of the predicted poses, SDF format.",
-            "title": "Poses",
-            "type": "string"
+            "$ref": "#/components/schemas/DockFile",
+            "description": "poses.sdf: the predicted poses, best first, SDF format. In fixture results pose 1 is a labelled copy of the crystal ligand, not a docking result."
           },
           "receptor": {
-            "description": "URL of the prepared receptor, PDB format.",
-            "title": "Receptor",
-            "type": "string"
+            "$ref": "#/components/schemas/DockFile",
+            "description": "receptor.pdb: the docked protein chain, protein atoms only, PDB format."
           },
           "scores": {
-            "description": "URL of the per-pose scores, JSON.",
-            "title": "Scores",
-            "type": "string"
+            "$ref": "#/components/schemas/DockFile",
+            "description": "scores.json: the per-pose scores, JSON."
           }
         },
         "required": [
           "receptor",
           "poses",
+          "crystal_ligand",
           "scores",
           "log"
         ],
@@ -793,7 +817,7 @@
                 "type": "null"
               }
             ],
-            "description": "Result files; null until done, and null for fixture results."
+            "description": "Result files; null until done. In fixture mode only the precomputed demo jobs have files; results made up on request have scores only."
           },
           "finished_at": {
             "anyOf": [
@@ -3122,6 +3146,86 @@
         "summary": "Restore an archived Experiment to history",
         "tags": [
           "experiments"
+        ]
+      }
+    },
+    "/api/files/{job_id}/{name}": {
+      "get": {
+        "description": "A job that reuses another job's result (`cached_from`) serves that job's files.",
+        "operationId": "get_dock_file",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "receptor.pdb, poses.sdf, crystal_ligand.sdf, scores.json or log.txt. The URLs are listed in the job's `files`.",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "description": "receptor.pdb, poses.sdf, crystal_ligand.sdf, scores.json or log.txt. The URLs are listed in the job's `files`.",
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "chemical/x-mdl-sdfile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "chemical/x-pdb": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The file, in its own format."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnprocessableResponse"
+                }
+              }
+            },
+            "description": "The request cannot be carried out."
+          }
+        },
+        "summary": "Download one result file of a finished docking job",
+        "tags": [
+          "docking"
         ]
       }
     },
