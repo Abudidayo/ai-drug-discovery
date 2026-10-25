@@ -40,6 +40,8 @@ interface Rect {
 
 const GAP = 4;
 const EDGE = 2;
+/** Clear space kept between two labels, so neighbouring words never read as one. */
+const SPACING = 4;
 
 function spots(anchor: Disc, w: number, h: number): [number, number][] {
   const { x, y, r } = anchor;
@@ -62,7 +64,9 @@ function overlapsDisc(rect: Rect, disc: Disc): boolean {
 }
 
 function overlapsRect(a: Rect, b: Rect): boolean {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  return (
+    a.x < b.x + b.w + SPACING && a.x + a.w + SPACING > b.x && a.y < b.y + b.h && a.y + a.h > b.y
+  );
 }
 
 export function placeLabels(
