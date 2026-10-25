@@ -1,0 +1,104 @@
+# Test main, then deploy it to the demo codespace (.devcontainer/README.md).
+#
+# Runs on every push to main, and by hand from the Actions tab. The deploy job opens a
+# shell in the codespace and runs scripts/redeploy.sh, which checks out main, migrates
+# the database, builds the web app and restarts the stack; then it checks the public
+# link answers. GitHub lists each run under the repository's "demo" environment.
+#
+# Needs, in Settings -> Secrets and variables -> Actions:
+#   secret   CODESPACE_DEPLOY_TOKEN  classic token of the codespace's owner, `codespace` scope
+#   variable DEMO_CODESPACE          the codespace's name (`gh codespace list`)
+#   variable DEMO_URL                its public web address, ending in /
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time; a newer push waits rather than cancelling one half-way.
+concurrency:
+  group: deploy-demo
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-retries 30
+    env:
+      TEST_DATABASE_URL: postgresql://postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: API and pipeline
+        run: |
+          uv sync --all-packages --frozen
+          (cd api && uv run --no-sync ruff check . && uv run --no-sync pyright)
+          uv run --no-sync pytest api/tests -q
+          uv run --no-sync pytest tests -q
+      - name: Database migrations
+        run: >-
+          uv run --no-project --python 3.12 --with pytest --with "psycopg[binary]>=3.2,<4"
+          pytest db/tests -q
+
+      - name: Web app
+        working-directory: web
+        run: |
+          npm ci
+          npm run check:api
+          npm run typecheck
+          npm run lint
+          npx prettier --check .
+          npm test
+          npm run build
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: demo
+      url: ${{ vars.DEMO_URL }}
+    steps:
+      - name: Redeploy the codespace
+        env:
+          GH_TOKEN: ${{ secrets.CODESPACE_DEPLOY_TOKEN }}
+          CODESPACE: ${{ vars.DEMO_CODESPACE }}
+        # Starts the codespace first if it has stopped. Checks out main before running the
+        # script, so the script that runs is always main's own.
+        run: |
+          if [ -z "$GH_TOKEN" ] || [ -z "$CODESPACE" ]; then
+            echo "::error::Set the CODESPACE_DEPLOY_TOKEN secret and the DEMO_CODESPACE variable (.devcontainer/README.md, Deploy)."
+            exit 1
+          fi
+          gh codespace ssh -c "$CODESPACE" -- \
+            'bash -lc "cd /workspaces/ai-drug-discovery && git fetch -q origin main && git checkout -q --force -B main origin/main && scripts/redeploy.sh main"' \
+            < /dev/null
+
+      - name: Check the public link answers
+        env:
+          URL: ${{ vars.DEMO_URL }}
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -sf "${URL}api/health" | grep -q '"status":"ok"'; then exit 0; fi
+            sleep 5
+          done
+          echo "The demo didn't answer at ${URL}api/health" >&2
+          exit 1
