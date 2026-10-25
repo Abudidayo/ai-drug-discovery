@@ -71,6 +71,20 @@ def test_seeded_orders_and_output_shape():
     assert len({tuple(j["presented_order"]) for j in result["jurors"]}) == 3
 
 
+
+def test_on_juror_reports_each_juror_as_it_finishes():
+    events = []
+
+    def call(model, prompt, temperature):
+        events.append(("asked", model))
+        return mock_model(model, prompt, temperature)
+
+    result = run_jury(PACKET, CONFIG, call, on_juror=lambda juror: events.append(("finished", juror)))
+    expected = []
+    for juror in result["jurors"]:
+        expected += [("asked", juror["model"]), ("finished", juror)]
+    assert events == expected
+
 def test_fixture_consensus_exactly():
     assert consensus(PACKET, FIXTURE["jurors"]) == FIXTURE["consensus"]
     for juror in FIXTURE["jurors"][:2]:

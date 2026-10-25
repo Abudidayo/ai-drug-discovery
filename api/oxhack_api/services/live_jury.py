@@ -10,10 +10,10 @@
 
 Both send the same blinded evidence packet, rebuilt from the saved Experiment
 (`jury_packet`), and map stream A's result onto `Juror`, `JuryVote` and the
-consensus. Stream A runs the jurors one after another and returns only at the
-end; it has no per-juror callback yet. Until it does, this backend reports each
-juror as `running` when stream A first asks it, and saves every review when the
-run finishes.
+consensus. Stream A runs the jurors one after another. This backend reports each
+juror as `running` when stream A first asks it, and saves its review as soon as
+it finishes (`run_jury`'s `on_juror`), so the UI never shows a finished juror
+still reviewing.
 """
 
 from __future__ import annotations
@@ -48,7 +48,14 @@ from ..stream_a import (
     run_jury,
     validate_packet,
 )
-from .jury import JurorFinished, JurorStarted, JuryOutcome, JurySteps, JuryUnavailable
+from .jury import (
+    JurorFinished,
+    JurorStarted,
+    JuryEvent,
+    JuryOutcome,
+    JurySteps,
+    JuryUnavailable,
+)
 
 log = logging.getLogger(__name__)
 
@@ -137,49 +144,61 @@ class MappedJury:
     """Null when fewer than two jurors gave a valid review: stream A gives no consensus."""
 
 
+def _labels(packet: JSON) -> dict[str, str]:
+    """The packet's C labels, mapped to Candidate IDs."""
+    return {c["label"]: cast(str, c["candidate_id"]) for c in packet["candidates"]}
+
+
+def map_juror(juror: JSON, labels: dict[str, str]) -> tuple[Juror, list[JuryVote]]:
+    """Map one juror of `run_jury`'s result onto the contract. An invalid or failed
+    juror keeps its attempts, errors and token usage, and contributes no vote."""
+    model_id = cast(str, juror["model"])
+    mapped = Juror(
+        model_id=model_id,
+        status=juror["status"],
+        attempts=juror["attempts"],
+        latency_ms=juror["latency_ms"],
+        errors=list(juror["validation"]["errors"]),
+        token_usage=[
+            TokenUsage(
+                attempt=usage["attempt"],
+                input_tokens=usage["input_tokens"],
+                output_tokens=usage["output_tokens"],
+            )
+            for usage in juror.get("token_usage", [])
+        ],
+    )
+    if juror["status"] != "valid":
+        return mapped, []
+    votes = [
+        JuryVote(
+            model_id=model_id,
+            candidate_id=labels[review["label"]],
+            rank=review["rank"],
+            decision=review["decision"],
+            direction=review["direction"],
+            rationale=review["rationale"],
+            objection=review["objection"],
+            missing_evidence=list(review["missing_evidence"]),
+            supporting_evidence_ids=list(review["supporting_evidence_ids"]),
+            contradicting_evidence_ids=list(review["contradicting_evidence_ids"]),
+            safety=SafetyReview.model_validate(review["safety"]),
+        )
+        for review in juror["reviews"]
+    ]
+    return mapped, votes
+
+
 def map_jury_result(result: JSON, packet: JSON) -> MappedJury:
-    """Map `run_jury`'s result onto the contract. Invalid and failed jurors keep their
-    attempts, errors and token usage, and contribute no vote."""
-    labels = {c["label"]: cast(str, c["candidate_id"]) for c in packet["candidates"]}
+    """Map `run_jury`'s result onto the contract (`map_juror` for each juror)."""
+    labels = _labels(packet)
     jurors: list[Juror] = []
     votes: dict[str, list[JuryVote]] = {}
     for juror in result["jurors"]:
-        model_id = cast(str, juror["model"])
-        jurors.append(
-            Juror(
-                model_id=model_id,
-                status=juror["status"],
-                attempts=juror["attempts"],
-                latency_ms=juror["latency_ms"],
-                errors=list(juror["validation"]["errors"]),
-                token_usage=[
-                    TokenUsage(
-                        attempt=usage["attempt"],
-                        input_tokens=usage["input_tokens"],
-                        output_tokens=usage["output_tokens"],
-                    )
-                    for usage in juror.get("token_usage", [])
-                ],
-            )
-        )
-        if juror["status"] != "valid":
-            continue
-        votes[model_id] = [
-            JuryVote(
-                model_id=model_id,
-                candidate_id=labels[review["label"]],
-                rank=review["rank"],
-                decision=review["decision"],
-                direction=review["direction"],
-                rationale=review["rationale"],
-                objection=review["objection"],
-                missing_evidence=list(review["missing_evidence"]),
-                supporting_evidence_ids=list(review["supporting_evidence_ids"]),
-                contradicting_evidence_ids=list(review["contradicting_evidence_ids"]),
-                safety=SafetyReview.model_validate(review["safety"]),
-            )
-            for review in juror["reviews"]
-        ]
+        mapped, juror_votes = map_juror(juror, labels)
+        jurors.append(mapped)
+        if mapped.status == "valid":
+            votes[mapped.model_id] = juror_votes
     combined = result["consensus"]
     if combined is None:
         # Stream A gives no consensus from fewer than two valid ballots (consensus_status).
@@ -202,6 +221,13 @@ def map_jury_result(result: JSON, packet: JSON) -> MappedJury:
         contested=[labels[label] for label in combined["contested"]],
     )
     return MappedJury(jurors=jurors, votes=votes, outcome=outcome)
+
+
+@dataclass(frozen=True)
+class _Finished:
+    """Stream A's result for one juror, handed over as soon as it finishes."""
+
+    juror: JSON
 
 
 class StreamAJury:
@@ -271,8 +297,6 @@ class StreamAJury:
         }
         result = yield from self._run(packet, settings, dict(config.reasoning_effort))
         mapped = map_jury_result(result, packet)
-        for juror in mapped.jurors:
-            yield JurorFinished(juror, mapped.votes.get(juror.model_id, []))
         if mapped.outcome is None:
             raise JuryUnavailable(
                 "Fewer than two jurors returned a review that passed the checks, so there is "
@@ -282,9 +306,11 @@ class StreamAJury:
 
     def _run(
         self, packet: JSON, settings: JSON, effort: dict[str, str]
-    ) -> Generator[JurorStarted, None, JSON]:
-        """Run stream A's jury on a helper thread, yielding each juror as it starts."""
-        events: queue.Queue[str | JSON | BaseException] = queue.Queue()
+    ) -> Generator[JuryEvent, None, JSON]:
+        """Run stream A's jury on a helper thread, yielding each juror as it starts and
+        as it finishes. Returns stream A's whole result."""
+        labels = _labels(packet)
+        events: queue.Queue[str | _Finished | JSON | BaseException] = queue.Queue()
         started: set[str] = set()
 
         def run() -> None:
@@ -299,7 +325,10 @@ class StreamAJury:
                         events.put(model)
                     return inner(model, prompt, temperature)
 
-                events.put(run_jury(packet, settings, call))
+                def finished(juror: JSON) -> None:
+                    events.put(_Finished(juror))
+
+                events.put(run_jury(packet, settings, call, on_juror=finished))
             except BaseException as exc:  # handed to the job, which records it
                 events.put(exc)
             finally:
@@ -312,6 +341,8 @@ class StreamAJury:
             event = events.get()
             if isinstance(event, str):
                 yield JurorStarted(event)
+            elif isinstance(event, _Finished):
+                yield JurorFinished(*map_juror(event.juror, labels))
             elif isinstance(event, BaseException):
                 # Provider exceptions can carry credentials; only the type is shown or logged.
                 log.warning("stream A's jury raised %s", type(event).__name__)

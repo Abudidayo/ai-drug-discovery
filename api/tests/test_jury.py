@@ -12,6 +12,7 @@ from conftest import COVID, SteppedRunner, create, ready_experiment
 from fastapi.testclient import TestClient
 
 from oxhack_api.services.jury import FixtureJury
+from oxhack_api.services.live_jury import StreamAJury
 from oxhack_api.settings import FIXTURES_DIR
 
 
@@ -69,6 +70,38 @@ def test_jury_reports_progress_juror_by_juror(client: TestClient, runner: Steppe
     assert glm["latency_ms"] > 0
     summary = client.get("/api/experiments").json()["items"][0]
     assert summary["jury_status"] == "done"
+
+
+def test_stream_a_jury_saves_each_juror_as_it_finishes(
+    make_client: Callable[..., TestClient], runner: SteppedRunner
+) -> None:
+    """Stream A asks its jurors one after another; a finished juror must not still read
+    as reviewing while the next one works."""
+    client = make_client(jury=StreamAJury("mock"))
+    experiment_id = ready_experiment(client, runner)["id"]
+    client.post(f"/api/experiments/{experiment_id}/jury")
+
+    def state() -> tuple[str, list[str]]:
+        run = jury_of(client, experiment_id)
+        return run["status"], [j["status"] for j in run["jurors"]]
+
+    seen = [state()]
+    while runner.jobs:
+        runner.step()
+        seen.append(state())
+    assert seen == [
+        ("queued", ["pending", "pending", "pending"]),
+        ("running", ["pending", "pending", "pending"]),
+        ("running", ["running", "pending", "pending"]),
+        ("running", ["valid", "pending", "pending"]),
+        ("running", ["valid", "running", "pending"]),
+        ("running", ["valid", "valid", "pending"]),
+        ("running", ["valid", "valid", "running"]),
+        ("running", ["valid", "valid", "valid"]),
+        ("done", ["valid", "valid", "valid"]),
+    ]
+    run = jury_of(client, experiment_id)
+    assert len(run["votes"]) == 3 * len(run["consensus"]["ranking"])
 
 
 def test_jury_is_asked_once(client: TestClient, runner: SteppedRunner) -> None:

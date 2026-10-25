@@ -626,7 +626,9 @@ def validate_config(config):
         raise ValueError("temperature must be a finite number")
 
 
-def run_jury(packet, config, model_call, *, max_calls=None):
+def run_jury(packet, config, model_call, *, max_calls=None, on_juror=None):
+    """Ask each juror in turn. `on_juror`, when given, receives each juror's result
+    as soon as that juror finishes, before the next one is asked."""
     validate_packet(packet)
     validate_config(config)
     effort = (model_call.reasoning_effort if isinstance(model_call, CortexModel)
@@ -695,6 +697,8 @@ def run_jury(packet, config, model_call, *, max_calls=None):
                        "latency_ms": round((perf_counter() - started) * 1000),
                        "presented_order": order, "reviews": reviews,
                        "validation": validation, "raw_output": None if status == "valid" else raw})
+        if on_juror is not None:
+            on_juror(deepcopy(jurors[-1]))
     summary = consensus(packet, jurors)
     return {"experiment_id": packet["experiment_id"], "jury": deepcopy(config),
             "jurors": jurors,

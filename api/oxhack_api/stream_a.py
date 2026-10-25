@@ -406,10 +406,16 @@ def validate_packet(packet: JSON) -> None:
     _jury.validate_packet(packet)
 
 
-def run_jury(packet: JSON, config: JSON, model_call: ModelCall) -> JSON:
-    """Ask every juror in turn and combine the valid ballots. Returns only at the end:
-    stream A has no per-juror callback yet."""
-    return cast(JSON, _jury.run_jury(packet, config, model_call))
+def run_jury(
+    packet: JSON,
+    config: JSON,
+    model_call: ModelCall,
+    *,
+    on_juror: Callable[[JSON], None] | None = None,
+) -> JSON:
+    """Ask every juror in turn and combine the valid ballots. `on_juror` receives each
+    juror's result as soon as that juror finishes."""
+    return cast(JSON, _jury.run_jury(packet, config, model_call, on_juror=on_juror))
 
 
 mock_model = cast(ModelCall, _jury.mock_model)
