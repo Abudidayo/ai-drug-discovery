@@ -1,10 +1,9 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 import { copy, stepSlugs, type StepSlug } from "../copy/en";
-import type { FollowUps } from "../lib/followUps";
-import { covidExperiment, covidWithJury, dockJob, EXPERIMENT_ID } from "../test/fixtures";
+import { covidExperiment, EXPERIMENT_ID } from "../test/fixtures";
 import { renderApp } from "../test/render";
 import { fakeApi, http, networkError, server, serveExperiment } from "../test/server";
 import { Shell } from "./Shell";
@@ -179,94 +178,6 @@ describe("Disease in the header", () => {
   it("is absent before an Experiment exists", () => {
     renderAt("/");
     expect(screen.queryByText("COVID-19")).not.toBeInTheDocument();
-  });
-});
-
-describe("Work prepared in the background", () => {
-  const navLink = (slug: StepSlug) =>
-    within(screen.getByRole("navigation", { name: copy.stepsLabel })).getByRole("link", {
-      name: titleOf(slug),
-    });
-
-  it("describes the jury and the poses by where they stand, keeping each step's name", async () => {
-    serveExperiment({ ...covidWithJury("running"), dock_jobs: [dockJob("done")] });
-    renderAt(`${E}/biology`);
-
-    await waitFor(() => {
-      expect(navLink("jury")).toHaveAccessibleDescription(copy.followUp.working);
-    });
-    expect(navLink("pose")).toHaveAccessibleDescription(copy.followUp.ready);
-    // The state is said once, as a description: never in the step's name or on screen.
-    expect(navLink("jury")).toHaveAccessibleName(titleOf("jury"));
-    expect(navLink("pose")).toHaveAccessibleName(titleOf("pose"));
-    expect(screen.queryByText(copy.followUp.working)).not.toBeVisible();
-    for (const slug of stepSlugs.filter((slug) => slug !== "jury" && slug !== "pose")) {
-      expect(navLink(slug)).not.toHaveAttribute("aria-describedby");
-    }
-  });
-
-  it("says nothing with nothing to wait for, but keeps the marks so the header never moves", async () => {
-    serveExperiment({ ...covidWithJury("failed"), dock_jobs: [dockJob("failed")] });
-    renderAt(`${E}/biology`);
-    await waitFor(() => {
-      expect(screen.queryByText(copy.experiment.loading)).not.toBeInTheDocument();
-    });
-
-    for (const slug of ["jury", "pose"] as const) {
-      expect(navLink(slug)).not.toHaveAttribute("aria-describedby");
-      expect(navLink(slug).querySelector("[aria-hidden='true']")).toHaveAttribute(
-        "data-state",
-        "idle",
-      );
-    }
-  });
-
-  describe("tells a screen reader once when one becomes ready", () => {
-    const working: FollowUps = { jury: "working", pose: "working" };
-
-    function renderShell(step: StepSlug, followUps: FollowUps | undefined) {
-      const shell = (state: FollowUps | undefined) => (
-        <MemoryRouter initialEntries={[`${E}/${step}`]}>
-          <Shell step={step} experimentId={EXPERIMENT_ID} followUps={state}>
-            <p>Figure</p>
-          </Shell>
-        </MemoryRouter>
-      );
-      const view = render(shell(followUps));
-      return (next: FollowUps | undefined) => {
-        view.rerender(shell(next));
-      };
-    }
-
-    const notice = () => {
-      const region = screen
-        .getByRole("navigation", { name: copy.stepsLabel })
-        .querySelector("[aria-live='polite']");
-      if (region === null) throw new Error("No live region in the step navigation");
-      return region;
-    };
-
-    it("when it finishes while the reader is on another step", () => {
-      const update = renderShell("biology", working);
-      expect(notice()).toBeEmptyDOMElement();
-
-      update({ jury: "ready", pose: "working" });
-      expect(notice()).toHaveTextContent(copy.followUp.readyNotice(titleOf("jury")));
-      update({ jury: "ready", pose: "ready" });
-      expect(notice()).toHaveTextContent(copy.followUp.readyNotice(titleOf("pose")));
-    });
-
-    it("but not on the step itself, which shows its own progress", () => {
-      const update = renderShell("jury", working);
-      update({ jury: "ready", pose: "working" });
-      expect(notice()).toBeEmptyDOMElement();
-    });
-
-    it("and not for what was already ready when the Experiment loaded", () => {
-      const update = renderShell("biology", undefined);
-      update({ jury: "ready", pose: "ready" });
-      expect(notice()).toBeEmptyDOMElement();
-    });
   });
 });
 

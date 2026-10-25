@@ -417,14 +417,6 @@ describe("Step 6, Compare", () => {
 
 const POSE_LABEL = copy.pose.viewerLabel("Baricitinib", "JAK2");
 const STRUCTURE_LINE = copy.pose.structure("6WTO", "JAK2", 1.74);
-const NO_STRUCTURE = copy.pose.unsupported.no_structure(
-  "Fostamatinib, Dexamethasone, Imatinib, Remdesivir and Colchicine",
-  5,
-);
-const ANTIBODIES = copy.pose.unsupported.antibody(
-  "Anifrolumab, Siltuximab, Tocilizumab and Sarilumab",
-  4,
-);
 
 function control(name: string) {
   return screen.getByRole("button", { name });
@@ -440,7 +432,7 @@ async function poseView() {
 }
 
 describe("Step 7, Binding pose", () => {
-  it("shows a computed pose with its controls, and says each number, help and reason once", async () => {
+  it("shows a computed pose with its controls, and says each number and its help once", async () => {
     serveExperiment({ ...covidExperiment(), dock_jobs: [dockJob("done")] });
     const user = userEvent.setup();
     renderApp(`${E}/pose`);
@@ -470,13 +462,12 @@ describe("Step 7, Binding pose", () => {
       copy.pose.redockStatus.passed,
       copy.pose.fixture("pose", true) ?? "",
       copy.pose.caveat,
-      copy.pose.unsupportedTitle,
-      NO_STRUCTURE,
-      ANTIBODIES,
       copy.pose.legend.protein,
       copy.pose.legend.drug,
     );
     expect(screen.getByText(/^0\.74/)).toHaveAttribute("data-fixture", "true");
+    // The drugs that can't be docked are simply not offered: nothing lists them.
+    expect(screen.queryByText(/Tocilizumab|Fostamatinib/)).not.toBeInTheDocument();
     // Plain words: the program and the statistic are never named.
     expect(document.body).not.toHaveTextContent(/vina|rmsd/i);
     // The hidden network and the pose: never more than three WebGL canvases on the step.
@@ -599,9 +590,23 @@ describe("Step 7, Binding pose", () => {
     expectOnce(copy.pose.score, "−10.2", copy.pose.fixture("score", true) ?? "");
     expect(screen.queryByRole("button", { name: copy.pose.controls.surface })).toBeNull();
   });
+
+  it("says in one line, without listing drugs, when none can be docked", async () => {
+    const experiment = covidExperiment();
+    serveExperiment({
+      ...experiment,
+      candidates: experiment.candidates.map((c) => ({ ...c, dockable: false })),
+    });
+    renderApp(`${E}/pose`);
+    expect(await screen.findByText(copy.pose.noneDockable)).toBeInTheDocument();
+    expectOnce(copy.pose.noneDockable);
+    expect(screen.queryByRole("combobox", { name: copy.pose.pick })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Baricitinib|Tocilizumab/)).not.toBeInTheDocument();
+    expect(screen.queryByText(copy.pose.caveat)).not.toBeInTheDocument();
+  });
 });
 
-describe("Step 8, Saved experiments", () => {
+describe("Step 8, History", () => {
   const other = (): Experiment => ({
     ...covidExperiment("ready", null, "11111111-2222-4333-8444-555555555555"),
     created_at: "2026-10-24T15:30:00Z",

@@ -8,6 +8,7 @@
 }
 
 .bars {
+  composes: scroll-fade from global;
   display: flex;
   flex: 1;
   flex-direction: column;

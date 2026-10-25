@@ -23,7 +23,7 @@ function dataLine(item: ExperimentSummary): string {
 }
 
 /**
- * Step 8: saved experiments, newest first, with archived ones one switch away. Archiving hides
+ * Step 8, History: saved experiments, newest first, with archived ones one switch away. Archiving hides
  * an experiment from the saved list and keeps it whole; Restore brings it back. When every
  * listed experiment used the same data, the data line is said once, under the list.
  */

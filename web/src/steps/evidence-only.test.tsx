@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Experiment } from "../api/types";
 import { copy, unscorableReasonText } from "../copy/en";
@@ -152,19 +152,6 @@ describe("An evidence-only Experiment", () => {
     expect(await screen.findByText(copy.evidence.noModelNeutral)).toBeInTheDocument();
     expect(screen.queryByText(copy.evidence.noModel)).not.toBeInTheDocument();
     expect(screen.queryByText(NO_ROUTE)).not.toBeInTheDocument();
-  });
-
-  it("step 7 calls only the antibodies antibodies", async () => {
-    renderApp(`${E}/pose`);
-    expect(await screen.findByText(copy.pose.unsupportedTitle)).toBeInTheDocument();
-    await waitFor(() => {
-      expectOnce(
-        copy.pose.unsupported.antibody("Tocilizumab, Sarilumab, Siltuximab and Anifrolumab", 4),
-      );
-    });
-    expect(screen.getByText(/^Tofacitinib/)).toHaveTextContent(
-      copy.pose.unsupported.not_dockable("Tofacitinib", 1),
-    );
   });
 });
 

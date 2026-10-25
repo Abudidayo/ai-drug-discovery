@@ -104,8 +104,8 @@ export function isBuilding(experiment: Experiment): boolean {
 }
 
 /**
- * True once a building Experiment has saved its Disease Targets and network: "Its biology" draws
- * them while the drugs are ranked and their evidence collected.
+ * True once a building Experiment has saved its Disease Targets and network: "Disease proteins"
+ * draws them while the drugs are ranked and their evidence collected.
  */
 export function hasEarlyResult(experiment: Experiment): boolean {
   return isBuilding(experiment) && experiment.targets.length > 0;

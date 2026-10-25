@@ -193,6 +193,57 @@ a:hover {
   outline-offset: 2px;
 }
 
+/*
+ * Panels that scroll show no scroll bar, so a bar never cuts into the figure: they still scroll
+ * by wheel, trackpad, touch and keyboard, and a row cut at the panel's edge (or its fade) says
+ * there is more. The page's own scroll bar, on the root, stays.
+ */
+body * {
+  scrollbar-width: none;
+}
+
+body *::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * The quiet cue in place of the bar: a panel that scrolls fades at its foot while there is more
+ * below, and the fade lifts as the end comes into view. A panel whose content fits never fades.
+ * Compose it into a scrolling panel's class: `composes: scroll-fade from global;`. Where scroll
+ * timelines aren't supported, the panel simply doesn't fade.
+ */
+@property --scroll-fade {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.scroll-fade {
+  mask-image: linear-gradient(
+    to bottom,
+    var(--color-ink) calc(100% - var(--scroll-fade)),
+    transparent
+  );
+}
+
+@supports (animation-timeline: scroll()) {
+  .scroll-fade {
+    animation: scroll-fade linear both;
+    animation-timeline: scroll(self);
+  }
+}
+
+@keyframes scroll-fade {
+  0%,
+  90% {
+    --scroll-fade: var(--space-32);
+  }
+
+  100% {
+    --scroll-fade: 0px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*),
   ::view-transition-old(*),

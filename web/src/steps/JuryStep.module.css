@@ -198,6 +198,7 @@
 
 /* Sideways too on narrow screens; on wide ones the rows scroll under a fixed header. */
 .scroll {
+  composes: scroll-fade from global;
   flex: 0 1 auto;
   min-height: 0;
   overflow: auto;
@@ -475,6 +476,7 @@
 }
 
 .calls {
+  composes: scroll-fade from global;
   flex: 1;
   min-height: 0;
   overflow-y: auto;

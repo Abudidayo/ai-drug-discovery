@@ -9,9 +9,8 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router";
-import { isBuilding, useCommonDiseases, useDiseaseSearch, useOpenDisease } from "../api/queries";
+import { useCommonDiseases, useDiseaseSearch, useOpenDisease } from "../api/queries";
 import type { Experiment } from "../api/types";
-import { BuildLine } from "../app/ExperimentStatus";
 import { Panel } from "../app/Figure";
 import { HOME_PATH, stepPath } from "../app/steps";
 import { copy } from "../copy/en";
@@ -163,8 +162,6 @@ export function DiseaseSearch({ current, preload = false }: DiseaseSearchProps) 
   } else if (searching && search.settled && search.isSuccess && results.length === 0) {
     status = <p>{copy.search.noMatch(query.trim())}</p>;
   }
-  // The Disease on screen is still building: its network appears as soon as it is drawn.
-  const building = !searching && current !== undefined && isBuilding(current) ? current : null;
 
   return (
     <Panel area="search" label={copy.search.placeholder}>
@@ -218,11 +215,6 @@ export function DiseaseSearch({ current, preload = false }: DiseaseSearchProps) 
         {status !== null && (
           <div className={styles.status} role="status">
             {status}
-          </div>
-        )}
-        {building !== null && status === null && (
-          <div className={styles.status}>
-            <BuildLine experiment={building} />
           </div>
         )}
       </div>

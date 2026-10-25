@@ -5,14 +5,8 @@ import type { Candidate, DockJob, Experiment, Structure } from "../api/types";
 import { DrugPicker } from "../app/DrugPicker";
 import { FigureNote, Panel } from "../app/Figure";
 import { copy, stepCopy } from "../copy/en";
-import {
-  bestScore,
-  defaultDockingChoice,
-  dockingChoices,
-  jobFor,
-  type DockingChoices,
-} from "../lib/docking";
-import { drugName, listOf, signed } from "../lib/format";
+import { bestScore, defaultDockingChoice, dockingPairs, jobFor } from "../lib/docking";
+import { drugName, signed } from "../lib/format";
 import styles from "./PoseStep.module.css";
 
 // 3Dmol.js loads only once a pose is shown.
@@ -30,7 +24,7 @@ const REDOCK_AXIS = { min: 0, max: 3, ticks: [0, 1, 2, 3] };
 /**
  * Step 7: an optional binding pose (plan.md §7). The pose takes the stage, with its drug picker
  * and structure line; beside it, in one column, how far to trust it (the docking score, the
- * redock check and the caveat), then the drugs that can't be docked yet, each reason said once.
+ * redock check and the caveat). The picker offers only the drugs that can be docked.
  */
 export function PoseStep({ experiment }: { experiment: Experiment }) {
   const structures = useStructures();
@@ -57,15 +51,13 @@ export function PoseStep({ experiment }: { experiment: Experiment }) {
     );
   }
 
-  const choices = dockingChoices(experiment.candidates, structures.data);
-  const chosenId = picked ?? defaultDockingChoice(choices);
-  const chosen = choices.supported.find(({ candidate }) => candidate.candidate_id === chosenId);
+  const pairs = dockingPairs(experiment.candidates, structures.data);
+  const chosenId = picked ?? defaultDockingChoice(pairs);
+  const chosen = pairs.find(({ candidate }) => candidate.candidate_id === chosenId);
   if (chosen === undefined) {
-    // Nothing to draw: the reasons take the main area instead of sitting beside an empty one.
     return (
-      <Panel area="pose" title={copy.pose.unsupportedTitle}>
-        <FigureNote>{copy.pose.noneSupported}</FigureNote>
-        <UnsupportedList groups={choices.unsupported} />
+      <Panel area="pose" label={title}>
+        <FigureNote>{copy.pose.noneDockable}</FigureNote>
       </Panel>
     );
   }
@@ -75,12 +67,11 @@ export function PoseStep({ experiment }: { experiment: Experiment }) {
       experiment={experiment}
       candidate={chosen.candidate}
       structure={chosen.structure}
-      unsupported={choices.unsupported}
       picker={
         <DrugPicker
           label={copy.pose.pick}
           value={chosen.candidate.candidate_id}
-          options={choices.supported.map(({ candidate }) => ({
+          options={pairs.map(({ candidate }) => ({
             id: candidate.candidate_id,
             name: drugName(candidate.name),
           }))}
@@ -95,13 +86,11 @@ interface PairViewProps {
   experiment: Experiment;
   candidate: Candidate;
   structure: Structure;
-  /** The drugs with no pose to offer, said below the numbers. */
-  unsupported: DockingChoices["unsupported"];
   picker: ReactNode;
 }
 
 /** One drug in one structure: its pose, or the way to one, and the numbers that go with it. */
-function PairView({ experiment, candidate, structure, unsupported, picker }: PairViewProps) {
+function PairView({ experiment, candidate, structure, picker }: PairViewProps) {
   const request = useRequestDock(experiment.id);
   const job = jobFor(experiment.dock_jobs, candidate.candidate_id, structure.id);
   const unavailable = request.error instanceof ApiError && request.error.unreachable;
@@ -177,7 +166,7 @@ function PairView({ experiment, candidate, structure, unsupported, picker }: Pai
       >
         {body}
       </Panel>
-      <ScoresPanel structure={structure} result={result} unsupported={unsupported} />
+      <ScoresPanel structure={structure} result={result} />
     </>
   );
 }
@@ -264,14 +253,13 @@ function Axis({ min, max, ticks, value, reference, format }: AxisProps) {
 interface ScoresPanelProps {
   structure: Structure;
   result: DockJob | undefined;
-  unsupported: DockingChoices["unsupported"];
 }
 
 /**
- * The docking score and the redock check, each with what it means, then the caveat; below them,
- * the drugs that can't be docked. One column that scrolls as a whole when the window is short.
+ * The docking score and the redock check, each with what it means, then the caveat. One column
+ * that scrolls as a whole when the window is short.
  */
-function ScoresPanel({ structure, result, unsupported }: ScoresPanelProps) {
+function ScoresPanel({ structure, result }: ScoresPanelProps) {
   const noteId = useId();
   const score = result === undefined ? null : bestScore(result);
   const { control } = structure;
@@ -345,31 +333,7 @@ function ScoresPanel({ structure, result, unsupported }: ScoresPanelProps) {
           )}
           <p className={styles.caveat}>{copy.pose.caveat}</p>
         </section>
-        {unsupported.length > 0 && (
-          <section className={styles.measure} aria-labelledby={`${noteId}-unsupported`}>
-            <h3 id={`${noteId}-unsupported`} className={styles.label}>
-              {copy.pose.unsupportedTitle}
-            </h3>
-            <UnsupportedList groups={unsupported} />
-          </section>
-        )}
       </div>
     </Panel>
-  );
-}
-
-/** The drugs with no pose to offer, one line per reason. */
-function UnsupportedList({ groups }: { groups: DockingChoices["unsupported"] }) {
-  return (
-    <ul className={styles.unsupported}>
-      {groups.map(({ reason, candidates }) => (
-        <li key={reason}>
-          {copy.pose.unsupported[reason](
-            listOf(candidates.map((candidate) => drugName(candidate.name))),
-            candidates.length,
-          )}
-        </li>
-      ))}
-    </ul>
   );
 }

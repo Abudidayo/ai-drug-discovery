@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { covidExperiment, dockJob, structures } from "../test/fixtures";
-import {
-  bestScore,
-  defaultDockingChoice,
-  dockingChoices,
-  jobFor,
-  structureFor,
-  unsupportedReason,
-} from "./docking";
+import { bestScore, defaultDockingChoice, dockingPairs, jobFor, structureFor } from "./docking";
 
 const { candidates } = covidExperiment();
 
@@ -35,10 +28,10 @@ describe("structureFor", () => {
   });
 });
 
-describe("dockingChoices", () => {
-  it("splits the shortlist into dockable drugs and one group per reason", () => {
-    const choices = dockingChoices(candidates, structures);
-    expect(choices.supported.map(({ candidate: c }) => c.name)).toEqual([
+describe("dockingPairs", () => {
+  it("keeps the shortlist's dockable drugs, in shortlist order", () => {
+    const pairs = dockingPairs(candidates, structures);
+    expect(pairs.map(({ candidate: c }) => c.name)).toEqual([
       "BARICITINIB",
       "RUXOLITINIB",
       "TOFACITINIB",
@@ -46,31 +39,22 @@ describe("dockingChoices", () => {
       "FEDRATINIB",
       "THALIDOMIDE",
     ]);
-    expect(
-      choices.unsupported.map(({ reason, candidates: group }) => [
-        reason,
-        group.map((c) => c.name),
-      ]),
-    ).toEqual([
-      ["no_structure", ["FOSTAMATINIB", "DEXAMETHASONE", "IMATINIB", "REMDESIVIR", "COLCHICINE"]],
-      ["antibody", ["ANIFROLUMAB", "SILTUXIMAB", "TOCILIZUMAB", "SARILUMAB"]],
-    ]);
-    expect(defaultDockingChoice(choices)).toBe("CHEMBL2105759");
+    expect(defaultDockingChoice(pairs)).toBe("CHEMBL2105759");
   });
 
-  it("calls a small molecule without what docking needs not dockable", () => {
+  it("leaves out a small molecule without what docking needs", () => {
     const blocked = { ...candidate("CHEMBL1789941"), dockable: false };
-    expect(unsupportedReason(blocked, structures)).toBe("not_dockable");
+    expect(dockingPairs([blocked], structures)).toEqual([]);
   });
 
   it("opens on the first dockable drug when the known answer can't be docked", () => {
     const withoutKnownAnswer = candidates.map((c) =>
       c.known_answer ? { ...c, dockable: false } : c,
     );
-    expect(defaultDockingChoice(dockingChoices(withoutKnownAnswer, structures))).toBe(
+    expect(defaultDockingChoice(dockingPairs(withoutKnownAnswer, structures))).toBe(
       "CHEMBL1789941",
     );
-    expect(defaultDockingChoice(dockingChoices(candidates, []))).toBeUndefined();
+    expect(defaultDockingChoice(dockingPairs(candidates, []))).toBeUndefined();
   });
 });
 

@@ -1,6 +1,7 @@
 /* The chart and its notes scroll together when the full shortlist is taller than the panel;
    when there is room, the notes sit at the panel's foot, level with the network's key. */
 .chart {
+  composes: scroll-fade from global;
   display: flex;
   flex: 1;
   flex-direction: column;

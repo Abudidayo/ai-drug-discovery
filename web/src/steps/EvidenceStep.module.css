@@ -1,4 +1,5 @@
 .scroll {
+  composes: scroll-fade from global;
   flex: 1;
   min-height: 0;
   margin-right: calc(-1 * var(--space-8));

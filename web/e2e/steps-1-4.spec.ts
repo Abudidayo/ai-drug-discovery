@@ -38,14 +38,14 @@ test("a student walks from choosing COVID-19 to the evidence for baricitinib", a
   await expect(covid).toContainText("SARS-CoV-2");
   await expect(page.getByText("Common diseases", { exact: true })).toHaveCount(0);
 
-  // Next, at the bottom right, carries on to its biology.
+  // Next, at the bottom right, carries on to its proteins.
   await page.getByRole("contentinfo").getByRole("button", { name: "Next", exact: true }).click();
   await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}\/biology$/);
   const banner = page.getByRole("banner");
   await expect(banner.getByText("COVID-19", { exact: true })).toBeVisible();
   const bars = page.getByRole("list", { name: "Disease proteins by link strength" });
   await expect(bars).toBeVisible({ timeout: 15_000 });
-  await expectStep(page, "Its biology");
+  await expectStep(page, "Disease proteins");
   await expect(bars.getByRole("listitem")).toHaveCount(8);
   await expect(
     page.getByText("CCR2 isn’t in the protein network, so it can’t be used."),
@@ -77,7 +77,7 @@ test("a student walks from choosing COVID-19 to the evidence for baricitinib", a
   await expect(page.getByText("Remdesivir", { exact: true })).toBeVisible();
   await expect(page.getByText(/^None of this drug’s targets are human proteins/)).toHaveCount(1);
 
-  // The known-answer drug's evidence, which the steps place just before the saved experiments.
+  // The known-answer drug's evidence, which the steps place just before History.
   await page.getByRole("link", { name: "Evidence", exact: true }).click();
   await expectStep(page, "Evidence");
   await expect(page.getByRole("heading", { level: 2, name: "Baricitinib" })).toBeVisible();
@@ -111,7 +111,7 @@ test("the network persists across steps instead of being rebuilt", async ({ page
   });
 
   await page.getByRole("button", { name: "Next", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Its biology");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Disease proteins");
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Candidate drugs");
   await page.getByRole("link", { name: "Evidence", exact: true }).click();

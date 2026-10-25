@@ -20,13 +20,13 @@ async function loadedSearchbox() {
 }
 
 describe("Choosing a disease", () => {
-  it("builds the first common disease on arrival, on step 1, then Next shows its biology", async () => {
+  it("builds the first common disease on arrival, on step 1, then Next shows its proteins", async () => {
     const created = fakeApi.created;
     const user = userEvent.setup();
     const { router } = renderApp("/");
 
     // Nothing saved yet: the first common Disease starts building, and step 1 stays on screen
-    // with it marked in the list and its build in one line.
+    // with it marked in the list.
     await waitFor(() => {
       expect(router.state.location.pathname).toMatch(/^\/e\/[0-9a-f-]+\/disease$/);
     });

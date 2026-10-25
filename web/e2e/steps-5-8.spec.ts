@@ -112,7 +112,7 @@ test("the jury has started on its own; a student compares drugs, then archives a
     })
     .toBe(true);
   await page.goto(`/e/${id}/history`);
-  await expectStep(page, "Saved experiments");
+  await expectStep(page, "History");
   const list = page.getByRole("list", { name: "Experiments" });
   const open = list.locator("li[aria-current]");
   await expect(open).toContainText("COVID-19");
@@ -180,8 +180,8 @@ test("a student shows baricitinib's binding pose and checks it against the cryst
   await expect(
     page.getByText("Crystal structure 6WTO of JAK2, 1.74 Å resolution", { exact: true }),
   ).toHaveCount(1);
-  await expect(page.getByText(/^Fostamatinib, Dexamethasone, Imatinib/)).toHaveCount(1);
-  await expect(page.getByText(/are antibodies\. Docking needs a small molecule\.$/)).toHaveCount(1);
+  // Only the drugs that can be docked are offered; the others aren't listed.
+  await expect(page.getByText("Not available yet", { exact: true })).toHaveCount(0);
   await expect(
     page.getByRole("img", { name: "Protein network in 3D. Drag to rotate." }),
   ).toBeHidden();
@@ -229,8 +229,8 @@ test("a student shows baricitinib's binding pose and checks it against the cryst
   expect(await liveContexts(page)).toBe(2);
 
   // Leaving the step releases the pose's context, once the step's transition has played.
-  await page.getByRole("link", { name: "Saved experiments", exact: true }).click();
-  await expectStep(page, "Saved experiments");
+  await page.getByRole("link", { name: "History", exact: true }).click();
+  await expectStep(page, "History");
   await expect(view).toHaveCount(0);
   await expect.poll(() => liveContexts(page)).toBe(1);
 });

@@ -49,6 +49,7 @@
 /* The list scrolls; it reaches into the gutter so the current result's bar sits outside the
    text column, as in the prototype. */
 .results {
+  composes: scroll-fade from global;
   display: flex;
   flex-direction: column;
   min-height: 0;

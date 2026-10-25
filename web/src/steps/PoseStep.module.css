@@ -118,24 +118,17 @@
   }
 }
 
-/* The column beside the pose: how far to trust it, then what can't be docked. It scrolls as one
-   when the window is too short for it, and its foot fades so a cut line reads as "more below";
-   scrolled to the end, only its padding sits under the fade. */
+/* The column beside the pose: how far to trust it. It scrolls when the window is too short for
+   it. */
 .column {
+  composes: scroll-fade from global;
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: var(--space-32);
   min-height: 0;
   margin-right: calc(-1 * var(--space-8));
   padding-right: var(--space-8);
-  padding-bottom: var(--space-24);
   overflow-y: auto;
-  mask-image: linear-gradient(
-    to bottom,
-    var(--color-ink) calc(100% - var(--space-24)),
-    transparent
-  );
 }
 
 /* How far to trust the pose: each number with its axis and its meaning, then the caveat. */
@@ -276,36 +269,7 @@
   line-height: var(--leading-body);
 }
 
-.unsupported {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
-  max-width: 60ch;
-}
-
-.unsupported li {
-  position: relative;
-  padding-left: var(--space-24);
-  font-size: var(--text-body);
-  line-height: var(--leading-snug);
-}
-
-.unsupported li::before {
-  position: absolute;
-  top: 0.4em;
-  left: 2px;
-  width: 9px;
-  height: 9px;
-  border: 1.5px solid var(--color-ink);
-  border-radius: 50%;
-  content: "";
-}
-
 @media (max-height: 820px) and (min-width: 721px) {
-  .column {
-    gap: var(--space-24);
-  }
-
   .scores {
     gap: var(--space-16);
   }

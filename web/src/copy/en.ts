@@ -1,5 +1,4 @@
 import type { components } from "../api/schema";
-import type { UnsupportedReason } from "../lib/docking";
 import type { FailedCheck } from "../lib/jury";
 import { listOf } from "../lib/format";
 
@@ -41,18 +40,11 @@ export const copy = {
   back: "Back",
   next: "Next",
   stepsLabel: "Steps",
-  /** How the step navigation describes work the API prepares in the background. */
-  followUp: {
-    working: "In progress",
-    ready: "Ready",
-    /** Said once to screen readers when one becomes ready while the reader is elsewhere. */
-    readyNotice: (step: string) => `${step} is ready`,
-  },
   retry: "Try again",
 
   /**
-   * The eight steps of plan.md §2, in order, except that Evidence sits just before Saved
-   * experiments, so the main path runs from the candidates straight to the jury. `slug` is the URL
+   * The eight steps of plan.md §2, in order, except that Evidence sits just before History, so
+   * the main path runs from the candidates straight to the jury. `slug` is the URL
    * segment in `/e/:experimentId/:step`.
    * Intros never name the Disease: the header already shows it once.
    */
@@ -64,7 +56,7 @@ export const copy = {
     },
     {
       slug: "biology",
-      title: "Its biology",
+      title: "Disease proteins",
       intro: "Proteins linked to the disease, and how they connect inside the cell.",
     },
     {
@@ -94,7 +86,7 @@ export const copy = {
     },
     {
       slug: "history",
-      title: "Saved experiments",
+      title: "History",
       intro: "Each search is saved with the data it used, so you can come back to it.",
     },
   ],
@@ -225,7 +217,7 @@ export const copy = {
     /** Before the jury is asked: who will review. */
     panel: (models: string) => `${models} will each review the evidence for every drug.`,
     askFailed: "The jury couldn’t be asked. The server isn’t answering.",
-    archived: "This experiment is archived. Restore it in Saved experiments to ask the jury.",
+    archived: "This experiment is archived. Restore it in History to ask the jury.",
     progressLabel: "Model jury progress",
     queued: "Waiting to start",
     jurorStatus: {
@@ -329,7 +321,7 @@ export const copy = {
     viewerLabel: (drug: string, protein: string) =>
       `${drug} in ${protein}, in 3D. Drag to rotate, scroll to zoom.`,
     show: "Show binding pose",
-    archived: "This experiment is archived. Restore it in Saved experiments to compute a pose.",
+    archived: "This experiment is archived. Restore it in History to compute a pose.",
     queued: "Waiting to start",
     running: "Computing the binding pose. This can take up to three minutes.",
     failed: "The binding pose couldn’t be computed.",
@@ -340,7 +332,8 @@ export const copy = {
     noFiles: "This result has a score but no 3D model to show.",
     loading: "Loading the 3D model",
     filesFailed: "The 3D model couldn’t be loaded.",
-    noneSupported: "None of these drugs can be docked yet.",
+    /** On its own when no candidate drug can be docked: the drugs aren't listed. */
+    noneDockable: "None of the candidate drugs can be docked yet.",
     scoresLabel: "How far to trust this pose",
     score: "Docking score",
     scoreHelp:
@@ -376,15 +369,6 @@ export const copy = {
       reset: "Reset view",
     },
     legend: { protein: "Protein", drug: "Drug" },
-    unsupportedTitle: "Not available yet",
-    unsupported: {
-      no_structure: (names: string, count: number) =>
-        `${names}: no prepared structure of ${count === 1 ? "its" : "their"} target proteins yet.`,
-      antibody: (names: string, count: number) =>
-        `${names} ${count === 1 ? "is an antibody" : "are antibodies"}. Docking needs a small molecule.`,
-      not_dockable: (names: string, count: number) =>
-        `${names}: ${count === 1 ? "its" : "their"} structure isn’t ready for docking yet.`,
-    } satisfies Record<UnsupportedReason, (names: string, count: number) => string>,
   },
 
   history: {

@@ -46,6 +46,7 @@
 }
 
 .list {
+  composes: scroll-fade from global;
   display: flex;
   flex-direction: column;
   min-height: 0;

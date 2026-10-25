@@ -39,9 +39,23 @@ describe("Step 1, Choose a disease, with an Experiment", () => {
     // The search lists the Disease, so the header doesn't name it again.
     expect(within(screen.getByRole("banner")).queryByText("COVID-19")).not.toBeInTheDocument();
   });
+
+  it("says nothing about the build under the common diseases: the network is the progress", async () => {
+    const done = covidExperiment();
+    serveExperiment({
+      ...covidExperiment("building", "evidence"),
+      targets: done.targets,
+      network: done.network,
+    });
+    renderApp(`${E}/disease`);
+    await ready();
+    expect(screen.getByText(copy.search.common)).toBeInTheDocument();
+    expect(screen.queryByText(copy.experiment.stages.evidence)).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
 });
 
-describe("Step 2, Its biology", () => {
+describe("Step 2, Disease proteins", () => {
   it("draws the proteins and network while the drugs are still being ranked", async () => {
     const done = covidExperiment();
     serveExperiment({
