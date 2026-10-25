@@ -52,7 +52,7 @@ export const copy = {
     {
       slug: "candidates",
       title: "Candidate drugs",
-      intro: "Approved drugs whose targets sit close to the disease’s proteins.",
+      intro: "Approved drugs whose targets are closely tied to the disease’s proteins.",
     },
     {
       slug: "evidence",
@@ -95,7 +95,7 @@ export const copy = {
     queued: "Waiting to start",
     stages: {
       targets: "Finding the proteins linked to the disease",
-      ranking: "Placing approved drugs on the protein network",
+      ranking: "Ranking approved drugs",
       evidence: "Collecting the evidence for each drug",
       saving: "Saving the results",
     } satisfies Record<BuildStage, string>,

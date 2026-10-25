@@ -91,7 +91,8 @@ function WarningBox({ candidate }: { candidate: Candidate }) {
   const cited = new Set(candidate.warnings.map((warning) => warning.evidence_id));
   const sources = new Map<string, EvidenceItem>();
   for (const item of candidate.evidence) {
-    if (cited.has(item.id) && !sources.has(item.url)) sources.set(item.url, item);
+    // One link per source name: several warnings often cite different pages of one label.
+    if (cited.has(item.id) && !sources.has(sourceLabel(item))) sources.set(sourceLabel(item), item);
   }
   return (
     <div className={styles.warning} role="note" aria-labelledby="label-warning-title">

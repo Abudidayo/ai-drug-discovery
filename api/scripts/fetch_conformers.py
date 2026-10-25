@@ -13,27 +13,10 @@ import sys
 import urllib.request
 from pathlib import Path
 
+from oxhack_api.services.molecules import parse_sdf
+
 FIXTURES = Path(__file__).resolve().parents[1] / "oxhack_api" / "fixtures"
 SDF_URL = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/SDF?record_type=3d"
-
-
-def parse_sdf(sdf: str) -> tuple[list[dict[str, object]], list[dict[str, int]]]:
-    lines = sdf.splitlines()
-    n_atoms, n_bonds = int(lines[3][:3]), int(lines[3][3:6])
-    atoms = [
-        {
-            "element": line[31:34].strip(),
-            "x": float(line[:10]),
-            "y": float(line[10:20]),
-            "z": float(line[20:30]),
-        }
-        for line in lines[4 : 4 + n_atoms]
-    ]
-    bonds = [
-        {"a": int(line[:3]) - 1, "b": int(line[3:6]) - 1, "order": int(line[6:9])}
-        for line in lines[4 + n_atoms : 4 + n_atoms + n_bonds]
-    ]
-    return atoms, bonds
 
 
 def main() -> int:

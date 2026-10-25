@@ -167,3 +167,22 @@ describe("An evidence-only Experiment", () => {
     );
   });
 });
+
+describe("Label warning sources", () => {
+  it("links each source once, even when its warnings cite different pages", async () => {
+    const experiment = evidenceOnlyExperiment();
+    const baricitinib = experiment.candidates.find((c) => c.candidate_id === "CHEMBL2105759");
+    if (baricitinib === undefined) throw new Error("No baricitinib in the fixture");
+    const cited = new Set(baricitinib.warnings.map((warning) => warning.evidence_id));
+    let page = 0;
+    for (const item of baricitinib.evidence) {
+      if (cited.has(item.id))
+        item.url = `https://dailymed.nlm.nih.gov/dailymed/page-${String(++page)}`;
+    }
+    expect(page).toBeGreaterThan(1);
+    serveExperiment(experiment);
+    renderApp(`${E}/evidence`);
+    const box = await screen.findByRole("note", { name: copy.evidence.warningTitle });
+    expect(within(box).getAllByRole("link", { name: "DailyMed" })).toHaveLength(1);
+  });
+});

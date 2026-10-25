@@ -22,7 +22,7 @@ from .services.evaluation import EvaluationSource, FixtureEvaluation
 from .services.jury import FixtureJury, JuryBackend
 from .services.live import LiveSource
 from .services.live_jury import StreamAJury
-from .services.molecules import FixtureMolecules, MoleculeSource
+from .services.molecules import FixtureMolecules, MoleculeSource, PubChemMolecules
 from .services.ranking import EvidenceRanking
 from .services.source import ExperimentSource, FixtureSource
 from .settings import Settings, SnowflakeSettings
@@ -70,10 +70,18 @@ def build_components(
         jury=jury,
         docking=docking,
         evaluation=evaluation or FixtureEvaluation(fixtures),
-        molecules=molecules or FixtureMolecules(fixtures),
+        molecules=molecules or open_molecules(settings),
         runner=runner,
         jobs=jobs,
     )
+
+
+def open_molecules(settings: Settings) -> MoleculeSource:
+    """Fixture conformers, plus PubChem (cached in data_dir) for live Experiments."""
+    fixture = FixtureMolecules(settings.fixtures_dir)
+    if settings.source != "live":
+        return fixture
+    return PubChemMolecules(settings.data_dir / "conformers", fallback=fixture)
 
 
 def open_source(settings: Settings, docking: DockingBackend) -> ExperimentSource:
