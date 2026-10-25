@@ -239,6 +239,8 @@ export const copy = {
   compare: {
     pick: "Change drug",
     tableLabel: "Candidate drugs side by side",
+    /** Read by screen readers only: the header of the row-label column. */
+    rowsHeader: "Compared on",
     decision: "Jury decision",
     targets: "Targets",
     moreTargets: (shown: string, more: number) => `${shown} and ${String(more)} more`,

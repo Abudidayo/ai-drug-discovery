@@ -32,7 +32,9 @@ export function BiologyTargets({ experiment }: { experiment: Experiment }) {
     <Panel area="targets" label={copy.biology.targetsLabel}>
       {used.length > 0 && (
         <div className={styles.chart}>
-          <ol className={styles.bars} aria-label={copy.biology.targetsLabel}>
+          {/* Focusable so keyboard users can scroll it when the list is longer than the panel. */}
+          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
+          <ol className={styles.bars} aria-label={copy.biology.targetsLabel} tabIndex={0}>
             {used.map((target) => (
               <li
                 key={target.target_id}

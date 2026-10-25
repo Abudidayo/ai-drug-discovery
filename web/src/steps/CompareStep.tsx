@@ -177,7 +177,9 @@ export function CompareStep({ experiment }: { experiment: Experiment }) {
         style={{ "--drugs": chosen.length } as CSSProperties}
       >
         <div role="row" className={styles.head}>
-          <span role="columnheader" className={styles.corner} />
+          <span role="columnheader" className={styles.corner}>
+            <span className={styles.hidden}>{copy.compare.rowsHeader}</span>
+          </span>
           {chosen.map((candidate, column) => (
             <span role="columnheader" key={column} className={styles.pick}>
               <DrugPicker
@@ -197,10 +199,14 @@ export function CompareStep({ experiment }: { experiment: Experiment }) {
             </span>
           ))}
         </div>
-        <div className={styles.band}>
-          <Suspense fallback={null}>
-            <MoleculeStrip items={items} />
-          </Suspense>
+        {/* A table may only contain rows, so the molecule band is a row with one cell spanning
+            every column; the 3D molecules inside stay reachable and draggable. */}
+        <div className={styles.band} role="row">
+          <div role="cell" aria-colspan={chosen.length + 1} className={styles.bandCell}>
+            <Suspense fallback={null}>
+              <MoleculeStrip items={items} />
+            </Suspense>
+          </div>
         </div>
         {rows.map((row) => (
           <div role="row" key={row.label} className={styles.row}>

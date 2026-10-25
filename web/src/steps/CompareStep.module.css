@@ -31,6 +31,11 @@
   min-height: 0;
 }
 
+/* The band's single cell takes no box of its own, so the strip still sits in the subgrid. */
+.bandCell {
+  display: contents;
+}
+
 .row {
   border-top: 1px solid var(--color-rule);
 }
