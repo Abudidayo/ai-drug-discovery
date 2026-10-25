@@ -37,22 +37,9 @@ Picture a walker on the protein network. It starts on the disease's proteins and
 
 A drug scores high when its target proteins get visited a lot.
 
-```mermaid
-flowchart LR
-    D1(("Disease<br/>protein")) --- X(("protein"))
-    D2(("Disease<br/>protein")) --- X
-    X --- T1(("Drug A<br/>target"))
-    D2 --- T2(("Drug B<br/>target"))
-    X --- Y(("protein"))
-    Y --- Z(("protein"))
-    Z --- T3(("Drug C<br/>target"))
-    classDef disease fill:#f6c1c1,stroke:#b33
-    classDef drug fill:#c1d8f6,stroke:#3366b3
-    class D1,D2 disease
-    class T1,T2,T3 drug
-```
+![Random walk with restart on a toy protein network](docs/images/rwr-walk.gif)
 
-Drug B's target is one step from a disease protein, so it's visited most. Drug A is close behind. Drug C is far away and scores lowest.
+The red dot is the walker. Glow shows how often each protein is visited. Drug B's target is one step from a disease protein, so it's visited most; Drug C is far away and scores lowest.
 
 Unlike a single shortest path, the walk counts every route between a drug and the disease.
 
