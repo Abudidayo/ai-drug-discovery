@@ -28,4 +28,4 @@ build-backend = "hatchling.build"
 packages = ["pipeline", "jury"]
 
 [tool.uv.workspace]
-members = ["api"]
+members = ["api", "worker"]
