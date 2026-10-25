@@ -345,7 +345,12 @@ class EvidenceItem(Model):
     source_id: str = Field(description="The record's own ID in that database.")
     url: str = Field(description="Link to the original record.")
     release: DataRelease = Field(description="Data release the record was read from.")
-    statement: str = Field(description="The fact in one plain sentence, naming its source.")
+    statement: str = Field(
+        description="The fact as the source records it, naming the source. For audits and the jury."
+    )
+    summary: str = Field(
+        description="The same fact in plain words for students, e.g. 'Blocks JAK1.'"
+    )
     values: dict[str, float] = Field(
         description="Numbers quoted in the statement, by name; empty when it quotes none."
     )

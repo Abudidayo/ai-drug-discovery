@@ -1242,8 +1242,13 @@
             "type": "string"
           },
           "statement": {
-            "description": "The fact in one plain sentence, naming its source.",
+            "description": "The fact as the source records it, naming the source. For audits and the jury.",
             "title": "Statement",
+            "type": "string"
+          },
+          "summary": {
+            "description": "The same fact in plain words for students, e.g. 'Blocks JAK1.'",
+            "title": "Summary",
             "type": "string"
           },
           "url": {
@@ -1268,6 +1273,7 @@
           "url",
           "release",
           "statement",
+          "summary",
           "values"
         ],
         "title": "EvidenceItem",

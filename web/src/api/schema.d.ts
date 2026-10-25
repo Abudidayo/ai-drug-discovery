@@ -856,9 +856,14 @@ export interface components {
       source_id: string;
       /**
        * Statement
-       * @description The fact in one plain sentence, naming its source.
+       * @description The fact as the source records it, naming the source. For audits and the jury.
        */
       statement: string;
+      /**
+       * Summary
+       * @description The same fact in plain words for students, e.g. 'Blocks JAK1.'
+       */
+      summary: string;
       /**
        * Url
        * @description Link to the original record.

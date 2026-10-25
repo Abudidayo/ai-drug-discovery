@@ -1,12 +1,12 @@
 import { lazy, Suspense } from "react";
 import { useSearchParams } from "react-router";
 import { useConformer } from "../api/queries";
-import type { Candidate, EvidenceItem, Experiment, Warning } from "../api/types";
+import type { Candidate, EvidenceItem, Experiment } from "../api/types";
 import { FigureNote, Panel } from "../app/Figure";
 import { useNetworkHover } from "../app/networkHover";
 import { copy } from "../copy/en";
 import { focusCandidate } from "../lib/candidates";
-import { capitalise, drugName, listOf, withDrugName } from "../lib/format";
+import { capitalise, drugName, listOf } from "../lib/format";
 import styles from "./EvidenceStep.module.css";
 
 /** The query parameter that picks which Candidate the Evidence step is about. */
@@ -59,19 +59,20 @@ function MoleculePanel({ candidate }: { candidate: Candidate }) {
   );
 }
 
-/** One warning type per line, e.g. "Black box warning: vascular toxicity and carcinogenicity." */
-function warningLines(warnings: readonly Warning[]): string[] {
-  const byType = new Map<string, string[]>();
-  for (const warning of warnings) {
-    const areas = byType.get(warning.type) ?? [];
-    if (warning.toxicity_class !== null) areas.push(warning.toxicity_class);
-    if (warning.description !== null) areas.push(warning.description);
-    byType.set(warning.type, areas);
+/**
+ * The label risks as one plain sentence, from each cited warning's summary, e.g. "Serious
+ * infections, cancer and lung problems."
+ */
+function warningSentence(candidate: Candidate): string {
+  const byId = new Map(candidate.evidence.map((item) => [item.id, item]));
+  const risks: string[] = [];
+  for (const warning of candidate.warnings) {
+    const summary = byId.get(warning.evidence_id)?.summary.replace(/\.$/, "");
+    if (summary === undefined) continue;
+    const risk = summary.charAt(0).toLowerCase() + summary.slice(1);
+    if (!risks.includes(risk)) risks.push(risk);
   }
-  return [...byType].map(([type, areas]) => {
-    const label = capitalise(type.toLowerCase());
-    return areas.length === 0 ? `${label}.` : `${label}: ${listOf(areas)}.`;
-  });
+  return `${capitalise(listOf(risks))}.`;
 }
 
 function WarningBox({ candidate }: { candidate: Candidate }) {
@@ -93,9 +94,7 @@ function WarningBox({ candidate }: { candidate: Candidate }) {
         {copy.evidence.warningTitle}
       </p>
       <div className={styles.warningText}>
-        {warningLines(candidate.warnings).map((line) => (
-          <p key={line}>{line}</p>
-        ))}
+        <p>{warningSentence(candidate)}</p>
       </div>
       <div className={styles.warningSources}>
         {[...sources.values()].map((item) => (
@@ -127,7 +126,7 @@ export function EvidenceStep({ experiment }: { experiment: Experiment }) {
       return;
     }
     const named = symbols
-      .filter((node) => new RegExp(`\\b${escapeRegExp(node.symbol)}\\b`).test(item.statement))
+      .filter((node) => new RegExp(`\\b${escapeRegExp(node.symbol)}\\b`).test(item.summary))
       .map((node) => node.id);
     setHover(named.length > 0 ? { highlight: named, focus: named } : null);
   };
@@ -149,7 +148,7 @@ export function EvidenceStep({ experiment }: { experiment: Experiment }) {
                     point(null);
                   }}
                 >
-                  <span>{withDrugName(item.statement, candidate.name)}</span>
+                  <span>{item.summary}</span>
                   <a href={item.url} target="_blank" rel="noreferrer">
                     {sourceLabel(item)}
                   </a>

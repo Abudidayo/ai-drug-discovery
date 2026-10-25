@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { drugName, listOf, signed, withDrugName } from "./format";
+import { drugName, listOf, signed } from "./format";
 
 describe("drugName", () => {
   it.each([
@@ -9,14 +9,6 @@ describe("drugName", () => {
     ["Interferon beta-1a", "Interferon beta-1a"],
   ])("formats %s as %s", (input, expected) => {
     expect(drugName(input)).toBe(expected);
-  });
-});
-
-describe("withDrugName", () => {
-  it("rewrites the capitalised name inside a statement", () => {
-    expect(withDrugName("ChEMBL 37 records BARICITINIB's mechanism.", "BARICITINIB")).toBe(
-      "ChEMBL 37 records Baricitinib's mechanism.",
-    );
   });
 });
 

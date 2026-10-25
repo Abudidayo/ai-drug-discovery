@@ -18,15 +18,6 @@ export function drugName(chemblName: string): string {
   return capitalise(name.toLowerCase());
 }
 
-/**
- * Replaces the API's capitalised drug name inside a sentence, so statements quote the drug the
- * same way the rest of the screen does.
- */
-export function withDrugName(sentence: string, chemblName: string): string {
-  if (chemblName === "") return sentence;
-  return sentence.split(chemblName).join(drugName(chemblName));
-}
-
 /** A signed decimal with a true minus sign, e.g. −3.1, and tabular-friendly digits. */
 export function signed(value: number, digits = 1): string {
   const text = Math.abs(value).toFixed(digits);

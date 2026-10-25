@@ -166,7 +166,7 @@ describe("Step 4, Evidence", () => {
       copy.evidence.warningTitle,
       copy.evidence.pathTitle,
       copy.evidence.route.self("Baricitinib", "TYK2"),
-      "Black box warning: vascular toxicity, carcinogenicity, respiratory toxicity and infectious disease.",
+      "Blood clots and blood vessel problems, cancer, lung problems and serious infections.",
       copy.legend.disease,
       copy.legend.drug,
       copy.legend.path,
@@ -175,14 +175,14 @@ describe("Step 4, Evidence", () => {
     );
     const facts = screen.getByRole("list", { name: copy.evidence.listLabel });
     expect(within(facts).getAllByRole("listitem")).toHaveLength(6);
-    // Drug names in the API's statements read the same as everywhere else.
+    // Facts are the API's plain summaries, not the source's technical statement.
+    expect(within(facts).getByText("Blocks JAK1.")).toBeInTheDocument();
     expect(
-      within(facts).getByText(
-        "ChEMBL 37 records Baricitinib's mechanism as Tyrosine-protein kinase JAK1 inhibitor.",
-      ),
+      within(facts).getByText("Binds AAK1 very strongly in lab tests (9 tests)."),
     ).toBeInTheDocument();
+    expect(within(facts).queryByText(/pChEMBL|association score|records/)).not.toBeInTheDocument();
     // Warnings live in the warning box only, never as a fact.
-    expect(within(facts).queryByText(/Black Box Warning/)).not.toBeInTheDocument();
+    expect(within(facts).queryByText(/cancer/i)).not.toBeInTheDocument();
     expect(within(facts).getAllByRole("link", { name: "ChEMBL" })[0]).toHaveAttribute(
       "href",
       "https://www.ebi.ac.uk/chembl/api/data/mechanism/5293.json",
