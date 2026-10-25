@@ -28,8 +28,8 @@ from typing import Any, Literal, Protocol, TypeVar
 from uuid import UUID
 
 from .repo import Repo
-from .schemas import BuildStage, DockJob, Juror, JuryModel, JuryRun, PoseScore
-from .services.docking import DockingBackend, DockingFailed
+from .schemas import BuildStage, DockJob, Juror, JuryModel, JuryRun
+from .services.docking import DockingBackend, DockingFailed, DockResult
 from .services.jury import JurorStarted, JuryBackend, JuryEvent, JuryUnavailable
 from .services.source import ExperimentSource, SourceError
 
@@ -262,18 +262,24 @@ def run_dock(repo: Repo, backend: DockingBackend, job_id: UUID) -> Job:
         return None
     job = save_dock_job(repo, job.model_copy(update={"status": "running", "started_at": utcnow()}))
     yield {}
-    scores: list[PoseScore] = []
+    result: DockResult | None = None
     error: str | None = None
     try:
-        scores = yield from _each(backend.dock(job), lambda _: {})
+        result = yield from _each(backend.dock(job), lambda _: {})
     except DockingFailed as exc:
         error = str(exc)
     except Exception as exc:
         log.exception("docking job %s crashed", job_id)
         error = f"Docking crashed ({type(exc).__name__})."
     update: dict[str, Any] = (
-        {"status": "done", "scores": scores, "finished_at": utcnow()}
-        if error is None
+        {
+            "status": "done",
+            "scores": result.scores,
+            "files": result.files,
+            "control_rmsd": result.control_rmsd,
+            "finished_at": utcnow(),
+        }
+        if result is not None
         else {"status": "failed", "error": error, "finished_at": utcnow()}
     )
     save_dock_job(repo, job.model_copy(update=update))
