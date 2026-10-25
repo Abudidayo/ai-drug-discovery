@@ -13,8 +13,18 @@ ROOT = Path(__file__).resolve().parents[2]
 GENE = 'ENSG00000068078'
 
 
-def inputs():
+def base_packet():
     packet = json.loads((ROOT/'fixtures/evidence_packet.json').read_text())
+    removed = {e['id'] for e in packet['evidence'] if e['kind']=='pathway'}
+    packet['evidence'] = [e for e in packet['evidence'] if e['id'] not in removed]
+    packet['releases'] = [r for r in packet['releases'] if not r.startswith('reactome-')]
+    for c in packet['candidates']:
+        c['evidence_ids'] = [e for e in c['evidence_ids'] if e not in removed]
+    return packet
+
+
+def inputs():
+    packet = base_packet()
     item = packet['evidence'].pop()
     assert item['kind'] == 'network_path'
     for c in packet['candidates']:
@@ -39,7 +49,7 @@ def test_paths_are_id_resolved_and_scores_never_enter_packet():
     before = deepcopy((packet,candidates,kwargs))
     enriched = add_network_paths(packet,candidates,**kwargs)
     assert (packet,candidates,kwargs) == before
-    assert enriched == json.loads((ROOT/'fixtures/evidence_packet.json').read_text())
+    assert enriched == base_packet()
     validate_packet(enriched)
     item = enriched['evidence'][-1]
     assert item['values'] == {'hops':0}
@@ -49,7 +59,7 @@ def test_paths_are_id_resolved_and_scores_never_enter_packet():
     for forbidden in ['mean_distance','degree_matched_z','rank','path_count','987.65','-765.43']:
         assert forbidden not in text
     prompt = build_prompt(enriched,[c['label'] for c in enriched['candidates']])
-    assert PROMPT_VERSION == 'jury-v5'
+    assert PROMPT_VERSION == 'jury-v6'
     assert 'graph is undirected' in prompt and 'not a proven mechanism' in prompt
 
 

@@ -7,7 +7,8 @@
   "releases": [
     "opentargets-26.09",
     "chembl-37",
-    "string-12.5"
+    "string-12.5",
+    "reactome-97"
   ],
   "candidates": [
     {
@@ -42,7 +43,8 @@
         "E11",
         "E12",
         "E13",
-        "E14"
+        "E14",
+        "E23"
       ],
       "safety_status": "warnings_recorded"
     },
@@ -120,7 +122,8 @@
         "E15",
         "E16",
         "E17",
-        "E18"
+        "E18",
+        "E23"
       ],
       "safety_status": "warnings_recorded"
     }
@@ -360,6 +363,18 @@
       "statement": "In the filtered STRING 12.5 physical network (combined score ≥ 700, direct experiments ≥ 400), FGFR3 connects to the Disease Target FGFR3 in 0 steps: FGFR3. This is a network association, not a proven mechanism.",
       "values": {
         "hops": 0
+      }
+    },
+    {
+      "id": "E23",
+      "kind": "pathway",
+      "source": "reactome",
+      "source_id": "R-HSA-9006335",
+      "url": "https://reactome.org/content/detail/R-HSA-9006335",
+      "release": "reactome-97",
+      "statement": "In Reactome, at least one of this Candidate's Targets and at least one of the selected Disease Targets belong to 'Signaling by Erythropoietin' (R-HSA-9006335, 5 genes). Shared membership is not proof of effect.",
+      "values": {
+        "pathway_gene_count": 5
       }
     }
   ]

@@ -251,7 +251,8 @@ def approval_date_v2(drug, disease_id, sources):
     return min(dates, key=lambda d: (d["date"], d["application_id"])) if dates else None
 
 
-def build_v2_panel(universe, disease, true_drug, targets, scores, *, blocked, seed):
+def build_v2_panel(universe, disease, true_drug, targets, scores, *, blocked, seed,
+                   allow_plausible_shortfall=False, excluded_ids=()):
     """Seven strong, count-matched top-50 decoys, then seven matched decoys."""
     top = {t["target_id"] for t in targets["targets"][:50]}
     count = len(true_drug["targets"])
@@ -261,19 +262,20 @@ def build_v2_panel(universe, disease, true_drug, targets, scores, *, blocked, se
         and not set(d["source_chembl_ids"]).intersection(blocked)), key=lambda d: d["drug_id"])
     random.Random(seed).shuffle(eligible)
     priorities = {d["drug_id"]: i for i, d in enumerate(eligible)}
+    eligible = [d for d in eligible if d["drug_id"] not in excluded_ids]
     def best(drug):
         return max((scores.get(t["target_id"], 0) for t in drug["targets"]), default=0)
     def overlap(drug):
         return sorted({t["target_id"] for t in drug["targets"]}.intersection(top))
     plausible = [d for d in eligible if overlap(d)]
     plausible.sort(key=lambda d: (abs(len(d["targets"])-count), -best(d), priorities[d["drug_id"]]))
-    if len(plausible) < 7:
+    if len(plausible) < 7 and not allow_plausible_shortfall:
         raise ValueError("Need seven exact top-50 Target decoys")
     selected = plausible[:7]
     used = {d["drug_id"] for d in selected}
     rest = sorted((d for d in eligible if d["drug_id"] not in used),
                   key=lambda d: (abs(len(d["targets"])-count), priorities[d["drug_id"]]))
-    selected += rest[:7]
+    selected += rest[:14-len(selected)]
     if len(selected) != 14:
         raise ValueError("Need fourteen decoys")
     def row(drug):
@@ -285,8 +287,10 @@ def build_v2_panel(universe, disease, true_drug, targets, scores, *, blocked, se
     return {"disease": disease, "true_drug": row(true_drug), "decoys": [row(d) for d in selected],
             "seed": seed, "matching": {
                 "eligible_decoys": len(eligible), "eligible_plausible": len(plausible),
+                "plausible_decoy_count": sum(bool(overlap(d)) for d in selected),
+                "plausible_priority_slots": min(7, len(plausible)),
                 "plausible_rule": "Exact ENSG intersection with Disease top 50; no family fallback needed",
-                "selection": "Seven plausible: closest Target count, then highest direct score, then seeded priority. Seven remaining: closest count then seeded priority.",
+                "selection": "Up to seven plausible: closest Target count, then highest direct score, then seeded priority. Fill to fourteen: closest count then seeded priority.",
                 "exclusion": "Any clinical_indication record for Disease across parent and included salts, at any stage"}}
 
 
@@ -449,6 +453,36 @@ def blind_prompt_leaks(prompt, aliases):
                   | set(re.findall(r"\bCHEMBL[0-9]+\b", prompt, flags=re.I)))
 
 
+def drug_identity_aliases(selected, universe, sources):
+    """Collect identities only through verified parent/salt IDs, never names."""
+    molecule_table = {i: (name, synonyms, brands) for i, name, synonyms, brands in
+                      sources.table("drug_molecule").select("id", "name", "synonyms", "tradeNames").fetchall()}
+    aliases, excluded = {}, []
+    for drug_id in sorted(selected):
+        drug = universe[drug_id]
+        names = {drug["name"], drug_id}
+        molecules = {i: sources.chembl(f"molecule/{i}.json") for i in drug["source_chembl_ids"]}
+        linked_parent = any((m.get("molecule_hierarchy") or {}).get("parent_chembl_id") == drug_id
+                            for m in molecules.values())
+        for source_id, molecule in molecules.items():
+            parent = (molecule.get("molecule_hierarchy") or {}).get("parent_chembl_id")
+            if parent is None and source_id == drug_id and linked_parent:
+                parent = drug_id
+            if parent != drug_id:
+                excluded.append({"source_id": source_id, "candidate_id": drug_id, "status": "unmapped", "reason": "identity-source parent mismatch"})
+                continue
+            names.add(source_id)
+            if molecule.get("pref_name"):
+                names.add(molecule["pref_name"])
+            names.update(row["molecule_synonym"] for row in molecule.get("molecule_synonyms", []))
+            if source_id in molecule_table:
+                name, synonyms, brands = molecule_table[source_id]
+                names.add(name)
+                names.update(r["label"] for r in (synonyms or []) + (brands or []))
+        aliases[drug_id] = sorted(n for n in names if isinstance(n, str) and n.strip())
+    return aliases, excluded
+
+
 def prepare_v2_identities(data_dir="data", output="data/pilot/v2", *, offline=False):
     import httpx
     from jury.client import build_prompt, visible_packet
@@ -459,31 +493,7 @@ def prepare_v2_identities(data_dir="data", output="data/pilot/v2", *, offline=Fa
     with httpx.Client(timeout=15, follow_redirects=True) as http:
         sources = V2Sources(data_dir, output, offline=offline)
         sources.client = http
-        molecule_table = {i: (name, synonyms, brands) for i, name, synonyms, brands in
-                          sources.table("drug_molecule").select("id", "name", "synonyms", "tradeNames").fetchall()}
-        aliases, excluded = {}, []
-        for drug_id in sorted(selected):
-            drug = universe[drug_id]
-            names = {drug["name"], drug_id}
-            molecules = {i: sources.chembl(f"molecule/{i}.json") for i in drug["source_chembl_ids"]}
-            linked_parent = any((m.get("molecule_hierarchy") or {}).get("parent_chembl_id") == drug_id
-                                for m in molecules.values())
-            for source_id, molecule in molecules.items():
-                parent = (molecule.get("molecule_hierarchy") or {}).get("parent_chembl_id")
-                if parent is None and source_id == drug_id and linked_parent:
-                    parent = drug_id
-                if parent != drug_id:
-                    excluded.append({"source_id": source_id, "candidate_id": drug_id, "status": "unmapped", "reason": "identity-source parent mismatch"})
-                    continue
-                names.add(source_id)
-                if molecule.get("pref_name"):
-                    names.add(molecule["pref_name"])
-                names.update(row["molecule_synonym"] for row in molecule.get("molecule_synonyms", []))
-                if source_id in molecule_table:
-                    name, synonyms, brands = molecule_table[source_id]
-                    names.add(name)
-                    names.update(r["label"] for r in (synonyms or []) + (brands or []))
-            aliases[drug_id] = sorted(n for n in names if isinstance(n, str) and n.strip())
+        aliases, excluded = drug_identity_aliases(selected, universe, sources)
         target_ids = {t["id"] for p in output.glob("packet-*.json")
                       for c in json.loads(p.read_text())["candidates"] for t in c["targets"]}
         target_lexicon = {}
@@ -547,12 +557,237 @@ def prepare_v2_identities(data_dir="data", output="data/pilot/v2", *, offline=Fa
     return metadata
 
 
+
+
+B_SEED = 20261025
+B_DISEASES = [
+    ('MONDO_0005083', 'psoriasis', 'dermatology'),
+    ('MONDO_0004980', 'atopic eczema', 'dermatology'),
+    ('MONDO_0004979', 'asthma', 'respiratory'),
+    ('MONDO_0005101', 'ulcerative colitis', 'gastroenterology'),
+    ('MONDO_0005011', 'Crohn disease', 'gastroenterology'),
+    ('HP_0003124', 'Hypercholesterolemia', 'metabolic'),
+    ('MONDO_0005298', 'osteoporosis', 'metabolic'),
+    ('MONDO_0004989', 'breast carcinoma', 'oncology'),
+    ('MONDO_0005159', 'prostate carcinoma', 'oncology'),
+    ('MONDO_0004975', 'Alzheimer disease', 'neurology'),
+    ('MONDO_0005027', 'epilepsy', 'neurology'),
+]
+
+
+def build_b_panel(universe, disease, targets, scores, *, blocked, index, excluded_ids=()):
+    """Select the positive before inspecting network ranks or jury outputs."""
+    positives = sorted((d for d in universe['drugs'] if d['targets']
+        and REGULATORS.intersection(d['approval']['sources'])
+        and disease['id'] in (set(d['approval']['disease_ids']) |
+            {o['disease_id'] for o in d['approval'].get('overrides', [])})), key=lambda d: d['drug_id'])
+    if not positives:
+        raise ValueError(f"No mapped regulator-backed true drug for {disease['id']}")
+    priority = random.Random(B_SEED + index).sample(positives, len(positives))
+    true = next((d for d in priority if d['drug_id'] not in excluded_ids), None)
+    if true is None:
+        raise ValueError(f"No blindable approved true drug remains for {disease['id']}")
+    # A verified override is an existing Disease record even when OT's stage lags.
+    blocked = set(blocked)
+    for drug in universe['drugs']:
+        if any(o['disease_id'] == disease['id'] for o in drug['approval'].get('overrides', [])):
+            blocked.update(drug['source_chembl_ids'])
+    panel = build_v2_panel(universe, disease, true, targets, scores,
+                           blocked=blocked, seed=B_SEED + index,
+                           allow_plausible_shortfall=True, excluded_ids=excluded_ids)
+    panel['matching']['eligible_true_drugs'] = len(positives)
+    panel['true_drug_priority'] = [d['drug_id'] for d in priority]
+    return panel
+
+
+def avoid_identity_label_collisions(packet, aliases):
+    """Skip local E#/C# labels that are drug aliases, preserving all evidence."""
+    result = deepcopy(packet)
+    forbidden = {a.strip().casefold() for values in aliases.values() for a in values}
+    mappings = {}
+    for key, rows, prefix in [('id', result['evidence'], 'E'), ('label', result['candidates'], 'C')]:
+        replacements, number = {}, 1
+        for row in rows:
+            while f'{prefix}{number}'.casefold() in forbidden:
+                number += 1
+            replacements[row[key]] = f'{prefix}{number}'
+            row[key] = f'{prefix}{number}'
+            number += 1
+        mappings[key] = replacements
+    for candidate in result['candidates']:
+        candidate['evidence_ids'] = [mappings['id'][e] for e in candidate['evidence_ids']]
+    return result, {k: {old: new for old, new in v.items() if old != new} for k, v in mappings.items()}
+
+
+def unblindable_candidates(packet, aliases, target_symbols):
+    """Amendment 1: exact alias/symbol text collision, not a biological join."""
+    genes = {t['id'] for c in packet['candidates'] for t in c['targets']}
+    for item in packet['evidence']:
+        if item['kind'] == 'network_path':
+            genes.update(item['source_id'].split('@')[0].split('>'))
+    symbols = {}
+    for gene in sorted(genes):
+        symbol = target_symbols.get(gene)
+        if symbol:
+            symbols.setdefault(symbol.casefold(), []).append(gene)
+    # A symbol can also be printed in a pathway title or mechanism description.
+    # This is a lexical exclusion check; it never adds a biological relationship.
+    biological_text = ' '.join(
+        item['statement'].split('mechanism as ', 1)[-1] if item['kind'] == 'mechanism' else item['statement']
+        for item in packet['evidence'] if item['kind'] not in {'approval', 'warning'})
+    all_symbols = {}
+    for gene, symbol in target_symbols.items():
+        if symbol:
+            all_symbols.setdefault(symbol.casefold(), []).append(gene)
+    excluded = []
+    for candidate in sorted(packet['candidates'], key=lambda c: c['candidate_id']):
+        for alias in aliases[candidate['candidate_id']]:
+            key = alias.strip().casefold()
+            if key in all_symbols and alias_pattern([alias.strip()]).search(biological_text):
+                symbols.setdefault(key, all_symbols[key])
+        matching = sorted({a for a in [candidate['name'], *aliases[candidate['candidate_id']]]
+                           if a.strip().casefold() in symbols})
+        if matching:
+            excluded.append({'candidate_id': candidate['candidate_id'], 'name': candidate['name'],
+                'matching_aliases': matching,
+                'target_ids': sorted({g for a in matching for g in symbols[a.strip().casefold()]}),
+                'reason': 'name_or_synonym_equals_packet_Target_symbol'})
+    return excluded
+
+
+def prepare_experiment_b(data_dir='data', output='data/experiment_b', *,
+                         ranking_root='/Users/jessicamak/oxhack-workers/zaid-ro', offline=False):
+    """Reuse v2 selection, enrichment and blinding; Zaid's modules stay read-only."""
+    import shutil
+    import httpx
+    from pipeline.pathways import download, load_pathways
+    from pipeline.packets import add_network_paths, add_pathways
+    from ranking.artifacts import load_artifacts
+    from ranking.data import load_disease, load_drugs
+    from ranking.paths import PathReconstructor, representatives
+    from ranking.scoring import RankingEngine, RankingSettings
+    data_dir, output, ranking_root = Path(data_dir), Path(output), Path(ranking_root)
+    if (output / 'preregistered.json').exists():
+        raise ValueError('Experiment B is frozen; do not rebuild its inputs')
+    output.mkdir(parents=True, exist_ok=True)
+    for cache in [data_dir / 'pilot/v2/packets', data_dir / 'pilot/v2_paths/packets']:
+        if cache.exists():
+            shutil.copytree(cache, output / 'packets', dirs_exist_ok=True)
+    seed_target_cache(data_dir, output)
+    universe_path = data_dir / 'drug_targets.json'
+    universe = json.loads(universe_path.read_text())
+    path, reactome = download(data_dir) if not offline else (
+        data_dir / 'reactome/97/Ensembl2Reactome.human.tsv',
+        json.loads((data_dir / 'reactome/97/manifest.json').read_text()))
+    if reactome['release'] != 'reactome-97':
+        raise ValueError('Experiment B protocol pins Reactome 97')
+    pathways, unmapped = load_pathways(path)
+    (output / 'reactome.json').write_text(json.dumps({**reactome, 'unmapped_by_reason': unmapped}, indent=2)+'\n')
+    # Existing source cache establishes the parent links without name matching.
+    parents = {}
+    for cache in sorted((data_dir / 'chembl-37').glob('*.json')):
+        payload = json.loads(cache.read_text()).get('response') or {}
+        for molecule in payload.get('molecules', []) if isinstance(payload, dict) else []:
+            if 'molecule_hierarchy' in molecule:
+                parents[molecule['molecule_chembl_id']] = (molecule['molecule_hierarchy'] or {}).get('parent_chembl_id')
+    sources = V2Sources(data_dir, output, offline=offline)
+    eligible, excluded = [], []
+    with httpx.Client(timeout=30, follow_redirects=True) as http, load_artifacts(data_dir / 'a6/stage1') as artifacts:
+        sources.client = http
+        for drug in universe['drugs']:
+            if not drug['targets']:
+                continue
+            parent = parents.get(drug['drug_id'])
+            if parent is None:
+                parent = (sources.chembl(f"molecule/{drug['drug_id']}.json").get('molecule_hierarchy') or {}).get('parent_chembl_id')
+            if parent != drug['drug_id']:
+                excluded.append({'candidate_id': drug['drug_id'], 'status': 'unmapped', 'reason': 'unverified_parent_ID'})
+                continue
+            eligible.append(drug)
+        universe = {**universe, 'drugs': eligible}
+        symbols = dict(sources.table('target').select('id', 'approvedSymbol').fetchall())
+        mappings = json.loads((data_dir / 'string_id_map.json').read_text())['mappings']
+        indications = sources.table('clinical_indication')
+        ot_parents = dict(sources.table('drug_molecule').select('id', 'parentId').fetchall())
+        panels, checks = [], []
+        for index, (did, name, area) in enumerate(B_DISEASES):
+            top = disease_targets(CachedAssociations(sources), did)
+            if top['disease_name'].casefold() != name.casefold():
+                raise ValueError('Disease catalogue label changed')
+            disease = {'id': did, 'name': top['disease_name'], 'area': area}
+            scores = sources.associations(did)
+            full = disease_targets(CachedAssociations(sources), did, top_n=max(1, len(scores)))
+            blocked = {r[0] for r in indications.filter(duckdb.ColumnExpression('diseaseId') == did).select('drugId').fetchall()}
+            blocked.update(ot_parents[i] for i in tuple(blocked) if ot_parents.get(i))
+            blind_exclusions, excluded_ids = [], set()
+            while True:
+                panel = build_b_panel(universe, disease, top, scores, blocked=blocked,
+                                      index=index, excluded_ids=excluded_ids)
+                ids = [panel['true_drug']['drug_id'], *[d['drug_id'] for d in panel['decoys']]]
+                sources.unmapped.clear()
+                coverage = {}
+                _, packet = build_evidence_packet(disease, ids, full, universe,
+                    experiment_id=str(uuid5(NAMESPACE_URL, f'oxhack-experiment-b/{B_SEED}/{did}')),
+                    shuffle_seed=B_SEED+index, sources=sources, coverage=coverage)
+                targets_file = output / f'targets-{did}.json'
+                targets_file.write_text(json.dumps(top, indent=2)+'\n')
+                # Rank only the identical panel, using Zaid's unchanged degree-matched code.
+                drug_file = output / f'drugs-{did}.json'
+                drug_file.write_text(json.dumps({**universe, 'drugs': [d for d in eligible if d['drug_id'] in ids]}, indent=2)+'\n')
+                ranked = RankingEngine(artifacts, RankingSettings()).rank(load_disease(targets_file, did), load_drugs(drug_file))
+                (output / f'network-{did}.json').write_text(json.dumps(ranked, indent=2)+'\n')
+                engine = PathReconstructor(artifacts, [t['target_id'] for t in top['targets']])
+                rows = []
+                for candidate in packet['candidates']:
+                    paths = [engine.nearest_path(t['id']) for t in candidate['targets']]
+                    rows.append({'candidate_id': candidate['candidate_id'], 'network_paths': {'paths': representatives(paths)}, 'all_paths': paths})
+                graph = {'graph_version': 'string-12.5', 'filters': artifacts.manifest['filters'],
+                         'undirected': True, 'artifact_files': artifacts.manifest['files']}
+                path_coverage, pathway_coverage = {}, {}
+                packet = add_network_paths(packet, rows, graph=graph, target_names=symbols, string_mappings=mappings,
+                                           disease_target_ids=set(engine.disease_targets), coverage=path_coverage)
+                packet = add_pathways(packet, top, pathways, release=reactome['release'], coverage=pathway_coverage)
+                aliases, identity_unmapped = drug_identity_aliases(ids, {d['drug_id']: d for d in eligible}, sources)
+                collisions = unblindable_candidates(packet, aliases, symbols)
+                if collisions:
+                    selection_round = 1 + len({e['selection_round'] for e in blind_exclusions})
+                    for collision in collisions:
+                        collision.update(role='true_drug' if collision['candidate_id'] == panel['true_drug']['drug_id'] else 'decoy',
+                                         selection_round=selection_round)
+                        blind_exclusions.append(collision)
+                        excluded_ids.add(collision['candidate_id'])
+                    print(f"Replacing unblindable Candidates for {name}: {sorted(excluded_ids)}", flush=True)
+                    continue
+                panel['blind_exclusions'] = blind_exclusions
+                panel['identity_unmapped'] = identity_unmapped
+                packet, label_changes = avoid_identity_label_collisions(packet, aliases)
+                panel['label_normalizations'] = label_changes
+                flags = packet_leakage(packet)
+                if flags:
+                    raise ValueError(f'Packet leakage: {did}: {flags}')
+                (output / f'packet-{did}.json').write_text(json.dumps(packet, indent=2)+'\n')
+                (output / f'paths-{did}.json').write_text(json.dumps({'graph': graph, 'candidates': rows}, indent=2)+'\n')
+                checks.append({'disease_id': did, 'evidence': coverage, 'network_paths': path_coverage, 'pathways': pathway_coverage})
+                panels.append(panel)
+                (output / 'panels.json').write_text(json.dumps({'seed': B_SEED, 'panels': panels,
+                    'universe_sha256': sha256(universe_path.read_bytes()).hexdigest(), 'eligibility_unmapped': excluded,
+                    'cohort_protocol_sha256': sha256((ranking_root / 'ranking/cohort_protocol.json').read_bytes()).hexdigest()}, indent=2)+'\n')
+                (output / 'coverage.json').write_text(json.dumps(checks, indent=2)+'\n')
+                print(f"Prepared {name}: {panel['true_drug']['name']}; {sum(d['plausible'] for d in panel['decoys'])} plausible decoys", flush=True)
+                break
+    prepare_v2_identities(data_dir, output, offline=offline)
+    return panels
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--v2", action="store_true")
+    parser.add_argument("--experiment-b", action="store_true")
     args = parser.parse_args()
-    if args.v2:
+    if args.experiment_b:
+        prepare_experiment_b(offline=args.offline)
+    elif args.v2:
         prepare_v2(offline=args.offline)
         prepare_v2_identities(offline=args.offline)
     else:

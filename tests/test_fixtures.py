@@ -92,7 +92,8 @@ def test_ids_and_releases():
                         matches(r"[A-Za-z0-9][A-Za-z0-9_./-]*", value)
     releases = FILES["candidates"]["releases"]
     assert releases == FILES["evidence_packet"]["releases"]
-    assert set(releases) == {"opentargets-26.09", "chembl-37", "string-12.5"}
+    assert {"opentargets-26.09", "chembl-37", "string-12.5"} <= set(releases)
+    assert set(releases) <= {"opentargets-26.09", "chembl-37", "string-12.5", "reactome-97"}
     assert all(
         obj["release"] in releases
         for data in FILES.values() for obj in objects(data) if "release" in obj
@@ -297,8 +298,8 @@ def test_packet_blinding_and_evidence_statements():
         )
     )
     for e in packet["evidence"]:
-        assert e["source"] in {"open_targets", "chembl", "string"}
-        assert e["kind"] in {"target_association", "mechanism", "bioactivity", "approval", "warning", "network_path"}
+        assert e["source"] in {"open_targets", "chembl", "string", "reactome"}
+        assert e["kind"] in {"target_association", "mechanism", "bioactivity", "approval", "warning", "network_path", "pathway"}
         assert e["url"].startswith("https://")
         assert "illustrative" not in e["statement"]
         if e["kind"] == "network_path":
@@ -306,6 +307,12 @@ def test_packet_blinding_and_evidence_statements():
             assert e["values"] == {"hops": 0}
             assert "FGFR3 connects to the Disease Target FGFR3 in 0 steps" in e["statement"]
             assert "not a proven mechanism" in e["statement"]
+            continue
+        if e["kind"] == "pathway":
+            assert e["release"] == "reactome-97"
+            assert e["source_id"] == "R-HSA-9006335"
+            assert e["values"] == {"pathway_gene_count": 5}
+            assert "Shared membership is not proof of effect" in e["statement"]
             continue
         prefix = "Open Targets 26.09" if e["source"] == "open_targets" else "ChEMBL 37"
         assert e["statement"].startswith(prefix)

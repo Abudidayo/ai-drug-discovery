@@ -4,7 +4,8 @@
   "releases": [
     "opentargets-26.09",
     "chembl-37",
-    "string-12.5"
+    "string-12.5",
+    "reactome-97"
   ],
   "candidates": [
     {
@@ -247,6 +248,18 @@
           "release": "opentargets-26.09",
           "statement": "Open Targets 26.09 records a Black Box Warning for BARICITINIB: infectious disease.",
           "values": {}
+        },
+        {
+          "id": "E23",
+          "kind": "pathway",
+          "source": "reactome",
+          "source_id": "R-HSA-9006335",
+          "url": "https://reactome.org/content/detail/R-HSA-9006335",
+          "release": "reactome-97",
+          "statement": "In Reactome, at least one of this Candidate's Targets and at least one of the selected Disease Targets belong to 'Signaling by Erythropoietin' (R-HSA-9006335, 5 genes). Shared membership is not proof of effect.",
+          "values": {
+            "pathway_gene_count": 5
+          }
         }
       ],
       "warnings": [
@@ -369,6 +382,18 @@
           "release": "opentargets-26.09",
           "statement": "Open Targets 26.09 records a Black Box Warning for RUXOLITINIB: infectious disease.",
           "values": {}
+        },
+        {
+          "id": "E23",
+          "kind": "pathway",
+          "source": "reactome",
+          "source_id": "R-HSA-9006335",
+          "url": "https://reactome.org/content/detail/R-HSA-9006335",
+          "release": "reactome-97",
+          "statement": "In Reactome, at least one of this Candidate's Targets and at least one of the selected Disease Targets belong to 'Signaling by Erythropoietin' (R-HSA-9006335, 5 genes). Shared membership is not proof of effect.",
+          "values": {
+            "pathway_gene_count": 5
+          }
         }
       ],
       "warnings": [
