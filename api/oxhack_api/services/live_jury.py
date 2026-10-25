@@ -79,9 +79,15 @@ def model_family(model_id: str) -> str:
 
 def display_name(model_id: str) -> str:
     """A readable name for a Cortex model ID: claude-sonnet-5 is Claude Sonnet 5,
-    openai-gpt-5.4 is GPT-5.4, glm-5.3 is GLM-5.3."""
+    claude-opus-5-5 is Claude Opus 5.5 (Cortex writes version dots as hyphens),
+    openai-gpt-5.4 is GPT-5.4, glm-5.3 is GLM-5.3, kimi-k3 is Kimi K3."""
     name = model_id.removeprefix("openai-")
-    words = name.split("-")
+    words: list[str] = []
+    for word in name.split("-"):
+        if word.isdigit() and words and words[-1].replace(".", "").isdigit():
+            words[-1] = f"{words[-1]}.{word}"
+        else:
+            words.append(word)
     if words[0].lower() in _UPPER and len(words) > 1:
         return f"{words[0].upper()}-{'-'.join(words[1:])}"
     return " ".join(w.upper() if w.lower() in _UPPER else w.capitalize() for w in words)

@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 
 from oxhack_api.services import plain
-from oxhack_api.services.live_jury import map_jury_result
+from oxhack_api.services.live_jury import display_name, map_jury_result
 from oxhack_api.services.ranking import EvidenceRanking, RankingInput
 from oxhack_api.settings import REPO_ROOT
 
@@ -88,6 +88,20 @@ def test_stream_a_jury_result_maps_without_inventing_votes() -> None:
     assert mapped.outcome.agreement == result["consensus"]["kendalls_w"]
 
 
+@pytest.mark.parametrize(
+    ("model_id", "expected"),
+    [
+        ("claude-opus-5-5", "Claude Opus 5.5"),
+        ("claude-sonnet-5", "Claude Sonnet 5"),
+        ("openai-gpt-5.4", "GPT-5.4"),
+        ("glm-5.3", "GLM-5.3"),
+        ("kimi-k3", "Kimi K3"),
+    ],
+)
+def test_model_display_names(model_id: str, expected: str) -> None:
+    assert display_name(model_id) == expected
+
+
 def test_network_unavailable_reason_is_plain() -> None:
     text = plain.network_unavailable("Baricitinib", "COVID-19")
     assert "network" in text
@@ -128,3 +142,19 @@ def test_live_covid_build_end_to_end() -> None:
         items: list[dict[str, Any]] = candidate["evidence"]
         for item in items:
             assert not any(word in item["summary"] for word in banned), item["summary"]
+
+
+def test_snowflake_json_settings_fail_plainly(monkeypatch: pytest.MonkeyPatch) -> None:
+    """uv's .env reader drops the double quotes of an unquoted JSON value."""
+    from pydantic import ValidationError
+
+    from oxhack_api.settings import SnowflakeSettings
+
+    monkeypatch.setenv("SNOWFLAKE_MODELS", "[claude-opus-5-5,openai-gpt-5.4,kimi-k3]")
+    with pytest.raises(ValidationError, match="wrap the JSON in single quotes"):
+        SnowflakeSettings()
+    monkeypatch.setenv("SNOWFLAKE_MODELS", '["a","b","c"]')
+    monkeypatch.setenv("SNOWFLAKE_REASONING_EFFORT", "")
+    settings = SnowflakeSettings()
+    assert settings.models == ["a", "b", "c"]
+    assert settings.reasoning_effort == {}

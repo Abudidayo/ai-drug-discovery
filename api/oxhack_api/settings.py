@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field, SecretStr, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, SecretStr, ValidationInfo, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -127,17 +128,36 @@ class SnowflakeSettings(BaseSettings):
 
     account: str | None = Field(default=None, description="Snowflake account identifier.")
     pat: SecretStr | None = Field(default=None, description="Programmatic access token.")
-    models: list[str] = Field(
+    # NoDecode: these JSON values are parsed below, so a malformed one gets a plain error
+    # naming the variable instead of failing the app's startup with a stack trace.
+    models: Annotated[list[str], NoDecode] = Field(
         default_factory=list[str],
         description="JSON array of three pinned Cortex model IDs from three model families.",
     )
-    reasoning_effort: dict[str, str | None] = Field(
+    reasoning_effort: Annotated[dict[str, str | None], NoDecode] = Field(
         default_factory=dict[str, str | None],
         description=(
             'JSON object of reasoning effort by model ID, e.g. {"openai-gpt-5.4": "low"}; '
             "null or missing means the provider default."
         ),
     )
+
+    @field_validator("models", "reasoning_effort", mode="before")
+    @classmethod
+    def _parse_json(cls, value: object, info: ValidationInfo) -> object:
+        if not isinstance(value, str):
+            return value
+        if not value.strip():
+            return [] if info.field_name == "models" else {}
+        name = f"SNOWFLAKE_{(info.field_name or '').upper()}"
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            raise ValueError(
+                f"{name} is not valid JSON ({value!r}). In a .env file, wrap the JSON in "
+                """single quotes, e.g. '["model-a","model-b","model-c"]', so its double """
+                "quotes are kept."
+            ) from None
 
     def require_complete(self) -> None:
         """Raise ValueError unless a Cortex jury can run with these settings."""
