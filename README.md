@@ -64,11 +64,11 @@ Unlike a single shortest path, the walk counts every route between a drug and th
 
 ## Results
 
-Every test asks one thing: do known approved drugs come back? Rules, seeds and inputs were frozen before each test ran. Full protocols are in [`results/`](results/).
+To check the method works, we hide what we already know. For each disease, we take drugs that regulators have already approved for it, and see whether our method ranks them near the top without being told. Rules, seeds and inputs were frozen before each test ran. Full protocols are in [`results/`](results/).
 
 ### 1. Network shortlist (14 diseases, 293 known drug–disease pairs)
 
-Both methods pick 15 drugs per disease from the same 1,956 approved drugs. Picking at random finds about 0.8%.
+For each disease, each method picks 15 drugs out of 1,956. We count how many of the drugs already approved for that disease made the 15. Picking at random would catch about 0.8%.
 
 | Metric | Z-score shortlist | Random walk shortlist |
 |---|---:|---:|
@@ -81,7 +81,7 @@ Random walk was ahead by 1.84 percentage points (macro), winning on 4 diseases, 
 
 ### 2. Model jury (14 new diseases, drug names hidden, pre-registered)
 
-Each panel holds 1 approved drug and 14 decoys. Chance: Hits@5 33%, MRR 0.22.
+Each panel has 15 drugs: 1 already approved for the disease and 14 that aren't. The model ranks them without seeing drug names. Hits@5 counts how often the approved drug lands in the top 5 (chance 33%); MRR rewards ranking it higher (chance 0.22, perfect 1.0).
 
 | Method | Hits@5 | MRR | Beats chance? (Holm-adjusted p) |
 |---|---:|---:|---|
