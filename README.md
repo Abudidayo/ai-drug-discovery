@@ -70,20 +70,24 @@ To check the method works, we hide what we already know. For each disease, we ta
 
 For each disease, each method picks 15 drugs out of 1,956. We count how many of the drugs already approved for that disease made the 15. Picking at random would catch about 0.8%.
 
-| Metric | Z-score shortlist | Random walk shortlist |
-|---|---:|---:|
-| Known pairs retrieved | 11 / 293 | **15 / 293** |
-| Micro Recall@15 | 3.75% | **5.12%** |
-| Macro Recall@15 | 5.05% | **6.89%** |
-| Diseases with at least one hit | 8 / 14 | 8 / 14 |
+Higher is better for every number below.
 
-Random walk was ahead by 1.84 percentage points (macro), winning on 4 diseases, losing on 2 and tying on 8. The 95% paired bootstrap interval is −0.61 to +4.40, so the gain is **not statistically established**. We made random walk the default as a product choice.
+| Metric | What it means | Z-score | Random walk |
+|---|---|---:|---:|
+| Known pairs retrieved | Approved drug–disease pairs that made the top 15, out of 293 | 11 / 293 | **15 / 293** |
+| Micro Recall@15 | The same, as a percentage of all 293 pairs | 3.75% | **5.12%** |
+| Macro Recall@15 | The share found for each disease, averaged over the 14 diseases, so every disease counts equally | 5.05% | **6.89%** |
+| Diseases with at least one hit | Diseases where at least one approved drug made the 15 | 8 / 14 | 8 / 14 |
+
+**What this shows:** random walk caught a few more approved drugs (15 vs 11), and about 6 times more than random picking (0.8%). But it won on only 4 diseases, lost on 2 and tied on 8. The 95% confidence interval for the gain runs from −0.61 to +4.40 points: since it includes zero, the gain could be luck. We made random walk the default as a product choice, not a proven improvement.
 
 ### 2. Model jury (14 new diseases, drug names hidden, pre-registered)
 
 Each panel has 15 drugs: 1 already approved for the disease and 14 that aren't. The model ranks them without seeing drug names. Hits@5 counts how often the approved drug lands in the top 5 (chance 33%); MRR rewards ranking it higher (chance 0.22, perfect 1.0).
 
-| Method | Hits@5 | MRR | Beats chance? (Holm-adjusted p) |
+Higher Hits@5 and MRR are better. The p-value says how likely a score this high would be by luck alone, corrected for testing several methods; below 0.05 counts as beating chance.
+
+| Method | Hits@5 | MRR | Beats chance? (p) |
 |---|---:|---:|---|
 | GPT-5.4 alone | 8 / 14 | **0.461** | **Yes** (0.013) |
 | Claude Opus 5.5 alone | 6 / 14 | **0.422** | **Yes** (0.049) |
