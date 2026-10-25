@@ -1,12 +1,13 @@
 import {
   createViewer,
+  Parsers,
   SurfaceType,
   type AtomSelectionSpec,
   type AtomSpec,
   type GLModel,
   type GLViewer,
 } from "3dmol";
-import { Matrix4, Quaternion, Vector3 } from "three";
+import { Box3, Matrix4, Quaternion, Vector3 } from "three";
 import { tokenColor } from "./plate";
 
 /**
@@ -22,9 +23,13 @@ const POCKET_ANGSTROM = 4.5;
 const SURFACE_ANGSTROM = 6;
 /** Spin speed in degrees a second. */
 const SPIN_DEGREES = 10;
-/** How far the camera pulls back from the drug, so the pocket around it shows. */
-const ZOOM_OUT = 0.7;
-/** Degrees the opening view tips the drug back from face-on, so it still reads as 3D. */
+/** The camera's vertical field of view in degrees: 3Dmol's default, set so framing can rely on it. */
+const FIELD_OF_VIEW = 20;
+/** How much of the view's width and height the framed atoms may take; the rest is margin. */
+const FILL = 0.9;
+/** Half the smallest height (Å) the view shows, so a lone fragment isn't blown up to fill it. */
+const MIN_HALF_HEIGHT = 6;
+/** Degrees the opening view tips the drug's top away from the reader, so it still reads as 3D. */
 const TILT = 24;
 /** How deep (Å) and how wide around the drug to look for protein in the way of the view. */
 const FRONT_DEPTH = 16;
@@ -112,6 +117,45 @@ export function faceOn(drugAtoms: readonly AtomSpec[], proteinAtoms: readonly At
   return new Quaternion().setFromRotationMatrix(basis);
 }
 
+/** A turn about the screen's own axis (x across, y up, z towards the reader), in degrees. */
+export function screenTurn(axis: "x" | "y", degrees: number): Quaternion {
+  const direction = axis === "x" ? new Vector3(1, 0, 0) : new Vector3(0, 1, 0);
+  return new Quaternion().setFromAxisAngle(direction, (degrees * Math.PI) / 180);
+}
+
+export interface Framing {
+  /** The point (in the structure's coordinates) at the middle of the view, and turned about. */
+  centre: Vector3;
+  /** The camera's distance from `centre`, in ångströms. */
+  distance: number;
+}
+
+/**
+ * Where the camera goes so that, turned by `turn`, the `subject` sits in the middle of a view of
+ * this `aspect` (width over height) and it and its `surroundings` fill the view up to FILL on the
+ * tighter side. Exact for a perspective camera with a vertical field of view of `fov` degrees: a
+ * point nearer the reader looks bigger, so each point is checked at its own depth.
+ */
+export function frame(
+  subject: readonly Vector3[],
+  surroundings: readonly Vector3[],
+  turn: Quaternion,
+  aspect: number,
+  fov = FIELD_OF_VIEW,
+): Framing {
+  const turnPoint = (point: Vector3) => point.clone().applyQuaternion(turn);
+  const middle = new Box3().setFromPoints(subject.map(turnPoint)).getCenter(new Vector3());
+  const tanY = Math.tan((fov * Math.PI) / 360);
+  const tanX = tanY * aspect;
+  let distance = MIN_HALF_HEIGHT / tanY;
+  for (const point of [...subject, ...surroundings]) {
+    const offset = turnPoint(point).sub(middle);
+    const across = Math.max(Math.abs(offset.x) / tanX, Math.abs(offset.y) / tanY) / FILL;
+    distance = Math.max(distance, offset.z + across);
+  }
+  return { centre: middle.applyQuaternion(turn.clone().invert()), distance };
+}
+
 /** 3Dmol keeps these observers private and never disconnects them; dispose does. */
 interface ViewerInternals {
   divwatcher?: { disconnect(): void };
@@ -125,7 +169,10 @@ export class PoseScene {
   private readonly ligand: GLModel;
   private readonly crystal: string;
   private readonly pocket: AtomSelectionSpec;
-  private readonly home: number[];
+  /** The opening view: its turn, the drug it centres on, and what else it fits in. */
+  private readonly turn: Quaternion;
+  private readonly drugPoints: Vector3[];
+  private readonly surroundings: Vector3[];
   private surface: Promise<number> | null = null;
   private overlay: GLModel | null = null;
   private spinFrame = 0;
@@ -193,14 +240,16 @@ export class PoseScene {
     );
     viewer.setViewStyle({ style: "outline", color: ink, width: 0.02 });
 
+    viewer.setCameraParameters({ fov: FIELD_OF_VIEW });
+    // Only for the depth range kept in view and its fog, which it sets from the whole protein.
     viewer.zoomTo({ model: this.ligand });
-    const turn = faceOn(drug, this.receptor.selectedAtoms({}));
-    const fitted = viewer.getView() as number[];
-    viewer.setView([...fitted.slice(0, 4), turn.x, turn.y, turn.z, turn.w]);
-    viewer.rotate(TILT, "x");
-    viewer.zoom(ZOOM_OUT);
-    this.home = viewer.getView() as number[];
-    viewer.render();
+    // The crystal position is framed too, so its overlay never falls outside the view.
+    const parsed = Parsers.sdf?.(firstMolecule(files.crystal), {}) as AtomSpec[][] | undefined;
+    const crystal = parsed?.[0] ?? [];
+    this.drugPoints = drug.map(toPoint);
+    this.surroundings = [...this.receptor.selectedAtoms(this.pocket), ...crystal].map(toPoint);
+    this.turn = screenTurn("x", -TILT).multiply(faceOn(drug, this.receptor.selectedAtoms({})));
+    this.reset();
   }
 
   /**
@@ -263,14 +312,27 @@ export class PoseScene {
       const seconds = Math.min(0.1, (now - last) / 1000);
       last = now;
       if (document.hidden || this.holder.clientWidth === 0) return;
-      this.viewer.rotate(SPIN_DEGREES * seconds, "y");
+      // About the screen's upright axis, like a turntable; 3Dmol's own rotate turns about the
+      // structure's axes.
+      const view = this.viewer.getView() as number[];
+      const [x, y, z, w] = view.slice(4);
+      const turned = screenTurn("y", SPIN_DEGREES * seconds).multiply(new Quaternion(x, y, z, w));
+      this.viewer.setView([...view.slice(0, 4), turned.x, turned.y, turned.z, turned.w]);
     };
     this.spinFrame = requestAnimationFrame(turn);
   }
 
-  /** Back to the opening view: centred on the drug, the pocket around it. */
+  /**
+   * Back to the opening view: the drug in the middle, its pocket around it, framed anew for the
+   * view's current shape.
+   */
   reset(): void {
-    this.viewer.setView(this.home);
+    const aspect = this.holder.clientWidth / Math.max(1, this.holder.clientHeight) || 1;
+    const { centre, distance } = frame(this.drugPoints, this.surroundings, this.turn, aspect);
+    this.viewer.setPerceivedDistance(distance);
+    const depth = (this.viewer.getView() as number[])[3];
+    const { x, y, z, w } = this.turn;
+    this.viewer.setView([-centre.x, -centre.y, -centre.z, depth, x, y, z, w]);
     this.viewer.render();
   }
 

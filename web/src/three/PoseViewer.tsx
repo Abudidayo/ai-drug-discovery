@@ -53,8 +53,9 @@ function Toggle({ pressed, onToggle, swatch, children }: ToggleProps) {
 /**
  * A docking result in 3D (3Dmol.js): the protein's backbone, the pocket and the drug's pose. Four
  * controls sit above the view, never over it: the pocket surface, the drug's crystal position,
- * spin and reset. Spin starts on unless the reader asks for reduced motion. The viewer and its
- * WebGL context are released on unmount.
+ * spin and reset; the key shares their row, so the view takes the rest of the height. Spin starts
+ * on unless the reader asks for reduced motion. The viewer and its WebGL context are released on
+ * unmount.
  */
 export function PoseViewer({ files, label }: PoseViewerProps) {
   const [receptor, poses, crystal] = useQueries({
@@ -186,27 +187,21 @@ export function PoseViewer({ files, label }: PoseViewerProps) {
         >
           {copy.pose.controls.reset}
         </button>
+        <ul className={styles.legend}>
+          <li>
+            <span className={styles.swatch} data-key="protein" aria-hidden="true" />
+            {copy.pose.legend.protein}
+          </li>
+          <li>
+            <span className={styles.swatch} data-key="drug" aria-hidden="true" />
+            {copy.pose.legend.drug}
+          </li>
+        </ul>
       </div>
       <div className={styles.stage}>
         <div ref={hostRef} className={styles.plate} role="img" aria-label={label} />
         {note !== null && <p className={styles.note}>{note}</p>}
       </div>
-      <ul className={styles.legend}>
-        <li>
-          <span className={styles.swatch} data-key="protein" aria-hidden="true" />
-          {copy.pose.legend.protein}
-        </li>
-        <li>
-          <span className={styles.swatch} data-key="drug" aria-hidden="true" />
-          {copy.pose.legend.drug}
-        </li>
-        {overlay && (
-          <li>
-            <span className={styles.swatch} data-key="overlay" aria-hidden="true" />
-            {copy.pose.controls.overlay}
-          </li>
-        )}
-      </ul>
     </div>
   );
 }

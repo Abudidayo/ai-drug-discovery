@@ -1,5 +1,7 @@
-/* The drug's name in heading type, with a dashed rule and a chevron that say it can change. */
+/* The drug's name in heading type, with a dashed rule and a chevron that say it can change. As
+   wide as the chosen name where the browser can size it so, not as the longest option. */
 .picker {
+  field-sizing: content;
   max-width: 100%;
   padding: 0 22px 2px 0;
   border: 0;

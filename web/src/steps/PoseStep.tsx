@@ -29,8 +29,8 @@ const REDOCK_AXIS = { min: 0, max: 3, ticks: [0, 1, 2, 3] };
 
 /**
  * Step 7: an optional binding pose (plan.md §7). The pose takes the stage, with its drug picker
- * and structure line; beside it, how far to trust it (the docking score, the redock check and the
- * caveat), and the drugs that can't be docked yet, each reason said once.
+ * and structure line; beside it, in one column, how far to trust it (the docking score, the
+ * redock check and the caveat), then the drugs that can't be docked yet, each reason said once.
  */
 export function PoseStep({ experiment }: { experiment: Experiment }) {
   const structures = useStructures();
@@ -60,32 +60,34 @@ export function PoseStep({ experiment }: { experiment: Experiment }) {
   const choices = dockingChoices(experiment.candidates, structures.data);
   const chosenId = picked ?? defaultDockingChoice(choices);
   const chosen = choices.supported.find(({ candidate }) => candidate.candidate_id === chosenId);
+  if (chosen === undefined) {
+    // Nothing to draw: the reasons take the main area instead of sitting beside an empty one.
+    return (
+      <Panel area="pose" title={copy.pose.unsupportedTitle}>
+        <FigureNote>{copy.pose.noneSupported}</FigureNote>
+        <UnsupportedList groups={choices.unsupported} />
+      </Panel>
+    );
+  }
   return (
-    <>
-      {chosen === undefined ? (
-        // Nothing to draw: the reasons take the main area instead of sitting beside an empty one.
-        <UnsupportedPanel groups={choices.unsupported} area="pose" note={copy.pose.noneSupported} />
-      ) : (
-        <PairView
-          key={chosen.candidate.candidate_id}
-          experiment={experiment}
-          candidate={chosen.candidate}
-          structure={chosen.structure}
-          picker={
-            <DrugPicker
-              label={copy.pose.pick}
-              value={chosen.candidate.candidate_id}
-              options={choices.supported.map(({ candidate }) => ({
-                id: candidate.candidate_id,
-                name: drugName(candidate.name),
-              }))}
-              onChange={setPicked}
-            />
-          }
+    <PairView
+      key={chosen.candidate.candidate_id}
+      experiment={experiment}
+      candidate={chosen.candidate}
+      structure={chosen.structure}
+      unsupported={choices.unsupported}
+      picker={
+        <DrugPicker
+          label={copy.pose.pick}
+          value={chosen.candidate.candidate_id}
+          options={choices.supported.map(({ candidate }) => ({
+            id: candidate.candidate_id,
+            name: drugName(candidate.name),
+          }))}
+          onChange={setPicked}
         />
-      )}
-      {chosen !== undefined && <UnsupportedPanel groups={choices.unsupported} />}
-    </>
+      }
+    />
   );
 }
 
@@ -93,11 +95,13 @@ interface PairViewProps {
   experiment: Experiment;
   candidate: Candidate;
   structure: Structure;
+  /** The drugs with no pose to offer, said below the numbers. */
+  unsupported: DockingChoices["unsupported"];
   picker: ReactNode;
 }
 
 /** One drug in one structure: its pose, or the way to one, and the numbers that go with it. */
-function PairView({ experiment, candidate, structure, picker }: PairViewProps) {
+function PairView({ experiment, candidate, structure, unsupported, picker }: PairViewProps) {
   const request = useRequestDock(experiment.id);
   const job = jobFor(experiment.dock_jobs, candidate.candidate_id, structure.id);
   const unavailable = request.error instanceof ApiError && request.error.unreachable;
@@ -173,7 +177,7 @@ function PairView({ experiment, candidate, structure, picker }: PairViewProps) {
       >
         {body}
       </Panel>
-      <ScoresPanel structure={structure} result={result} />
+      <ScoresPanel structure={structure} result={result} unsupported={unsupported} />
     </>
   );
 }
@@ -257,8 +261,17 @@ function Axis({ min, max, ticks, value, reference, format }: AxisProps) {
   );
 }
 
-/** The docking score and the redock check, each with what it means, then the caveat. */
-function ScoresPanel({ structure, result }: { structure: Structure; result: DockJob | undefined }) {
+interface ScoresPanelProps {
+  structure: Structure;
+  result: DockJob | undefined;
+  unsupported: DockingChoices["unsupported"];
+}
+
+/**
+ * The docking score and the redock check, each with what it means, then the caveat; below them,
+ * the drugs that can't be docked. One column that scrolls as a whole when the window is short.
+ */
+function ScoresPanel({ structure, result, unsupported }: ScoresPanelProps) {
   const noteId = useId();
   const score = result === undefined ? null : bestScore(result);
   const { control } = structure;
@@ -271,95 +284,92 @@ function ScoresPanel({ structure, result }: { structure: Structure; result: Dock
   const describedBy = fixture === null ? undefined : noteId;
 
   return (
-    <Panel area="scores" label={copy.pose.scoresLabel}>
-      <div className={styles.scores}>
-        {result !== undefined && score !== null && (
-          <section className={styles.measure} aria-labelledby={`${noteId}-score`}>
+    <Panel area="scores">
+      <div className={styles.column}>
+        <section className={styles.scores} aria-label={copy.pose.scoresLabel}>
+          {result !== undefined && score !== null && (
+            <section className={styles.measure} aria-labelledby={`${noteId}-score`}>
+              <div className={styles.measureHead}>
+                <h3 id={`${noteId}-score`} className={styles.label}>
+                  {copy.pose.score}
+                </h3>
+                <p className={styles.reading}>
+                  <span
+                    className={styles.value}
+                    data-fixture={result.fixture || undefined}
+                    aria-describedby={result.fixture ? describedBy : undefined}
+                  >
+                    {signed(score)}
+                  </span>
+                </p>
+              </div>
+              <Axis {...SCORE_AXIS} value={score} format={(tick) => signed(tick, 0)} />
+              <p className={styles.help}>{copy.pose.scoreHelp}</p>
+            </section>
+          )}
+          <section className={styles.measure} aria-labelledby={`${noteId}-redock`}>
             <div className={styles.measureHead}>
-              <h3 id={`${noteId}-score`} className={styles.label}>
-                {copy.pose.score}
+              <h3 id={`${noteId}-redock`} className={styles.label}>
+                {copy.pose.redock}
               </h3>
-              <p className={styles.reading}>
-                <span
-                  className={styles.value}
-                  data-fixture={result.fixture || undefined}
-                  aria-describedby={result.fixture ? describedBy : undefined}
-                >
-                  {signed(score)}
-                </span>
-              </p>
+              {control.rmsd === null ? (
+                <p className={styles.missing}>{copy.pose.redockStatus.not_measured}</p>
+              ) : (
+                <p className={styles.reading}>
+                  <span className={styles.status}>{copy.pose.redockStatus[control.status]}</span>
+                  <span
+                    className={styles.value}
+                    data-fixture={control.fixture || undefined}
+                    aria-describedby={control.fixture ? describedBy : undefined}
+                  >
+                    {control.rmsd.toFixed(2)}
+                    <small> Å</small>
+                  </span>
+                </p>
+              )}
             </div>
-            <Axis {...SCORE_AXIS} value={score} format={(tick) => signed(tick, 0)} />
-            <p className={styles.help}>{copy.pose.scoreHelp}</p>
+            {control.rmsd !== null && (
+              <Axis
+                {...REDOCK_AXIS}
+                value={control.rmsd}
+                reference={control.success_threshold}
+                format={(tick) => (tick === 0 ? "0" : `${String(tick)} Å`)}
+              />
+            )}
+            <p className={styles.help}>{copy.pose.redockHelp(control.success_threshold)}</p>
+          </section>
+          {fixture !== null && (
+            <p id={noteId} className={styles.fixture}>
+              {fixture}
+            </p>
+          )}
+          <p className={styles.caveat}>{copy.pose.caveat}</p>
+        </section>
+        {unsupported.length > 0 && (
+          <section className={styles.measure} aria-labelledby={`${noteId}-unsupported`}>
+            <h3 id={`${noteId}-unsupported`} className={styles.label}>
+              {copy.pose.unsupportedTitle}
+            </h3>
+            <UnsupportedList groups={unsupported} />
           </section>
         )}
-        <section className={styles.measure} aria-labelledby={`${noteId}-redock`}>
-          <div className={styles.measureHead}>
-            <h3 id={`${noteId}-redock`} className={styles.label}>
-              {copy.pose.redock}
-            </h3>
-            {control.rmsd === null ? (
-              <p className={styles.missing}>{copy.pose.redockStatus.not_measured}</p>
-            ) : (
-              <p className={styles.reading}>
-                <span className={styles.status}>{copy.pose.redockStatus[control.status]}</span>
-                <span
-                  className={styles.value}
-                  data-fixture={control.fixture || undefined}
-                  aria-describedby={control.fixture ? describedBy : undefined}
-                >
-                  {control.rmsd.toFixed(2)}
-                  <small> Å</small>
-                </span>
-              </p>
-            )}
-          </div>
-          {control.rmsd !== null && (
-            <Axis
-              {...REDOCK_AXIS}
-              value={control.rmsd}
-              reference={control.success_threshold}
-              format={(tick) => (tick === 0 ? "0" : `${String(tick)} Å`)}
-            />
-          )}
-          <p className={styles.help}>{copy.pose.redockHelp(control.success_threshold)}</p>
-        </section>
-        {fixture !== null && (
-          <p id={noteId} className={styles.fixture}>
-            {fixture}
-          </p>
-        )}
-        <p className={styles.caveat}>{copy.pose.caveat}</p>
       </div>
     </Panel>
   );
 }
 
 /** The drugs with no pose to offer, one line per reason. */
-function UnsupportedPanel({
-  groups,
-  area = "unsupported",
-  note,
-}: {
-  groups: DockingChoices["unsupported"];
-  area?: "unsupported" | "pose";
-  /** Said first when no drug at all can be docked. */
-  note?: string;
-}) {
-  if (groups.length === 0 && note === undefined) return null;
+function UnsupportedList({ groups }: { groups: DockingChoices["unsupported"] }) {
   return (
-    <Panel area={area} title={copy.pose.unsupportedTitle}>
-      {note !== undefined && <FigureNote>{note}</FigureNote>}
-      <ul className={styles.unsupported}>
-        {groups.map(({ reason, candidates }) => (
-          <li key={reason}>
-            {copy.pose.unsupported[reason](
-              listOf(candidates.map((candidate) => drugName(candidate.name))),
-              candidates.length,
-            )}
-          </li>
-        ))}
-      </ul>
-    </Panel>
+    <ul className={styles.unsupported}>
+      {groups.map(({ reason, candidates }) => (
+        <li key={reason}>
+          {copy.pose.unsupported[reason](
+            listOf(candidates.map((candidate) => drugName(candidate.name))),
+            candidates.length,
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }

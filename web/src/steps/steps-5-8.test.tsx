@@ -500,13 +500,10 @@ describe("Step 7, Binding pose", () => {
     await waitFor(() => {
       expect(view).toHaveAttribute("data-surface", "on");
     });
-    // The crystal position is keyed only while its overlay is drawn, with the toggle's label.
-    const overlayKey = () =>
-      screen.queryAllByText(copy.pose.controls.overlay).filter((el) => el.closest("li"));
-    expect(overlayKey()).toHaveLength(0);
+    // The crystal position's toggle is its own key: its label is said once, drawn or not.
     await user.click(control(copy.pose.controls.overlay));
     expect(control(copy.pose.controls.overlay)).toHaveAttribute("aria-pressed", "true");
-    expect(overlayKey()).toHaveLength(1);
+    expect(screen.getAllByText(copy.pose.controls.overlay)).toHaveLength(1);
     await user.click(control(copy.pose.controls.spin));
     expect(control(copy.pose.controls.spin)).toHaveAttribute("aria-pressed", "false");
     await user.click(control(copy.pose.controls.reset));

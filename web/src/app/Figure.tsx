@@ -34,7 +34,6 @@ export type PanelArea =
   | "reading"
   | "pose"
   | "scores"
-  | "unsupported"
   | "results"
   | "tested"
   | "main";

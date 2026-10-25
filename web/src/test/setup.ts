@@ -73,15 +73,16 @@ vi.mock("3dmol", () => {
     setStyle = noop;
     setViewStyle = noop;
     setView = noop;
+    setCameraParameters = noop;
+    setPerceivedDistance = noop;
     zoomTo = noop;
-    zoom = noop;
     spin = noop;
-    rotate = noop;
     render = noop;
     clear = noop;
   }
   return {
     createViewer: (element: HTMLElement) => new FakeViewer(element),
+    Parsers: { sdf: () => [[{ x: 0, y: 0, z: 0 }]] },
     SurfaceType: { VDW: 1 },
   };
 });

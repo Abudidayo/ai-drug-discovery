@@ -13,14 +13,14 @@
 }
 
 /* Where the 3D view sits, or will: ruled above and below, in the same box as the viewer's
-   (below its row of controls and above its key). */
+   (below its row of controls and key). */
 .stage {
   display: flex;
   flex: 1;
   align-items: center;
   justify-content: center;
   min-height: 0;
-  margin: 44px 0 34px;
+  margin-top: 44px;
   border-top: 1px solid var(--color-rule);
   border-bottom: 1px solid var(--color-rule);
 }
@@ -118,6 +118,26 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* The column beside the pose: how far to trust it, then what can't be docked. It scrolls as one
+   when the window is too short for it, and its foot fades so a cut line reads as "more below";
+   scrolled to the end, only its padding sits under the fade. */
+.column {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-32);
+  min-height: 0;
+  margin-right: calc(-1 * var(--space-8));
+  padding-right: var(--space-8);
+  padding-bottom: var(--space-24);
+  overflow-y: auto;
+  mask-image: linear-gradient(
+    to bottom,
+    var(--color-ink) calc(100% - var(--space-24)),
+    transparent
+  );
 }
 
 /* How far to trust the pose: each number with its axis and its meaning, then the caveat. */
@@ -284,6 +304,10 @@
 }
 
 @media (max-height: 820px) and (min-width: 721px) {
+  .column {
+    gap: var(--space-24);
+  }
+
   .scores {
     gap: var(--space-16);
   }

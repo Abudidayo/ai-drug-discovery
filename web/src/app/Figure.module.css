@@ -36,13 +36,11 @@
   grid-template-areas: "ballot reading";
 }
 
-/* The binding pose takes the stage; what it means and what is missing sit beside it. */
+/* The binding pose takes the stage; what it means and what is missing sit beside it, in a column
+   only as wide as its reading needs. */
 .grid[data-layout="pose"] {
-  grid-template-rows: auto minmax(0, 1fr);
-  grid-template-columns: minmax(0, 7.4fr) minmax(0, 4.6fr);
-  grid-template-areas:
-    "pose scores"
-    "pose unsupported";
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 32%, 480px);
+  grid-template-areas: "pose scores";
 }
 
 /* No protein network for this Experiment: the step's own panels take its cell. */
@@ -128,10 +126,6 @@
 
 .panel[data-area="scores"] {
   grid-area: scores;
-}
-
-.panel[data-area="unsupported"] {
-  grid-area: unsupported;
 }
 
 .panel[data-area="results"] {
@@ -280,15 +274,16 @@
   }
 
   .grid[data-layout="pose"] {
-    grid-template-areas: "pose" "scores" "unsupported";
+    grid-template-areas: "pose" "scores";
   }
 
   .grid[data-layout="evaluation"] {
     grid-template-areas: "results" "tested";
   }
 
+  /* Tall enough, under its wrapped controls, for a view about as tall as it is wide. */
   .panel[data-area="pose"] {
-    min-height: 480px;
+    min-height: 600px;
   }
 
   .panel[data-area="net"] {
