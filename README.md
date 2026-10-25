@@ -68,7 +68,7 @@ To check the method works, we hide what we already know. For each disease, we ta
 
 ### 1. Network shortlist (14 diseases, 293 known drug–disease pairs)
 
-For each disease, each method picks 15 drugs out of 1,956. We count how many of the drugs already approved for that disease made the 15. If you picked 15 drugs at random, each approved drug would have a 15 in 1,956 chance of being picked, so you'd catch only about **0.8%** of them. That's the bar to beat.
+For each disease, each method picks 15 drugs out of 1,956. We count how many of the drugs already approved for that disease made the 15. Across the 14 diseases there are 293 drug–disease pairs where the drug is already approved for that disease. Choosing 15 drugs at random would include only about **2** of those 293. Our two ranking methods included 11 and 15.
 
 Higher is better for every number below.
 
@@ -79,7 +79,7 @@ Higher is better for every number below.
 | Macro Recall@15 | The share found for each disease, averaged over the 14 diseases, so every disease counts equally | 5.05% | **6.89%** |
 | Diseases with at least one hit | Diseases where at least one approved drug made the 15 | 8 / 14 | 8 / 14 |
 
-**What this shows:** random walk caught a few more approved drugs (15 vs 11), which is about 6–9 times better than picking 15 at random (0.8%). But it won on only 4 diseases, lost on 2 and tied on 8. The 95% confidence interval for the gain runs from −0.61 to +4.40 points: since it includes zero, the gain could be luck. We made random walk the default as a product choice, not a proven improvement.
+**What this shows:** both methods find far more approved drugs than random choice (about 2), and random walk found a few more than the z-score (15 vs 11). But it won on only 4 diseases, lost on 2 and tied on 8. The 95% confidence interval for the gain runs from −0.61 to +4.40 points: since it includes zero, the gain could be luck. We made random walk the default as a product choice, not a proven improvement.
 
 ### 2. Model jury (14 new diseases, drug names hidden, pre-registered)
 
