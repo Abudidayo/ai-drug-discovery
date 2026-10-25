@@ -10,7 +10,7 @@ import pytest
 
 from pipeline.drugs import (
     APPROVAL_SOURCES, Cache, CHEMBL_URL, OT_RELEASE, approval_rows,
-    build_universe, parent_groups, run,
+    build_universe, load_approval_overrides, parent_groups, run,
 )
 
 
@@ -67,6 +67,7 @@ def test_regulator_universe_and_contract(recorded):
             assert all(isinstance(value, str) and value for value in item.values())
     assert result["coverage"] == {
         "drugs": 6, "drugs_with_targets": 5, "unmapped_items": 5,
+        "approval_overrides": 0, "unmapped_approval_overrides": [],
         "unmapped_by_reason": {"missing_uniprot_mapping": 1,
                                "non_protein_target": 1, "non_single_protein_target": 3},
     }
@@ -363,3 +364,90 @@ def test_covid_approval_gap_is_in_pinned_source_records():
     # Regulator reports on other indications or an unmapped source phrase cannot
     # supply a COVID-19 approval through an ID join.
     assert approval_rows(sample['indications'], sample['reports']) == {}
+
+
+def test_verified_overrides_add_only_missing_indications(recorded):
+    row = load_approval_overrides()[0]
+    before = by_id(build_universe(**recorded))[row['drug_id']]
+    result = build_universe(**recorded, overrides=[row])
+    after = by_id(result)[row['drug_id']]
+    assert after['approval']['disease_ids'] == sorted(
+        before['approval']['disease_ids'] + [row['disease_id']])
+    assert after['approval']['overrides'] == [{'disease_id': row['disease_id'], 'url': row['url']}]
+    assert after['targets'] == before['targets']
+    assert result['coverage']['approval_overrides'] == 1
+    assert result['coverage']['unmapped_approval_overrides'] == []
+    # An OT approval on any included salt remains OT data, not an override.
+    recorded['tables']['clinical_indication'].append({
+        'drugId': row['drug_id'], 'diseaseId': row['disease_id'],
+        'maxClinicalStage': 'APPROVAL', 'clinicalReportIds': ['override-regression'],
+    })
+    recorded['tables']['clinical_report'].append({'id': 'override-regression', 'source': 'FDA'})
+    result = build_universe(**recorded, overrides=[row])
+    assert 'overrides' not in by_id(result)[row['drug_id']]['approval']
+    assert result['coverage']['approval_overrides'] == 0
+
+
+def test_override_only_drug_keeps_its_targets(recorded):
+    row = load_approval_overrides()[0]
+    before = by_id(build_universe(**recorded))[row['drug_id']]
+    recorded['tables']['clinical_indication'] = [r for r in recorded['tables']['clinical_indication']
+                                                if r['drugId'] != row['drug_id']]
+    assert row['drug_id'] not in by_id(build_universe(**recorded))
+    drug = by_id(build_universe(**recorded, overrides=[row]))[row['drug_id']]
+    assert drug['approval'] == {'sources': ['FDA'], 'disease_ids': [row['disease_id']],
+                               'overrides': [{'disease_id': row['disease_id'], 'url': row['url']}]}
+    assert drug['targets'] == before['targets']
+
+
+@pytest.mark.parametrize('mapping,reason', [
+    ('absent', 'missing_parent_mapping'), ('missing', 'missing_parent_mapping'),
+    ('ambiguous', 'ambiguous_parent'), ('salt', 'ambiguous_parent'),
+])
+def test_override_parent_is_never_guessed(recorded, mapping, reason):
+    row = load_approval_overrides()[0]
+    if mapping == 'absent':
+        row['drug_id'] = 'CHEMBL999999999'
+    elif mapping == 'salt':
+        row['drug_id'] = 'CHEMBL1795071'
+    else:
+        molecule = next(r for r in recorded['chembl_molecules']
+                        if r['molecule_chembl_id'] == row['drug_id'])
+        molecule['molecule_hierarchy']['parent_chembl_id'] = (
+            None if mapping == 'missing' else 'CHEMBL1789941')
+    result = build_universe(**recorded, overrides=[row])
+    assert result['coverage']['approval_overrides'] == 0
+    assert result['coverage']['unmapped_approval_overrides'] == [{
+        'drug_id': row['drug_id'], 'disease_id': row['disease_id'], 'reason': reason}]
+    assert result['coverage']['unmapped_by_reason'][reason] >= 1
+    assert result['coverage']['unmapped_items'] == sum(result['coverage']['unmapped_by_reason'].values())
+    assert all('overrides' not in d['approval'] for d in result['drugs'])
+
+
+def test_curated_overrides_match_recorded_fda_records():
+    sample = json.loads((DATA.parent / 'fda_covid_approvals.json').read_text())
+    assert load_approval_overrides() == sample['records']
+    assert sample['provenance']['checked_on'] == '2026-10-25'
+
+
+@pytest.mark.parametrize('change', [
+    {'regulator': 'ATC'}, {'drug_id': 'baricitinib'}, {'disease_id': 'MONDO:0100096'},
+    {'url': 'https://www.accessdata.fda.gov.evil.example/label.pdf'},
+    {'url': 'http://www.accessdata.fda.gov/label.pdf'},
+    {'approval_url': 'https://example.com/approval'}, {'label_text': ''},
+    {'approval_date': '2022-05-11', 'checked_on': '2022-05-10'},
+    {'checked_on': '9999-01-01'}, {'application_number': None},
+])
+def test_invalid_override_provenance_fails_closed(tmp_path, change):
+    path = tmp_path / 'overrides.json'
+    path.write_text(json.dumps([{**load_approval_overrides()[0], **change}]))
+    with pytest.raises(ValueError):
+        load_approval_overrides(path)
+
+
+def test_duplicate_override_rejected(tmp_path):
+    path = tmp_path / 'overrides.json'
+    row = load_approval_overrides()[0]
+    path.write_text(json.dumps([row, row]))
+    with pytest.raises(ValueError, match='Duplicate'):
+        load_approval_overrides(path)
