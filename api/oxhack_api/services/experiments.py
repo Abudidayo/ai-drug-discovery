@@ -216,7 +216,7 @@ class ExperimentService:
                 started_at=None,
                 finished_at=None,
             )
-            reused = self.repo.find_reusable_dock_job(inputs.cache_key)
+            reused = self.repo.find_reusable_dock_job(inputs.cache_key, job.fixture)
             if reused is None:
                 computing = [
                     j
@@ -234,7 +234,7 @@ class ExperimentService:
                     return job
                 except DuplicateComputation:
                     # Another request started the same computation since we looked.
-                    reused = self.repo.find_reusable_dock_job(inputs.cache_key)
+                    reused = self.repo.find_reusable_dock_job(inputs.cache_key, job.fixture)
                     if reused is None:
                         raise
             # Identical inputs: reuse the result (or the live run) instead of docking again.

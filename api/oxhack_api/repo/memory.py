@@ -159,7 +159,9 @@ class MemoryRepo:
                 raise AlreadyExists(f"docking job {job.id}")
             row = _DockRow(job.model_copy(deep=True), inputs)
             if row.computes and any(
-                other.computes and other.inputs.cache_key == inputs.cache_key
+                other.computes
+                and other.inputs.cache_key == inputs.cache_key
+                and other.job.fixture == job.fixture
                 for other in self._dock.values()
             ):
                 raise DuplicateComputation(f"a live docking job computes {inputs.cache_key}")
@@ -179,10 +181,14 @@ class MemoryRepo:
         with self._lock:
             self._dock[job.id].job = job.model_copy(deep=True)
 
-    def find_reusable_dock_job(self, cache_key: str) -> DockJob | None:
+    def find_reusable_dock_job(self, cache_key: str, fixture: bool) -> DockJob | None:
         with self._lock:
             for row in self._dock.values():
-                if row.inputs.cache_key == cache_key and row.computes:
+                if (
+                    row.inputs.cache_key == cache_key
+                    and row.job.fixture == fixture
+                    and row.computes
+                ):
                     return row.job.model_copy(deep=True)
             return None
 

@@ -26,6 +26,7 @@ from pydantic import ValidationError
 from oxhack_api.repo import Repo
 from oxhack_api.schemas import DockJob, Structure
 from oxhack_api.services.docking import (
+    DockInputs,
     FixtureDocking,
     unsupported_reason,
 )
@@ -233,9 +234,9 @@ def test_a_racing_duplicate_reuses_the_job_that_won(
     lookups: list[str] = []
     find = repo.find_reusable_dock_job
 
-    def stale_first_lookup(cache_key: str) -> DockJob | None:
+    def stale_first_lookup(cache_key: str, fixture: bool) -> DockJob | None:
         lookups.append(cache_key)
-        return None if len(lookups) == 1 else find(cache_key)
+        return None if len(lookups) == 1 else find(cache_key, fixture)
 
     monkeypatch.setattr(repo, "find_reusable_dock_job", stale_first_lookup)
     response = dock(client, second_experiment, RUXOLITINIB, "6WTN_A")
@@ -294,3 +295,30 @@ def test_docking_folders_come_from_the_dev_container_names(
     assert settings.docking_venv == Path("/home/vscode/.venvs/docking")
     assert settings.structures_dir == REPO_ROOT / "worker" / "structures"
     assert Settings(results_dir=Path("data/x")).results_dir == REPO_ROOT / "data" / "x"
+
+
+class LiveLikeDocking(FixtureDocking):
+    """Stands in for Vina: real results, so it seeds no made-up ones."""
+
+    fixture = False
+
+    def seed_jobs(self) -> list[tuple[DockJob, DockInputs]]:
+        return []
+
+
+def test_a_live_server_never_reuses_a_made_up_result(
+    make_client: Callable[..., TestClient], runner: SteppedRunner
+) -> None:
+    """A database once used in fixture mode keeps its made-up results. A live server
+    with the same inputs must compute its own: the made-up job's files live only in the
+    fixtures, so following it served a pose that couldn't be loaded."""
+    make_client()  # Fixture mode saves its precomputed baricitinib-in-6WTO result.
+    live = make_client(docking=LiveLikeDocking(FIXTURES_DIR))
+    experiment_id = ready_experiment(live, runner)["id"]
+    response = dock(live, experiment_id, BARICITINIB, "6WTO_A")
+    assert response.status_code == 202, response.text
+    job = response.json()
+    assert job["cached_from"] is None
+    assert job["fixture"] is False
+    assert job["status"] == "queued"
+    assert len(runner.jobs) == 1, "the live server docks the pair itself"

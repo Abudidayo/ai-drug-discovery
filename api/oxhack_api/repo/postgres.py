@@ -51,7 +51,7 @@ from ..schemas import (
 )
 from .base import AlreadyExists, DockInputs, DuplicateComputation
 
-SCHEMA_VERSION = "0007"
+SCHEMA_VERSION = "0008"
 """The newest file in `db/migrations/` this code needs applied."""
 
 Conn = Connection[DictRow]
@@ -670,14 +670,15 @@ class PostgresRepo:
                 ),
             )
 
-    def find_reusable_dock_job(self, cache_key: str) -> DockJob | None:
+    def find_reusable_dock_job(self, cache_key: str, fixture: bool) -> DockJob | None:
         with self.connection() as conn:
             row = conn.execute(
                 f"""
                 select {_DOCK_COLUMNS} from dock_jobs
-                where cache_key = %s and cached_from is null and status <> 'failed'
+                where cache_key = %s and fixture = %s
+                  and cached_from is null and status <> 'failed'
                 """,
-                (cache_key,),
+                (cache_key, fixture),
             ).fetchone()
         return None if row is None else DockJob.model_validate(row)
 

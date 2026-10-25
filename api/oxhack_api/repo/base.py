@@ -115,8 +115,9 @@ class Repo(Protocol):
 
     def add_dock_job(self, job: DockJob, inputs: DockInputs) -> None:
         """Insert a job. Raise DuplicateComputation when it would compute a cache key
-        that a live job (queued, running or done, not itself reusing one) already
-        computes; the caller then reuses that job."""
+        that a live job (queued, running or done, not itself reusing one) of the same
+        kind (made-up fixture result or real) already computes; the caller then reuses
+        that job."""
         ...
 
     def get_dock_job(self, job_id: UUID) -> DockJob | None: ...
@@ -130,8 +131,10 @@ class Repo(Protocol):
         """Save the job's progress and results (status, scores, files, error, times)."""
         ...
 
-    def find_reusable_dock_job(self, cache_key: str) -> DockJob | None:
-        """The job that computes this cache key itself and has not failed, if any."""
+    def find_reusable_dock_job(self, cache_key: str, fixture: bool) -> DockJob | None:
+        """The job that computes this cache key itself and has not failed, if any.
+        `fixture` keeps made-up and real results apart: a database once used in fixture
+        mode keeps its made-up results, and a live server must never serve them."""
         ...
 
     def list_dock_jobs_cached_from(self, job_id: UUID) -> list[DockJob]:
