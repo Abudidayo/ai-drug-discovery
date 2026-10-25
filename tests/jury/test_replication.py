@@ -61,7 +61,12 @@ def test_same_chance_tests_reproduce_original_eleven_panel_analysis():
     for m,v in methods.items():
         for key in ['hits','hits_at_5','mrr','hits_p_one_sided','mrr_p_monte_carlo',
                     'hits_p_one_sided_holm','mrr_p_monte_carlo_holm']:
-            assert v[key]==old['methods'][m][key]
+            expected = old['methods'][m][key]
+            if isinstance(expected, float):
+                # Allow only binary64 rounding differences across platform libm implementations.
+                assert v[key] == pytest.approx(expected, rel=0, abs=1e-15)
+            else:
+                assert v[key] == expected
 
 
 def test_fourteen_failed_panels_are_all_misses_with_joint_holm():
@@ -144,4 +149,13 @@ def test_all_published_statistics_recompute(study, group):
     root = Path(__file__).resolve().parents[2]
     published = json.loads((root / 'results' / study / 'results.json').read_text())
     methods = (published[group] if group else published)['methods']
-    assert pilot.replication_statistics({m: v['per_panel'] for m, v in methods.items()}) == methods
+    actual = pilot.replication_statistics({m: v['per_panel'] for m, v in methods.items()})
+    assert actual.keys() == methods.keys()
+    for method, expected in methods.items():
+        assert actual[method].keys() == expected.keys()
+        for key, value in expected.items():
+            if isinstance(value, float):
+                # Published numbers stay fixed; tolerate only binary64 rounding (absolute 1e-15).
+                assert actual[method][key] == pytest.approx(value, rel=0, abs=1e-15)
+            else:
+                assert actual[method][key] == value

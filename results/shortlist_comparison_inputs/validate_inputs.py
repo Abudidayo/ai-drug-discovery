@@ -19,7 +19,7 @@ if args.ranking_venv is None:
     parser.error("pass --ranking-venv or set RANKING_VENV")
 ranking_venv = args.ranking_venv.resolve()
 ZAID = ranking_venv.parent.parent
-if not (ranking_venv / "bin/python").is_file() or not (ZAID / "ranking/data.py").is_file():
+if not any((ranking_venv / name).is_file() for name in ("bin/python", "Scripts/python.exe")) or not (ZAID / "ranking/data.py").is_file():
     parser.error("--ranking-venv must point to Zaid's ranking/.venv directory")
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(ZAID))

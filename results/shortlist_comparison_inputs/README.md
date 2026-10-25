@@ -4,6 +4,7 @@
 Paths start at the checkout root. `data/` inputs come from the `stream-a-data-v1` release or a local build; validation checks the historical `data/a6/stage1` artifacts, while comparison uses Zaid's `data/ranking/string-12.5-c700-e400` layout. Zaid must use his own pre-label seal at `data/evaluation/shortlist-comparison-v1/implementation.json`; no seal is supplied or verified here. This retrospective comparison is descriptive.
 
 From Zaid's repo root, after the data and his original seal are in place:
+On Windows, validate with `ranking\.venv\Scripts\python.exe -B results/shortlist_comparison_inputs/validate_inputs.py --ranking-venv ranking/.venv`.
 ```sh
 PYTHONDONTWRITEBYTECODE=1 ranking/.venv/bin/python -B results/shortlist_comparison_inputs/validate_inputs.py --ranking-venv ranking/.venv
 PYTHONDONTWRITEBYTECODE=1 ranking/.venv/bin/python -B -m ranking.shortlist_comparison compare \
