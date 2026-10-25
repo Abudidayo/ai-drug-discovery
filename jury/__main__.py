@@ -25,7 +25,7 @@ def main():
             if not os.environ.get("SNOWFLAKE_MODELS"):
                 parser.error("Set SNOWFLAKE_MODELS to a JSON array of three verified model IDs")
             config["models"] = json.loads(os.environ["SNOWFLAKE_MODELS"])
-            client = CortexModel(timeout=args.timeout)
+            client = CortexModel(timeout=args.timeout, reasoning_effort=config.get("reasoning_effort", {}))
         result = run_jury(packet, config, mock_model if args.mock else client)
         args.out.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
     except (ValueError, KeyError, OSError) as exc:

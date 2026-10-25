@@ -9,7 +9,12 @@
     "prompt_version": "jury-v1",
     "temperature": 0,
     "max_attempts": 2,
-    "shuffle_seed": 7
+    "shuffle_seed": 7,
+    "reasoning_effort": {
+      "claude-sonnet-5": null,
+      "openai-gpt-5.4": null,
+      "glm-5.3": null
+    }
   },
   "jurors": [
     {
@@ -123,7 +128,14 @@
         "numbers_match": true,
         "errors": []
       },
-      "raw_output": null
+      "raw_output": null,
+      "token_usage": [
+        {
+          "attempt": 1,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
     },
     {
       "model": "openai-gpt-5.4",
@@ -236,7 +248,14 @@
         "numbers_match": true,
         "errors": []
       },
-      "raw_output": null
+      "raw_output": null,
+      "token_usage": [
+        {
+          "attempt": 1,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
     },
     {
       "model": "glm-5.3",
@@ -260,7 +279,19 @@
           "Attempt 2: JSON decoding failed because the reply was plain text."
         ]
       },
-      "raw_output": "Example: I cannot return structured reviews."
+      "raw_output": "Example: I cannot return structured reviews.",
+      "token_usage": [
+        {
+          "attempt": 1,
+          "input_tokens": null,
+          "output_tokens": null
+        },
+        {
+          "attempt": 2,
+          "input_tokens": null,
+          "output_tokens": null
+        }
+      ]
     }
   ],
   "consensus": {

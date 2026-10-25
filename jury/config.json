@@ -1,5 +1,6 @@
 {
   "models": ["mock-family-a", "mock-family-b", "mock-family-c"],
+  "reasoning_effort": {},
   "prompt_version": "jury-v3",
   "temperature": 0,
   "max_attempts": 2,

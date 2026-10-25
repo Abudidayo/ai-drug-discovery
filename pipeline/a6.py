@@ -90,7 +90,7 @@ def candidate_payload(network, updates, packet):
     candidates = []
     for update in updates:
         original = by_id[update["candidate_id"]]
-        if original["status"] not in {"scored", "not_scorable"}:
+        if original["status"] not in {"scored", "distance_only", "not_scorable"}:
             raise ValueError("Stream B status is outside the shared fixture contract")
         row = {k: original[k] for k in ("candidate_id", "status", "selected_by", "direct_evidence_rank")}
         row.update({k: update[k] for k in ("name", "targets", "evidence", "warnings", "safety_status", "dockable", "pubchem_cid")})
@@ -197,9 +197,6 @@ def markdown(comparison):
     for j in comparison["jurors"]:
         lines.append(f"- {j['model']}: {j['status']}, {j['attempts']} attempt(s).")
         lines.extend(f"  - {e}" for e in j["validation"]["errors"])
-    for change in comparison.get("source_alias_revalidation", []):
-        if change["recovered"]:
-            lines.append(f"- {change['model']} became valid after source-aware offline replay of its final reply: Open Targets 26.09 Target symbol aliases and/or the assigned mechanism's literal E3 ligase phrase. The default validator confused protein names with measurements or evidence IDs. Original validation and raw replies are retained; no extra model call, ballot wording or citation-array edit was used.")
     lines += ["", "| Candidate | Network rank | z | Direct rank | " + " | ".join(models) + " | Borda | Contested |",
               "|---|---:|---:|---:|" + "---|" * len(models) + "---:|---|"]
 
@@ -262,57 +259,6 @@ def audit_rows(runs, *, seed=SEED, per_stratum=5):
     return rows, shortages
 
 
-def revalidate_aliases(packet, result, lexicon):
-    """Replay final invalid replies with source-verified name disambiguation.
-
-    The checker mistakes the source's literal 'E3 ligase' protein phrase for an
-    inline E ID. Disambiguate 'E3 [ubiquitin] ligase' only in an inspection copy,
-    only when an assigned mechanism contains that protein phrase. Restore
-    every original prose field afterward; citation arrays and ballots stay exact.
-    """
-    result = deepcopy(result)
-    aliases = [alias for row in lexicon for alias in row["aliases"]]
-    changes = []
-    candidates = {c["label"]: c for c in packet["candidates"]}
-    evidence = {e["id"]: e for e in packet["evidence"]}
-    for juror in result["jurors"]:
-        if juror["status"] != "invalid" or not juror["raw_output"]:
-            continue
-        raw = juror["raw_output"]
-        original_reviews, disambiguations = {}, []
-        if juror["validation"]["schema"]:
-            ballot, _ = json.JSONDecoder().raw_decode(raw, raw.index("{"))
-            original_reviews = {r["label"]: deepcopy(r) for r in ballot["reviews"]}
-            for review in ballot["reviews"]:
-                candidate = candidates.get(review["label"])
-                if not candidate or not any(
-                    evidence[e]["kind"] == "mechanism"
-                    and re.search(r"\bE3 (?:ubiquitin )?ligase\b", evidence[e]["statement"])
-                    for e in candidate["evidence_ids"]):
-                    continue
-                for field in ("rationale", "objection", "missing_evidence"):
-                    texts = review[field] if isinstance(review[field], list) else [review[field]]
-                    normalized = [re.sub(r"\bE3(?=\s+(?:ubiquitin\s+)?ligase\b)", "protein", text) for text in texts]
-                    if normalized != texts:
-                        disambiguations.append({"label": review["label"], "field": field,
-                                                "source_verified_phrase": "E3 [ubiquitin] ligase"})
-                    review[field] = normalized if isinstance(review[field], list) else normalized[0]
-            raw = json.dumps(ballot)
-        reviews, validation = validate_reply(raw, packet, name_aliases=aliases)
-        changes.append({"model": juror["model"], "original_status": juror["status"],
-                        "original_validation": deepcopy(juror["validation"]),
-                        "replay_validation": validation, "recovered": reviews is not None,
-                        "source_phrase_disambiguations": disambiguations})
-        if reviews is not None:
-            for review in reviews:
-                if review["label"] in original_reviews:
-                    for field in ("rationale", "objection", "missing_evidence"):
-                        review[field] = original_reviews[review["label"]][field]
-            juror.update(status="valid", reviews=reviews, validation=validation, raw_output=None)
-    result["consensus"] = consensus(packet, result["jurors"])
-    return result, changes
-
-
 def prepare(data, output, zaid):
     drugs = read(data / "drug_targets.json")
     for disease_id in DISEASES:
@@ -369,11 +315,12 @@ def live(output):
     if "kimi-k3" in models and effort.get("kimi-k3") != "low":
         raise ValueError("A6 requires Kimi low reasoning effort")
     config = dict(models=models, prompt_version=PROMPT_VERSION, temperature=0,
-                  max_attempts=2, shuffle_seed=SEED)
+                  max_attempts=2, shuffle_seed=SEED,
+                  reasoning_effort={model: effort.get(model) for model in models})
     ledger_path = output / "live_calls.json"
     ledger = read(ledger_path) if ledger_path.exists() else []
     manifest = read(output / "manifest.json")
-    frozen_config = {"jury": config, "reasoning_effort": {m: effort[m] for m in models if m in effort}}
+    frozen_config = {"jury": config}
     config_path = output / "live_config.json"
     if config_path.exists() and read(config_path) != frozen_config:
         raise ValueError("Live configuration differs from the frozen jury")
@@ -431,27 +378,9 @@ def report(data, output):
     for disease_id in DISEASES:
         folder = output / disease_id
         packet, result = read(folder / "evidence_packet.json"), read(folder / "jury_result.json")
-        if any(j["status"] == "invalid" for j in result["jurors"]):
-            import duckdb
-
-            genes = sorted({t["id"] for c in packet["candidates"] for t in c["targets"]})
-            table = PilotSources(data, output / "evidence", offline=True).table("target")
-            records = table.filter(duckdb.ColumnExpression("id").isin(*genes)).select("id", "symbolSynonyms").fetchall()
-            lexicon = [{"target_id": i, "aliases": sorted({v["label"] for v in aliases or []
-                       if re.search(r"[A-Za-z]", v["label"])})} for i, aliases in sorted(records)]
-            write(folder / "source_aliases.json", {"release": "opentargets-26.09", "field": "target.symbolSynonyms",
-                "scope": "exact packet Target IDs; lexical validation metadata only, never model input", "records": lexicon})
-            original = deepcopy(result)
-            result, changes = revalidate_aliases(packet, result, lexicon)
-            if not (folder / "jury_result_default_validation.json").exists():
-                write(folder / "jury_result_default_validation.json", original)
-            write(folder / "alias_revalidation.json", changes)
-            write(folder / "jury_result.json", result)
         network = read(folder / "network.json")
         write(folder / "candidates.json", candidate_payload(network, read(folder / "candidates.json")["candidates"], packet))
         comparison = compare(network, packet, result, read(data / "drug_targets.json"))
-        comparison["source_alias_revalidation"] = (read(folder / "alias_revalidation.json")
-            if (folder / "alias_revalidation.json").exists() else [])
         write(folder / "comparison.json", comparison)
         (folder / "comparison.md").write_text(markdown(comparison))
         runs.append((packet, result))

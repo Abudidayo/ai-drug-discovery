@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from jury.client import consensus, mock_model, validate_reply
+from jury.client import consensus, mock_model
 from pipeline import a6
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -143,49 +143,6 @@ def test_audit_is_seeded_balanced_exact_source_text_and_blank_judgment():
         assert row["the cited statements"] == "\n".join(f"{e}: {items[e]}" for e in row["cited E IDs"].split("; "))
 
 
-def test_source_alias_replay_recovers_names_but_never_new_measurements():
-    _, packet, result, _ = inputs()
-    juror = result["jurors"][0]
-    reviews = [{k: v for k, v in r.items() if k != "candidate_id"} for r in juror["reviews"]]
-    reviews[0]["rationale"] = "VEGFR2 inhibition is documented."
-    raw = json.dumps({"reviews": reviews})
-    assert validate_reply(raw, packet)[0] is None
-    juror.update(status="invalid", reviews=None, raw_output=raw)
-    before = deepcopy(result)
-    lexicon = [{"target_id": "ENSG00000128052", "aliases": ["VEGFR2"]}]
-    recovered, changes = a6.revalidate_aliases(packet, result, lexicon)
-    assert result == before
-    assert recovered["jurors"][0]["status"] == "valid"
-    assert recovered["jurors"][0]["reviews"][0]["rationale"] == reviews[0]["rationale"]
-    assert changes[0]["recovered"]
-    reviews[0]["rationale"] += " Efficacy is 99.123456 percent."
-    result["jurors"][0]["raw_output"] = json.dumps({"reviews": reviews})
-    rejected, changes = a6.revalidate_aliases(packet, result, lexicon)
-    assert rejected["jurors"][0]["status"] == "invalid"
-    assert not changes[0]["recovered"]
-
-
-def test_e3_ligase_phrase_is_disambiguated_only_with_assigned_source_support():
-    _, packet, result, _ = inputs()
-    juror = result["jurors"][0]
-    reviews = [{k: v for k, v in r.items() if k != "candidate_id"} for r in juror["reviews"]]
-    reviews[0]["rationale"] = "A CRL4(CRBN) E3 ligase inhibitor is recorded."
-    raw = json.dumps({"reviews": reviews})
-    _, flags = validate_reply(raw, packet)
-    assert flags["errors"]
-    juror.update(status="invalid", reviews=None, raw_output=raw, validation=flags)
-    assert a6.revalidate_aliases(packet, result, [])[0]["jurors"][0]["status"] == "invalid"
-    next(e for e in packet["evidence"] if e["id"] == "E6")["statement"] = "A CRL4(CRBN) E3 ubiquitin ligase inhibitor is recorded."
-    recovered, changes = a6.revalidate_aliases(packet, result, [])
-    assert recovered["jurors"][0]["status"] == "valid"
-    assert recovered["jurors"][0]["reviews"][0]["rationale"] == reviews[0]["rationale"]
-    assert recovered["jurors"][0]["reviews"][0]["supporting_evidence_ids"] == reviews[0]["supporting_evidence_ids"]
-    assert changes[0]["source_phrase_disambiguations"]
-    reviews[0]["rationale"] += " This also cites E3."
-    result["jurors"][0]["raw_output"] = json.dumps({"reviews": reviews})
-    assert a6.revalidate_aliases(packet, result, [])[0]["jurors"][0]["status"] == "invalid"
-
-
 def test_live_budget_and_no_repeated_calls_on_completed_run(tmp_path, monkeypatch):
     _, packet, _, _ = inputs()
     for d in a6.DISEASES:
@@ -195,7 +152,7 @@ def test_live_budget_and_no_repeated_calls_on_completed_run(tmp_path, monkeypatc
     calls = []
 
     class Client:
-        reasoning_effort = {}
+        reasoning_effort = {"family-c": "low"}
 
         def __call__(self, model, prompt, temperature):
             calls.append(model)
@@ -207,11 +164,29 @@ def test_live_budget_and_no_repeated_calls_on_completed_run(tmp_path, monkeypatc
             pass
 
     monkeypatch.setenv("SNOWFLAKE_MODELS", json.dumps(["family-a", "family-b", "family-c"]))
-    monkeypatch.setenv("SNOWFLAKE_REASONING_EFFORT", "{}")
+    monkeypatch.setenv("SNOWFLAKE_REASONING_EFFORT", '{"family-c": "low"}')
     monkeypatch.setattr(a6, "CortexModel", Client)
     a6.live(tmp_path)
     assert len(calls) == len(a6.read(tmp_path / "live_calls.json")) == 8
     assert all(j["status"] == "valid" for d in a6.DISEASES
                for j in a6.read(tmp_path / d / "jury_result.json")["jurors"])
+    assert all(a6.read(tmp_path / d / "jury_result.json")["jury"]["reasoning_effort"] == {
+        "family-a": None, "family-b": None, "family-c": "low"} for d in a6.DISEASES)
     a6.live(tmp_path)
     assert len(calls) == 8
+
+
+def test_distance_only_candidate_retains_distance_without_a_z_score():
+    fixture = a6.read(ROOT / 'fixtures/candidates.json')
+    packet = a6.read(ROOT / 'fixtures/evidence_packet.json')
+    network = {'candidates': deepcopy(fixture['candidates']),
+               'shortlist': [c['candidate_id'] for c in fixture['candidates']]}
+    candidate = next(c for c in network['candidates'] if c['status'] == 'scored')
+    candidate['status'] = 'distance_only'
+    candidate['network']['degree_matched_z'] = None
+    projected = a6.candidate_payload(network, fixture['candidates'], packet)
+    row = next(c for c in projected['candidates'] if c['candidate_id'] == candidate['candidate_id'])
+    assert row['status'] == 'distance_only'
+    assert row['network']['mean_distance'] == candidate['network']['mean_distance']
+    assert row['network']['degree_matched_z'] is None
+    assert set(row) == set(next(c for c in fixture['candidates'] if c['candidate_id'] == row['candidate_id']))

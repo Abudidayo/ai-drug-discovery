@@ -53,7 +53,8 @@ def test_prompt_allowlist_and_no_input_ranking():
 def test_seeded_orders_and_output_shape():
     result = run_jury(PACKET, CONFIG, mock_model)
     assert set(result) == set(FIXTURE)
-    assert result["jury"] == {**CONFIG, 'prompt_version': PROMPT_VERSION}
+    assert result["jury"] == {**CONFIG, 'prompt_version': PROMPT_VERSION,
+                              'reasoning_effort': {model: None for model in CONFIG['models']}}
     assert PROMPT_VERSION == 'jury-v4'
     assert len(result["jurors"]) == 3
     for i, j in enumerate(result["jurors"]):
@@ -61,7 +62,7 @@ def test_seeded_orders_and_output_shape():
         random.Random(CONFIG["shuffle_seed"] + i).shuffle(order)
         assert j["presented_order"] == order
         assert j["status"] == "valid" and j["attempts"] == 1
-        assert set(j) == set(FIXTURE["jurors"][0]) | {"token_usage"}
+        assert set(j) == set(FIXTURE["jurors"][0])
         assert j["token_usage"] == [{"attempt": 1, "input_tokens": None, "output_tokens": None}]
         assert set(j["reviews"][0]) == set(FIXTURE["jurors"][0]["reviews"][0])
         assert j["validation"]["errors"] == []
@@ -601,3 +602,57 @@ def test_recorded_kimi_citations_remain_required_in_v4():
     assert validate_reply(json.dumps(value), case['packet'])[0] is not None
     value['reviews'][0]['objection'] += ' An invented dose of 99 mg.'
     assert validate_reply(json.dumps(value), case['packet'])[0] is None
+
+
+@pytest.mark.parametrize('override', [False, True])
+def test_saved_effort_matches_effective_provider_settings(monkeypatch, override):
+    monkeypatch.setenv('SNOWFLAKE_ACCOUNT', 'test-account')
+    monkeypatch.setenv('SNOWFLAKE_PAT', 'fake-test-token')
+    models = ['claude-opus-5-5', 'openai-gpt-5.4', 'kimi-k3']
+    configured = {models[0]: None, models[1]: 'low', models[2]: 'low'}
+    expected = {models[0]: 'low', models[1]: None, models[2]: 'low'} if override else configured
+    if override:
+        monkeypatch.setenv('SNOWFLAKE_REASONING_EFFORT', json.dumps(expected))
+    else:
+        monkeypatch.delenv('SNOWFLAKE_REASONING_EFFORT', raising=False)
+    real_openai = openai.OpenAI
+    observed = {}
+
+    def handle(request):
+        body = json.loads(request.content)
+        model = body['model']
+        effort = body.get('output_config', {}).get('effort') if model.startswith('claude-') else body.get('reasoning_effort')
+        observed[model] = effort
+        if model.startswith('claude-'):
+            return httpx.Response(200, json={'content': [{'type': 'text', 'text': json.dumps(reply())}]})
+        return httpx.Response(200, json={'id': 'test', 'choices': [
+            {'index': 0, 'message': {'role': 'assistant', 'content': json.dumps(reply())}, 'finish_reason': 'stop'}]})
+
+    monkeypatch.setattr(openai, 'OpenAI', lambda **kwargs: real_openai(
+        **kwargs, http_client=httpx.Client(transport=httpx.MockTransport(handle))))
+    config = {**CONFIG, 'models': models, 'reasoning_effort': configured}
+    before = deepcopy(config)
+    client = CortexModel(reasoning_effort=configured)
+    try:
+        result = run_jury(PACKET, config, client)
+    finally:
+        client.close()
+    assert config == before
+    assert observed == result['jury']['reasoning_effort'] == expected
+    assert {k: v for k, v in result['jury'].items() if k not in {'reasoning_effort', 'prompt_version'}} == {
+        k: v for k, v in config.items() if k not in {'reasoning_effort', 'prompt_version'}}
+    assert all(j['status'] == 'valid' for j in result['jurors'])
+
+
+@pytest.mark.parametrize('effort', [None, [], {'unknown-model': 'low'}, {'mock-family-a': ''},
+                                   {'mock-family-a': 1}])
+def test_invalid_effort_configuration(effort):
+    with pytest.raises(ValueError, match='reasoning_effort'):
+        validate_config({**CONFIG, 'reasoning_effort': effort})
+
+
+def test_legacy_config_saves_provider_defaults():
+    config = {k: v for k, v in CONFIG.items() if k != 'reasoning_effort'}
+    result = run_jury(PACKET, config, mock_model)
+    assert result['jury']['reasoning_effort'] == {model: None for model in config['models']}
+    assert 'reasoning_effort' not in config
