@@ -9,6 +9,7 @@ numpy==2.4.6
     #   pandas
     #   posebusters
     #   rdkit
+    #   scipy
     #   vina
 packaging==26.3
     # via
@@ -28,6 +29,8 @@ rdkit==2026.9.1
     # via
     #   -r .devcontainer/docking-requirements.in
     #   posebusters
+scipy==1.17.1
+    # via -r .devcontainer/docking-requirements.in
 setuptools==84.2.1
     # via vina
 six==1.17.0
