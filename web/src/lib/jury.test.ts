@@ -1,0 +1,76 @@
+import { describe, expect, it } from "vitest";
+import { covidExperiment, covidJury } from "../test/fixtures";
+import {
+  countedJurors,
+  excludedJurors,
+  failedCheck,
+  featuredObjection,
+  juryRows,
+  retriedCount,
+} from "./jury";
+
+describe("the recorded COVID-19 jury", () => {
+  const { candidates } = covidExperiment();
+  const jury = covidJury();
+
+  it("orders rows by consensus and splits on colchicine only", () => {
+    const rows = juryRows(jury, candidates);
+    expect(rows.map((row) => row.candidate.name).slice(0, 3)).toEqual([
+      "BARICITINIB",
+      "TOFACITINIB",
+      "TOCILIZUMAB",
+    ]);
+    expect(rows.filter((row) => row.contested).map((row) => row.candidate.name)).toEqual([
+      "COLCHICINE",
+    ]);
+  });
+
+  it("features the most sceptical model's objection to the known-answer drug", () => {
+    const objection = featuredObjection(jury, candidates);
+    expect(objection?.juror.model.display_name).toBe("GLM-5.3");
+    expect(objection?.candidate.name).toBe("BARICITINIB");
+    expect(objection?.text).toMatch(/^Blocking JAK1 may also weaken/);
+  });
+
+  it("counts valid jurors only, and the one that needed a retry", () => {
+    expect(countedJurors(jury)).toHaveLength(3);
+    expect(excludedJurors(jury)).toEqual([]);
+    expect(retriedCount(jury)).toBe(1);
+  });
+
+  it("has an agreement that matches Kendall's W of the ranks", () => {
+    const n = candidates.length;
+    const sums = candidates.map((c) =>
+      jury.votes.filter((v) => v.candidate_id === c.candidate_id).reduce((s, v) => s + v.rank, 0),
+    );
+    const s = sums.reduce((total, sum) => total + (sum - (3 * (n + 1)) / 2) ** 2, 0);
+    expect(jury.agreement).toBeCloseTo((12 * s) / (9 * (n ** 3 - n)), 4);
+    expect(jury.agreement).toBeCloseTo(0.6167, 4);
+  });
+});
+
+describe("failedCheck", () => {
+  it("names the check the last attempt failed", () => {
+    expect(
+      failedCheck([
+        "Attempt 1: C2: evidence belongs to another Candidate",
+        "Attempt 2: C9: unsupported or unparseable number in objection",
+      ]),
+    ).toBe("numbers");
+  });
+
+  it("names the most basic failure when one attempt failed several checks", () => {
+    expect(
+      failedCheck([
+        "Attempt 1: C3: unsupported or unparseable number in rationale",
+        "Attempt 1: C5: unknown evidence ID",
+      ]),
+    ).toBe("unknownEvidence");
+  });
+
+  it("recognises refusals, and names nothing for errors it doesn't know", () => {
+    expect(failedCheck(["Attempt 1: refused (provider stop_reason=refusal)"])).toBe("refused");
+    expect(failedCheck(["Attempt 1: call failed (TimeoutError)"])).toBeNull();
+    expect(failedCheck([])).toBeNull();
+  });
+});

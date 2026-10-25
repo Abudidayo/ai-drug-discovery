@@ -1,0 +1,19 @@
+{
+  "tool": "Built-in image_gen",
+  "purpose": "Remove baked-in top-edge branding and navigation so the live header can remain transparent.",
+  "prompt": "Use case: precise-object-edit. This is an approved website concept image. Edit ONLY the baked-in website branding and navigation along the very top edge (approximately top 80 pixels). Remove the small upper-left network logo and the words \"Drug repurposing explorer\". Remove the upper-right website navigation \"Problem & solution\", \"Workflow\", \"Results\" and any active underline or outline pill around those navigation labels. Inpaint each removed UI element using the existing local illustrated background, continuing the same faceted laboratory or cell artwork naturally. The top strip MUST NOT become a solid bar, gradient overlay, flat navy rectangle or blank panel: the actual artwork should continue behind where the letters used to be. Preserve the exact canvas dimensions, full framing, all illustrations, character identity, face, pose, colors, lighting and EVERY other word, label, arrow, headline and lower-page control as unchanged as possible. Do not crop, zoom, redraw the scene, add a new logo, add new text or add new buttons. This is an extremely localized removal of top-edge UI only. Keep everything below that top strip untouched.",
+  "assets": [
+    {
+      "source": "story-1.png",
+      "output": "story-1-header-clean.png"
+    },
+    {
+      "source": "story-2.png",
+      "output": "story-2-header-clean.png"
+    },
+    {
+      "source": "story-3.png",
+      "output": "story-3-header-clean.png"
+    }
+  ]
+}

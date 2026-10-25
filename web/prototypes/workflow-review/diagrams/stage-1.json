@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Map disease biology",
+    "quality_profile": "showcase",
+    "animation": "none",
+    "viewBox": [
+      1100,
+      550
+    ]
+  },
+  "components": [
+    {
+      "id": "open-targets",
+      "type": "database",
+      "label": "Open Targets",
+      "sublabel": "Disease–target associations",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "chembl",
+      "type": "database",
+      "label": "ChEMBL + regulators",
+      "sublabel": "Approved drugs and human targets",
+      "pos": [
+        40,
+        220
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "string",
+      "type": "database",
+      "label": "STRING 12.5",
+      "sublabel": "Human physical interaction graph",
+      "pos": [
+        40,
+        400
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "identifiers",
+      "type": "backend",
+      "label": "Resolve identifiers",
+      "sublabel": "Stable Ensembl gene IDs",
+      "pos": [
+        425,
+        220
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "disease-graph",
+      "type": "backend",
+      "label": "Disease-linked network",
+      "sublabel": "Targets, interactions and coverage",
+      "pos": [
+        810,
+        220
+      ],
+      "size": [
+        245,
+        110
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "open-targets",
+      "to": "identifiers"
+    },
+    {
+      "from": "chembl",
+      "to": "identifiers"
+    },
+    {
+      "from": "string",
+      "to": "identifiers"
+    },
+    {
+      "from": "identifiers",
+      "to": "disease-graph"
+    }
+  ]
+}

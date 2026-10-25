@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Three-model evidence review",
+    "quality_profile": "showcase",
+    "animation": "none",
+    "viewBox": [
+      1100,
+      550
+    ]
+  },
+  "components": [
+    {
+      "id": "packet",
+      "type": "database",
+      "label": "Evidence packet",
+      "sublabel": "Same evidence; shuffled candidate order",
+      "pos": [
+        40,
+        215
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "Network ranking withheld"
+    },
+    {
+      "id": "gpt",
+      "type": "cloud",
+      "label": "GPT-5.4",
+      "sublabel": "openai-gpt-5.4",
+      "pos": [
+        425,
+        40
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "OpenAI"
+    },
+    {
+      "id": "glm",
+      "type": "cloud",
+      "label": "GLM-5.3",
+      "sublabel": "glm-5.3",
+      "pos": [
+        425,
+        215
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "Zhipu · low reasoning"
+    },
+    {
+      "id": "kimi",
+      "type": "cloud",
+      "label": "Kimi K3",
+      "sublabel": "kimi-k3",
+      "pos": [
+        425,
+        390
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "Moonshot · low reasoning"
+    },
+    {
+      "id": "validation",
+      "type": "backend",
+      "label": "Validate + compare",
+      "sublabel": "Citations, ranks, objections and gaps",
+      "pos": [
+        810,
+        215
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "At least 2 valid jurors"
+    }
+  ],
+  "connections": [
+    {
+      "from": "packet",
+      "to": "gpt"
+    },
+    {
+      "from": "packet",
+      "to": "glm"
+    },
+    {
+      "from": "packet",
+      "to": "kimi"
+    },
+    {
+      "from": "gpt",
+      "to": "validation"
+    },
+    {
+      "from": "glm",
+      "to": "validation"
+    },
+    {
+      "from": "kimi",
+      "to": "validation"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Snowflake Cortex · jury-v7",
+      "wraps": [
+        "gpt",
+        "glm",
+        "kimi"
+      ],
+      "pad": 22
+    }
+  ]
+}

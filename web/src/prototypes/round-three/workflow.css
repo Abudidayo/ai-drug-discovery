@@ -1,0 +1,1009 @@
+@font-face {
+  font-family: "Workflow Sans";
+  src: url("./assets/dm-sans-latin-normal.woff2") format("woff2");
+  font-weight: 100 1000;
+  font-display: swap;
+}
+.r2.half-life-workflow {
+  color-scheme: dark;
+  --ink: #eef5ff;
+  --muted: #bdd0e5;
+  --canvas: #081a30;
+  --line: #6688a65c;
+  --mint: #9de2cf;
+  font-family: "Workflow Sans", sans-serif;
+  color: var(--ink);
+  background: var(--canvas);
+}
+.half-life-workflow * {
+  box-sizing: border-box;
+}
+.r2.half-life-workflow {
+  margin: 0;
+  min-width: 320px;
+}
+.half-life-workflow button,
+.half-life-workflow a {
+  -webkit-tap-highlight-color: transparent;
+}
+.half-life-workflow button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.half-life-workflow a {
+  color: inherit;
+  text-underline-offset: 4px;
+}
+.half-life-workflow button:focus-visible,
+.half-life-workflow a:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 5px;
+}
+.half-life-workflow ::selection {
+  color: var(--canvas);
+  background: var(--mint);
+}
+.half-life-workflow .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.half-life-workflow .skip {
+  position: fixed;
+  top: -100px;
+  left: 20px;
+  z-index: 20;
+  padding: 12px;
+  background: var(--canvas);
+}
+.half-life-workflow .skip:focus {
+  top: 10px;
+}
+.half-life-workflow [hidden] {
+  display: none !important;
+}
+.half-life-workflow .header {
+  position: absolute;
+  z-index: 2;
+  inset: 0 0 auto;
+  height: 100px;
+  padding: 22px 3.5%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  background: transparent;
+}
+.half-life-workflow .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  font-size: 32px;
+  line-height: 1.25;
+  font-weight: 550;
+}
+.half-life-workflow .brand svg {
+  width: 40px;
+  height: 40px;
+  fill: var(--ink);
+  stroke: var(--ink);
+  stroke-width: 1.4;
+}
+.half-life-workflow .brand svg path {
+  fill: none;
+}
+.half-life-workflow .brand small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.half-life-workflow .view-switch {
+  display: flex;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 0;
+  padding: 4px;
+  background: transparent;
+}
+.half-life-workflow .view-switch button {
+  min-width: 102px;
+  min-height: 38px;
+  border: 0;
+  border-radius: 24px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+}
+.half-life-workflow .view-switch button[aria-pressed="true"] {
+  color: #081b30;
+  background: #d8eaff;
+}
+.half-life-workflow .source-trigger {
+  border: 0;
+  background: transparent;
+  padding: 11px 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.half-life-workflow .source-trigger svg {
+  margin-left: 8px;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  vertical-align: middle;
+}
+.half-life-workflow .workflow-body {
+  min-height: 100svh;
+}
+.half-life-workflow .story-scene {
+  position: relative;
+  height: 100svh;
+  margin: 0;
+}
+.half-life-workflow .story-scene img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+}
+.half-life-workflow .technical-scene {
+  height: 100svh;
+  min-height: 720px;
+  padding: 116px 3.5% 136px;
+  display: flex;
+  flex-direction: column;
+}
+.half-life-workflow .technical-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 36px;
+  flex-shrink: 0;
+}
+.half-life-workflow .technical-heading h1 {
+  margin: 0;
+  font-size: clamp(30px, 2.7vw, 46px);
+  font-weight: 550;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+  max-width: 22ch;
+  text-wrap: balance;
+}
+.half-life-workflow .technical-heading p {
+  margin: 2px 0 0;
+  font-size: 17px;
+  color: var(--muted);
+  line-height: 1.6;
+  width: 50%;
+  max-width: none;
+}
+.half-life-workflow .diagram-space {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 14px 0;
+}
+.half-life-workflow .diagram-space img {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  display: block;
+  width: 100%;
+  height: calc(100% - 28px);
+  object-fit: contain;
+  max-width: 1320px;
+}
+.half-life-workflow .technical-note {
+  margin: 0;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #b8d7d3;
+  flex-shrink: 0;
+}
+.half-life-workflow .technical-caption {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-shrink: 0;
+}
+.half-life-workflow .technical-caption .technical-note {
+  flex: 1;
+}
+.half-life-workflow .technical-caption > button {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #8eafd380;
+  border-radius: 6px;
+  background: transparent;
+  color: #d7eafb;
+  font-size: 13px;
+}
+.half-life-workflow .evidence-metadata {
+  overflow-wrap: anywhere;
+  color: var(--mint);
+}
+.half-life-workflow #evidence-detail label {
+  display: block;
+  margin: 28px 0 10px;
+  font-size: 15px;
+}
+.half-life-workflow #evidence-detail select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #6b8ca5;
+  border-radius: 6px;
+  font: inherit;
+  background: #0a2137;
+  color: var(--ink);
+}
+.half-life-workflow #evidence-detail h3 {
+  margin: 30px 0 12px;
+  font-size: 18px;
+  font-weight: 550;
+}
+.half-life-workflow #evidence-detail blockquote {
+  margin: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: #e6f0fa;
+  font-size: 16px;
+  line-height: 1.65;
+  background: #0b2137;
+}
+.half-life-workflow #review-citations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.half-life-workflow #review-citations button {
+  padding: 5px 10px;
+  min-height: 36px;
+  border: 1px solid #6f9d9d;
+  border-radius: 5px;
+  background: #103440;
+  color: var(--mint);
+  font-size: 13px;
+}
+.half-life-workflow #review-citations button[aria-pressed="true"] {
+  background: var(--mint);
+  color: var(--canvas);
+}
+.half-life-workflow .docking-detail {
+  width: min(1200px, 100%);
+}
+.half-life-workflow .docking-detail img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.half-life-workflow .chapter-footer {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 2;
+  padding: 38px 3.5% 32px;
+  min-height: 123px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  background: transparent;
+}
+.half-life-workflow .chapter-footer::before {
+  content: "";
+  position: absolute;
+  top: 23px;
+  left: 3.5%;
+  right: 3.5%;
+  height: 1px;
+  background: var(--line);
+}
+.half-life-workflow .chapter-footer nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.half-life-workflow .chapter-footer nav button {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+}
+.half-life-workflow .chapter-footer nav button > span {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #7394b4;
+  border-radius: 50%;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.half-life-workflow .chapter-footer nav button[aria-current] {
+  color: var(--ink);
+}
+.half-life-workflow .chapter-footer nav button[aria-current] > span {
+  color: var(--canvas);
+  border-color: #d8eaff;
+  background: #d8eaff;
+}
+.half-life-workflow .chapter-context {
+  margin: 0;
+  text-align: right;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.half-life-workflow dialog {
+  position: fixed;
+  margin: 0 0 0 auto;
+  height: 100svh;
+  max-height: none;
+  width: min(620px, 100%);
+  max-width: 100%;
+  padding: 50px 38px;
+  background: #10283f;
+  border: 0;
+  border-left: 1px solid #597d9d;
+  color: var(--ink);
+  overflow-y: auto;
+  scrollbar-color: #668aa3 #10283f;
+}
+.half-life-workflow dialog::backdrop {
+  background: #020c1ed1;
+}
+.half-life-workflow dialog h2 {
+  font-size: 30px;
+  font-weight: 500;
+  margin: 4px 35px 20px 0;
+  letter-spacing: -0.03em;
+}
+.half-life-workflow dialog p,
+.half-life-workflow dialog dd {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #d0dfee;
+}
+.half-life-workflow dialog dt {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 26px 0 6px;
+}
+.half-life-workflow dialog dd {
+  margin: 0;
+}
+.half-life-workflow dialog code {
+  font-size: 13px;
+  color: #a8e6d7;
+}
+.half-life-workflow dialog .source-caveat {
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+  color: #abc2db;
+}
+.half-life-workflow dialog > a {
+  font-size: 14px;
+  color: var(--mint);
+}
+.half-life-workflow .close {
+  position: absolute;
+  top: 22px;
+  right: 24px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #6d8da8;
+  border-radius: 50%;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+}
+.half-life-workflow .close svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+@media (hover: hover) and (pointer: fine) {
+  .half-life-workflow button:hover {
+    color: #fff;
+  }
+  .half-life-workflow .view-switch button[aria-pressed="true"]:hover {
+    color: var(--canvas);
+  }
+  .half-life-workflow .source-trigger:hover,
+  .half-life-workflow dialog > a:hover {
+    color: #fff;
+  }
+}
+@media (max-width: 1100px) {
+  .half-life-workflow .chapter-footer nav {
+    gap: 15px;
+  }
+  .half-life-workflow .chapter-context {
+    display: none;
+  }
+  .half-life-workflow .technical-heading p {
+    font-size: 16px;
+  }
+}
+@media (max-width: 700px) {
+  .half-life-workflow .header {
+    height: 138px;
+    padding: 20px;
+  }
+  .half-life-workflow .brand {
+    font-size: 26px;
+    gap: 8px;
+  }
+  .half-life-workflow .brand svg {
+    width: 34px;
+  }
+  .half-life-workflow .view-switch {
+    top: 80px;
+  }
+  .half-life-workflow .source-trigger {
+    font-size: 12px;
+  }
+  .half-life-workflow .technical-scene {
+    min-height: 760px;
+    height: 100svh;
+    padding: 150px 20px 152px;
+  }
+  .half-life-workflow .technical-heading {
+    display: block;
+  }
+  .half-life-workflow .technical-heading h1 {
+    font-size: 30px;
+    max-width: 26ch;
+  }
+  .half-life-workflow .technical-heading p {
+    width: 100%;
+    margin-top: 14px;
+    font-size: 15px;
+  }
+  .half-life-workflow .diagram-space {
+    overflow-x: auto;
+    justify-content: start;
+    scrollbar-color: #668aa3 var(--canvas);
+  }
+  .half-life-workflow .diagram-space img {
+    width: 850px;
+    height: 425px;
+    max-width: none;
+  }
+  .half-life-workflow .technical-note {
+    font-size: 12px;
+    text-align: left;
+  }
+  .half-life-workflow .technical-caption {
+    display: block;
+  }
+  .half-life-workflow .technical-caption > button {
+    margin-top: 12px;
+  }
+  .half-life-workflow .chapter-footer {
+    position: fixed;
+    padding: 30px 20px 18px;
+  }
+  .half-life-workflow .chapter-footer nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    gap: 6px 16px;
+  }
+  .half-life-workflow .chapter-footer nav button {
+    font-size: 11px;
+    gap: 8px;
+  }
+  .half-life-workflow .chapter-footer nav button > span {
+    width: 27px;
+    height: 27px;
+    font-size: 11px;
+  }
+  .half-life-workflow dialog {
+    padding: 48px 26px;
+  }
+}
+
+.r2.half-life-workflow {
+  position: relative;
+  --sans: "Workflow Sans", sans-serif;
+}
+.half-life-workflow .brand {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.half-life-workflow .brand .r2-brand {
+  font: inherit;
+  letter-spacing: -0.025em;
+}
+.half-life-workflow .project-nav .r2-tabs {
+  padding: 4px;
+  border: 0;
+  background: transparent;
+}
+.half-life-workflow .project-nav .r2-tabs button {
+  border: 0;
+  padding: 7px 12px;
+  min-height: 38px;
+  border-radius: 22px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+.half-life-workflow .project-nav .r2-tabs button[aria-current] {
+  background: #d8eaff;
+  color: var(--canvas);
+}
+.half-life-workflow .source-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.half-life-workflow .source-trigger svg {
+  margin: 0;
+}
+.keynote[data-tab="workflow"] .keynote-main {
+  max-width: none;
+  padding: 0;
+  margin: 0;
+}
+@media (max-width: 1000px) {
+  .half-life-workflow .header {
+    height: 142px;
+  }
+  .half-life-workflow .view-switch {
+    top: 84px;
+  }
+  .half-life-workflow .technical-scene {
+    padding-top: 150px;
+  }
+}
+@media (max-width: 700px) {
+  .half-life-workflow .project-nav .r2-tabs {
+    gap: 0;
+  }
+  .half-life-workflow .project-nav .r2-tabs button {
+    padding: 6px;
+    font-size: 10px;
+  }
+  .half-life-workflow .brand {
+    font-size: 24px;
+  }
+  .half-life-workflow .header {
+    padding-inline: 16px;
+  }
+  .half-life-workflow .technical-scene {
+    padding-bottom: 228px;
+    min-height: 980px;
+  }
+}
+
+.r2.half-life-workflow {
+  --bg: #081a30;
+  --paper: #10283f;
+  --soft: #152d48;
+  --accent: #9de2cf;
+  --focus: #9de2cf;
+}
+
+.r2.half-life-workflow[data-view="technical"] {
+  display: flex;
+  flex-direction: column;
+}
+.half-life-workflow[data-view="technical"] .workflow-body {
+  min-height: 0;
+  flex: 1;
+}
+.half-life-workflow .technical-overview {
+  padding: 92px 3.5% 0;
+  max-width: 1750px;
+  margin-inline: auto;
+}
+.half-life-workflow .overview-map {
+  margin-top: 12px;
+  overflow-x: auto;
+  scrollbar-color: #668aa3 transparent;
+}
+.half-life-workflow .complete-workflow-diagram {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.half-life-workflow .overview-notes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.half-life-workflow .overview-notes strong {
+  color: var(--ink);
+  font-weight: 550;
+}
+.half-life-workflow .technical-actions {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.half-life-workflow .technical-actions button {
+  border: 0;
+  padding: 10px 0;
+  min-height: 44px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+}
+.half-life-workflow[data-view="technical"] .chapter-footer {
+  position: relative;
+  inset: auto;
+  padding: 0 3.5% 8px;
+  min-height: 52px;
+}
+.half-life-workflow[data-view="technical"] .chapter-footer::before {
+  display: none;
+}
+@media (max-width: 1000px) {
+  .half-life-workflow .technical-overview {
+    padding-top: 150px;
+  }
+}
+@media (max-width: 700px) {
+  .half-life-workflow .technical-overview {
+    padding-inline: 20px;
+  }
+  .half-life-workflow .complete-workflow-diagram {
+    min-width: 1050px;
+  }
+  .half-life-workflow .overview-notes {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .half-life-workflow[data-view="technical"] .chapter-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-inline: 20px;
+  }
+  .half-life-workflow .technical-actions {
+    flex-wrap: wrap;
+    gap: 8px 20px;
+  }
+}
+
+.r2.half-life-workflow[data-view="technical"] {
+  min-height: 100svh;
+}
+.half-life-workflow .overview-canvas {
+  position: relative;
+}
+.half-life-workflow .signal-plane {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 1280px;
+  height: 400px;
+  pointer-events: none;
+  transform-origin: 0 0;
+}
+.half-life-workflow .evidence-signal {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  background: #efbd7d;
+  border-radius: 50%;
+  opacity: 0;
+}
+.half-life-workflow .evidence-signal:nth-child(2) {
+  width: 6px;
+  height: 6px;
+  left: -3px;
+  top: -3px;
+}
+.half-life-workflow .evidence-signal:nth-child(3) {
+  width: 4px;
+  height: 4px;
+  left: -2px;
+  top: -2px;
+}
+.half-life-workflow .walkthrough-controls {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-shrink: 0;
+}
+.half-life-workflow .walkthrough-controls button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+}
+.half-life-workflow .walkthrough-controls svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+.half-life-workflow .walkthrough-controls button:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+@media (max-width: 700px) {
+  .half-life-workflow .overview-canvas {
+    min-width: 1050px;
+  }
+  .half-life-workflow .workflow-playback {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
+.half-life-workflow .simple-workflow-diagram {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.half-life-workflow .simple-route {
+  fill: none;
+  stroke: #8bacbf;
+  stroke-width: 1.5;
+}
+.half-life-workflow .diagram-nodes {
+  position: absolute;
+  inset: 0;
+}
+.half-life-workflow .simple-node {
+  position: absolute;
+  padding: 14px;
+  border: 1px solid #6e97b0;
+  border-radius: 6px;
+  background: #10283f;
+}
+.half-life-workflow .simple-node[data-active="true"] {
+  border-color: #efbd7d;
+  background: #1a3246;
+}
+.half-life-workflow .simple-node-title {
+  margin: 0 0 8px;
+  color: #eef5ff;
+  font-size: clamp(17px, 1.3vw, 22px);
+  line-height: 1.2;
+  font-weight: 550;
+  letter-spacing: -0.3px;
+}
+.half-life-workflow .simple-node-keypoint {
+  margin: 0 0 10px;
+  color: #9de2cf;
+  font-size: clamp(15px, 1.1vw, 18px);
+  font-weight: 650;
+  line-height: 1.3;
+}
+.half-life-workflow .simple-node[data-active="true"] .simple-node-keypoint {
+  color: #efbd7d;
+}
+.half-life-workflow .simple-node-copy {
+  margin: 0;
+  color: #bdd0e5;
+  font-size: clamp(14px, 1vw, 17px);
+  line-height: 1.4;
+}
+.half-life-workflow .simple-node-copy span {
+  display: block;
+}
+.half-life-workflow .technical-overview .technical-heading {
+  display: block;
+}
+.half-life-workflow .technical-overview .technical-heading p {
+  width: auto;
+  margin-top: 10px;
+}
+.half-life-workflow .workflow-tools {
+  margin-top: 4px;
+}
+.half-life-workflow .technical-toggle {
+  margin-left: 8px;
+}
+.half-life-workflow .technical-toggle svg {
+  width: 12px;
+  height: 12px;
+}
+.half-life-workflow .technical-spec-content {
+  overflow-x: auto;
+  scrollbar-color: #668aa3 transparent;
+  padding-block: 16px;
+}
+.half-life-workflow[data-view="technical"] .workflow-body {
+  flex: initial;
+}
+.half-life-workflow[data-view="technical"] .chapter-footer {
+  justify-content: flex-start;
+  gap: 24px;
+}
+@media (max-width: 1100px) {
+  .half-life-workflow .overview-canvas {
+    min-width: 1160px;
+  }
+}
+
+.half-life-workflow .overview-canvas {
+  width: min(100%, calc((100svh - 290px) * 1280 / 520));
+  margin-inline: auto;
+}
+.half-life-workflow .signal-plane {
+  height: 520px;
+}
+.half-life-workflow .workflow-visual {
+  display: block;
+  width: 100%;
+  height: clamp(88px, 7vw, 106px);
+  margin: 8px 0 10px;
+  overflow: visible;
+}
+.half-life-workflow .workflow-visual text {
+  font-family: inherit;
+  font-size: 14px;
+  fill: #d0e3ef;
+}
+.half-life-workflow .workflow-visual .visual-caption {
+  font-size: 11px;
+  fill: #abc4d5;
+}
+.half-life-workflow .visual-edges {
+  fill: none;
+  stroke: #7198ae;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.half-life-workflow .visual-path {
+  fill: none;
+  stroke: #9de2cf;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.half-life-workflow .visual-protein {
+  fill: #9de2cf;
+}
+.half-life-workflow .visual-protein-muted {
+  fill: #3d647c;
+}
+.half-life-workflow .visual-slot {
+  fill: #9de2cf;
+}
+.half-life-workflow .visual-slot-direct {
+  fill: #d8b380;
+}
+.half-life-workflow .visual-paper {
+  fill: #17364a;
+  stroke: #86aec2;
+  stroke-width: 1.2;
+}
+.half-life-workflow .workflow-visual .visual-accent {
+  fill: #9de2cf;
+  font-weight: 600;
+}
+.half-life-workflow .workflow-visual .visual-eid {
+  fill: #9de2cf;
+  font-size: 18px;
+  font-weight: 650;
+}
+.half-life-workflow .visual-model {
+  fill: #173b4d;
+  stroke: #64978f;
+  stroke-width: 1;
+}
+.half-life-workflow .visual-rank {
+  fill: #17364a;
+  stroke: #7198ae;
+  stroke-width: 1;
+}
+.half-life-workflow .visual-database {
+  fill: #204a55;
+  stroke: #9de2cf;
+  stroke-width: 2;
+}
+.half-life-workflow .visual-database-top {
+  fill: #35656b;
+  stroke: #9de2cf;
+  stroke-width: 2;
+}
+.half-life-workflow .visual-pocket {
+  fill: #234a60;
+  stroke: #7ca8be;
+  stroke-width: 1.5;
+}
+.half-life-workflow .visual-ligand {
+  fill: none;
+  stroke: #e0b17a;
+  stroke-width: 3;
+}
+.half-life-workflow .visual-ligand-node {
+  fill: #e0b17a;
+}
+.half-life-workflow .simple-node[data-active="true"] .micro-pulse {
+  animation: workflow-cue 1600ms ease-in-out infinite;
+}
+.half-life-workflow .simple-node[data-active="true"] .pulse-1 {
+  animation-delay: 150ms;
+}
+.half-life-workflow .simple-node[data-active="true"] .pulse-2 {
+  animation-delay: 300ms;
+}
+.half-life-workflow .simple-node[data-active="true"] .pulse-3 {
+  animation-delay: 450ms;
+}
+.half-life-workflow .technical-overview[data-playing="false"] .micro-pulse {
+  animation-play-state: paused;
+}
+.half-life-workflow .simple-node[data-node="tiger"] .workflow-visual,
+.half-life-workflow .simple-node[data-node="docking"] .workflow-visual {
+  position: absolute;
+  right: 8px;
+  top: 35px;
+  width: 45px;
+  height: 48px;
+  margin: 0;
+}
+.half-life-workflow .simple-node[data-node="tiger"] .simple-node-keypoint,
+.half-life-workflow .simple-node[data-node="docking"] .simple-node-keypoint {
+  font-size: 14px;
+  line-height: 1.3;
+  margin-bottom: 6px;
+}
+.half-life-workflow .simple-node[data-node="tiger"] .simple-node-copy,
+.half-life-workflow .simple-node[data-node="docking"] .simple-node-copy {
+  font-size: 13px;
+  max-width: calc(100% - 40px);
+}
+@keyframes workflow-cue {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  45% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .half-life-workflow .technical-overview,
+  .half-life-workflow .technical-overview * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

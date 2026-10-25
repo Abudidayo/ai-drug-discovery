@@ -1,0 +1,62 @@
+[
+  {
+    "from": "sources",
+    "to": "connect",
+    "d": "M 378 81 L 477 81",
+    "dashed": false
+  },
+  {
+    "from": "connect",
+    "to": "rank",
+    "d": "M 819 81 L 918 81",
+    "dashed": false
+  },
+  {
+    "from": "rank",
+    "to": "packet",
+    "d": "M 1089 126 L 1089 216",
+    "dashed": false
+  },
+  {
+    "from": "packet",
+    "to": "cortex",
+    "d": "M 918 261 L 819 261",
+    "dashed": false
+  },
+  {
+    "from": "cortex",
+    "to": "validation",
+    "d": "M 477 261 L 378 261",
+    "dashed": false
+  },
+  {
+    "from": "validation",
+    "to": "compare",
+    "d": "M 207 306 L 207 396",
+    "dashed": false
+  },
+  {
+    "from": "compare",
+    "to": "tiger",
+    "d": "M 378 441 L 477 441",
+    "dashed": false
+  },
+  {
+    "from": "compare",
+    "to": "docking",
+    "d": "M 378 441 L 415 441 Q 423 441 423 433 L 423 359 Q 423 351 431 351 L 1081 351 Q 1089 351 1089 359 L 1089 396",
+    "dashed": true
+  },
+  {
+    "from": "rank",
+    "to": "tiger",
+    "d": "M 1260 81 L 1297 81 Q 1305 81 1305 89 L 1305 509.5 Q 1305 517.5 1297 517.5 L 656 517.5 Q 648 517.5 648 509.5 L 648 486",
+    "dashed": true
+  },
+  {
+    "from": "docking",
+    "to": "tiger",
+    "d": "M 918 441 L 819 441",
+    "dashed": false
+  }
+]

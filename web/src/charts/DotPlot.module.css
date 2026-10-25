@@ -1,0 +1,232 @@
+/* The jury's dot plot: names, the rank plot, then one decision column per model. Rows share
+   the panel's height, and the split row takes more of it so each model gets its own line. */
+.chart {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.scroll {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.table {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  column-gap: var(--space-16);
+  font-variant-numeric: tabular-nums;
+}
+
+.head,
+.row,
+.axis {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+
+.head {
+  border-bottom: 1px solid var(--color-ink);
+}
+
+.head > * {
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+  align-self: end;
+  min-width: 0;
+  padding-bottom: 10px;
+  font-size: var(--text-body-sm);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+}
+
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.row {
+  position: relative;
+  cursor: default;
+}
+
+/* One background behind the whole row, through the column gaps. */
+.row::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: transparent;
+  transition: background var(--duration-quick);
+  content: "";
+}
+
+.row[data-on]::before {
+  background: var(--color-hover);
+}
+
+.row[data-contested]::before {
+  box-shadow: inset 3px 0 0 var(--color-contested);
+  background: color-mix(in srgb, var(--color-contested) 11%, var(--color-paper));
+}
+
+/* Back-to-back split rows keep a paper gap, so each drug's three lines read as one group. */
+.row[data-contested] + .row[data-contested]::before {
+  inset: 4px 0 0;
+}
+
+.row[data-contested][data-on]::before {
+  background: color-mix(in srgb, var(--color-contested) 20%, var(--color-paper));
+}
+
+.name {
+  display: flex;
+  align-items: center;
+  font-size: var(--text-body-sm);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+.row[data-contested] .name {
+  padding-left: var(--space-12);
+}
+
+.plot,
+.axis > .track {
+  position: relative;
+}
+
+/* Markers sit inside a track inset by half a marker, so the first and last ranks never clip. */
+.track {
+  position: absolute;
+  inset: 0 8px;
+}
+
+.guide {
+  position: absolute;
+  right: 0;
+  left: 0;
+  border-top: 1px dotted var(--color-edge);
+}
+
+.range {
+  position: absolute;
+  top: 50%;
+  height: 1px;
+  background: var(--color-grey-1);
+}
+
+.mark {
+  position: absolute;
+  display: flex;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+}
+
+.decisions {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.line {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-height: 0;
+}
+
+.decision {
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-snug);
+  white-space: nowrap;
+}
+
+.decision[data-decision="investigate"] {
+  font-weight: var(--weight-semibold);
+}
+
+.decision[data-decision="watch"] {
+  color: var(--color-grey-1);
+}
+
+.decision[data-decision="deprioritise"] {
+  font-style: italic;
+  color: var(--color-grey-1);
+}
+
+.axis {
+  height: 30px;
+}
+
+.axis > .track {
+  position: relative;
+  grid-column: 2;
+  inset: auto;
+  margin: 0 8px;
+}
+
+/* The axis line runs the plot's full width, past the inset track. */
+.axis > .track::before {
+  position: absolute;
+  top: -1px;
+  right: -8px;
+  left: -8px;
+  border-top: 1px solid var(--color-ink);
+  content: "";
+}
+
+.tick {
+  position: absolute;
+  top: 0;
+  padding-top: 6px;
+  font-size: var(--text-label-sm);
+  line-height: 1;
+  color: var(--color-grey-1);
+  transform: translateX(-50%);
+}
+
+.tick::before {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 4px;
+  border-left: 1px solid var(--color-ink);
+  content: "";
+}
+
+.key {
+  display: flex;
+  flex: none;
+  gap: var(--space-12);
+  align-items: baseline;
+  max-width: 62ch;
+  padding-top: var(--space-12);
+  font-size: var(--text-body-sm);
+  color: var(--color-grey-1);
+}
+
+.key b {
+  font-weight: var(--weight-semibold);
+  color: var(--color-ink);
+}
+
+.swatch {
+  position: relative;
+  top: 1px;
+  flex: none;
+  width: 11px;
+  height: 11px;
+  background: var(--color-contested);
+}

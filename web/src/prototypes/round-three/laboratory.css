@@ -1,0 +1,197 @@
+.researcher-image.animated-lab {
+  background: #091a3b;
+}
+.laboratory-scene {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: hidden;
+}
+.keynote .animated-lab {
+  width: 100%;
+}
+.folio-plate .animated-lab {
+  width: 88%;
+}
+.signal-canvas .animated-lab {
+  width: 70%;
+}
+.lab-pipetting-arm {
+  transform-origin: 465px 605px;
+  animation: lab-pipette 4.4s cubic-bezier(0.77, 0, 0.175, 1) infinite;
+}
+.lab-sample-drop {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lab-dispense 4.4s cubic-bezier(0.55, 0.05, 0.8, 0.65) infinite;
+}
+.lab-sample-ripple {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lab-ripple 4.4s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+}
+.lab-monitor-signal {
+  animation: lab-monitor 3.4s linear infinite;
+}
+.lab-protein-signal {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lab-protein 2.5s cubic-bezier(0.77, 0, 0.175, 1) infinite;
+}
+.lab-focus-light {
+  animation: lab-focus 4.4s ease infinite;
+}
+@keyframes lab-pipette {
+  0%,
+  12%,
+  100% {
+    transform: rotate(-2deg) translateY(-5px);
+  }
+  35%,
+  58% {
+    transform: rotate(2deg) translateY(8px);
+  }
+  78% {
+    transform: rotate(-1deg) translateY(-2px);
+  }
+}
+@keyframes lab-dispense {
+  0%,
+  32% {
+    opacity: 0;
+    transform: translate(0, -4px) scale(0.7);
+  }
+  37% {
+    opacity: 1;
+    transform: translate(0, 0) scale(0.7);
+  }
+  53% {
+    opacity: 1;
+    transform: translate(0, 110px) scale(0.7);
+  }
+  56%,
+  100% {
+    opacity: 0;
+    transform: translate(0, 110px) scale(0.7);
+  }
+}
+@keyframes lab-ripple {
+  0%,
+  51% {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+  55% {
+    opacity: 0.8;
+    transform: scale(0.6);
+  }
+  75%,
+  100% {
+    opacity: 0;
+    transform: scale(2.1);
+  }
+}
+@keyframes lab-monitor {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0.35;
+  }
+  30% {
+    transform: translate(42px, -27px);
+    opacity: 1;
+  }
+  45% {
+    transform: translate(67px, -15px);
+    opacity: 1;
+  }
+  67% {
+    transform: translate(107px, -68px);
+    opacity: 1;
+  }
+  85% {
+    transform: translate(139px, -42px);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(230px, -33px);
+    opacity: 0.35;
+  }
+}
+@keyframes lab-protein {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.65);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.3);
+  }
+}
+@keyframes lab-focus {
+  0%,
+  30%,
+  90%,
+  100% {
+    opacity: 0.3;
+  }
+  55%,
+  75% {
+    opacity: 0.85;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .r2 .laboratory-scene .lab-sample-drop,
+  .r2 .laboratory-scene .lab-sample-ripple {
+    opacity: 0;
+  }
+  .r2 .lab-pipetting-arm {
+    transform: none;
+  }
+  .r2 .lab-monitor-signal {
+    opacity: 0.7;
+  }
+  .r2 .lab-protein-signal {
+    opacity: 0.5;
+  }
+}
+@media (max-width: 700px) {
+  .signal-canvas .animated-lab {
+    width: 90%;
+  }
+}
+.r2 .scene-0 > .scene-caption {
+  color: #e4edf9;
+  background: #0c1e3dd9;
+  padding: 3px 8px;
+  border-radius: 3px;
+  bottom: 7px;
+}
+.animated-lab {
+  aspect-ratio: 1672/941;
+  isolation: isolate;
+}
+.lab-projection,
+.lab-camera-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1672px;
+  height: 941px;
+  transform-origin: 0 0;
+}
+.lab-projection {
+  pointer-events: none;
+}
+.lab-camera-world {
+  contain: layout style;
+}
+.lab-camera-world > .laboratory-scene {
+  display: block;
+  width: 1672px;
+  height: 941px;
+  overflow: visible;
+}
+.animated-lab[data-camera-moving="true"] [data-motion-target] {
+  animation-play-state: paused !important;
+}

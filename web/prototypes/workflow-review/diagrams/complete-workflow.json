@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Half Life \u2014 complete technical workflow",
+    "quality_profile": "showcase",
+    "animation": "none",
+    "viewBox": [
+      1359,
+      549
+    ],
+    "legend": {
+      "mode": "hidden"
+    }
+  },
+  "components": [
+    {
+      "id": "sources",
+      "type": "database",
+      "label": "Open Targets + ChEMBL",
+      "sublabel": "STRING 12.5 \u00b7 Reactome \u00b7 regulatory records",
+      "pos": [
+        36.0,
+        36.0
+      ],
+      "size": [
+        342.0,
+        90.0
+      ],
+      "tag": "Disease evidence + approved medicines"
+    },
+    {
+      "id": "connect",
+      "type": "backend",
+      "label": "Connect drug + disease",
+      "sublabel": "Ensembl IDs \u00b7 shared targets \u00b7 pathways",
+      "pos": [
+        477.0,
+        36.0
+      ],
+      "size": [
+        342.0,
+        90.0
+      ],
+      "tag": "Physical STRING graph \u2192 network relevance"
+    },
+    {
+      "id": "rank",
+      "type": "backend",
+      "label": "Rank + select up to 15",
+      "sublabel": "Physical RWR: 10 \u00b7 direct evidence: 5",
+      "pos": [
+        918.0,
+        36.0
+      ],
+      "size": [
+        342.0,
+        90.0
+      ],
+      "tag": "Default restart 0.3 \u00b7 deduplicate + refill"
+    },
+    {
+      "id": "packet",
+      "type": "backend",
+      "label": "Build traceable evidence",
+      "sublabel": "Statement \u00b7 E-ID \u00b7 numeric values",
+      "pos": [
+        918.0,
+        216.0
+      ],
+      "size": [
+        342.0,
+        90.0
+      ],
+      "tag": "Source ID \u00b7 URL \u00b7 release \u00b7 candidate-bound"
+    },
+    {
+      "id": "cortex",
+      "type": "cloud",
+      "label": "Snowflake Cortex \u00b7 jury-v7",
+      "sublabel": "openai-gpt-5.4 \u00b7 glm-5.3 \u00b7 kimi-k3",
+      "pos": [
+        477.0,
+        216.0
+      ],
+      "size": [
+        342.0,
+        90.0
+      ],
+      "tag": "Same packet \u00b7 shuffled order \u00b7 ranks withheld"
+    },
+    {
+      "id": "validation",
+      "type": "backend",
+      "label": "Validate + compare critiques",
+      "sublabel": "JSON \u00b7 assigned E-IDs \u00b7 exact numbers",
+      "pos": [
+        36.0,
+        216.0
+      ],
+      "size": [
+        342.0,
+        90.0
+      ],
+      "tag": "Borda \u00b7 Kendall\u2019s W \u00b7 direction + gaps"
+    },
+    {
+      "id": "compare",
+      "type": "frontend",
+      "label": "Compare research candidates",
+      "sublabel": "Network + direct ranks beside AI judgment",
+      "pos": [
+        36.0,
+        396.0
+      ],
+      "size": [
+        342.0,
+        90.0
+      ],
+      "tag": "Sources \u00b7 exact reviews \u00b7 missing evidence"
+    },
+    {
+      "id": "tiger",
+      "type": "database",
+      "label": "TigerData \u00b7 PostgreSQL",
+      "sublabel": "Experiments \u00b7 candidate evidence \u00b7 jury votes",
+      "pos": [
+        477.0,
+        396.0
+      ],
+      "size": [
+        342.0,
+        90.0
+      ],
+      "tag": "Archive/restore \u00b7 job state \u00b7 file paths + hashes"
+    },
+    {
+      "id": "docking",
+      "type": "backend",
+      "label": "Optional structural exploration",
+      "sublabel": "RCSB PDB \u2192 RDKit / Meeko \u2192 AutoDock Vina",
+      "pos": [
+        918.0,
+        396.0
+      ],
+      "size": [
+        342.0,
+        90.0
+      ],
+      "tag": "Docker \u00b7 predicted poses \u00b7 no reranking"
+    }
+  ],
+  "connections": [
+    {
+      "from": "sources",
+      "to": "connect"
+    },
+    {
+      "from": "connect",
+      "to": "rank"
+    },
+    {
+      "from": "rank",
+      "to": "packet"
+    },
+    {
+      "from": "packet",
+      "to": "cortex"
+    },
+    {
+      "from": "cortex",
+      "to": "validation"
+    },
+    {
+      "from": "validation",
+      "to": "compare"
+    },
+    {
+      "from": "compare",
+      "to": "tiger"
+    },
+    {
+      "from": "compare",
+      "to": "docking",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "top",
+      "via": [
+        [
+          423.0,
+          441.0
+        ],
+        [
+          423.0,
+          351.0
+        ],
+        [
+          1089.0,
+          351.0
+        ]
+      ]
+    },
+    {
+      "from": "rank",
+      "to": "tiger",
+      "variant": "dashed",
+      "label": "Save ranking",
+      "fromSide": "right",
+      "toSide": "bottom",
+      "via": [
+        [
+          1305.0,
+          81.0
+        ],
+        [
+          1305.0,
+          517.5
+        ],
+        [
+          648.0,
+          517.5
+        ]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+[
+  {
+    "term": "How a connection is found",
+    "description": "Stable Ensembl IDs join drug targets to disease-linked proteins. Direct target overlap, STRING physical-network RWR and shared lowest-level Reactome pathway membership provide distinct kinds of association. They do not establish whether inhibiting or activating a target will help; the jury assesses that direction from the supplied evidence."
+  },
+  {
+    "term": "Biomedical data",
+    "description": "Open Targets \u00b7 ChEMBL \u00b7 STRING 12.5 \u00b7 Reactome \u00b7 regulatory sources \u00b7 RCSB PDB"
+  },
+  {
+    "term": "Candidate selection",
+    "description": "Random Walk with Restart on the physical protein network contributes 10 places; direct disease\u2013target evidence contributes 5. Overlaps are removed and places refilled where coverage allows."
+  },
+  {
+    "term": "Selected AI jury",
+    "description": "GPT-5.4 (openai-gpt-5.4), GLM-5.3 (glm-5.3) and Kimi K3 (kimi-k3) through Snowflake Cortex. GLM and Kimi use low reasoning effort; the current prompt is jury-v7."
+  },
+  {
+    "term": "Independent review",
+    "description": "All three models examine the same source-grounded evidence. Candidate order is independently shuffled and network rankings are withheld. JSON schema, citation IDs, numeric claims and ranks are checked. Borda consensus requires at least two valid jurors; Kendall\u2019s W and disagreements remain inspectable."
+  },
+  {
+    "term": "Evidence, word for word",
+    "description": "Evidence items retain E-ID, statement, numeric values, source ID, URL and release. Mechanism descriptions are embedded unchanged; association, bioactivity and pathway statements are constructed from structured records. Jurors see the candidate-bound IDs, statements and values, and must cite supporting or contradictory items. Stored rationales and objections retain the model\u2019s exact wording."
+  },
+  {
+    "term": "TigerData \u00b7 Tiger Cloud PostgreSQL",
+    "description": "Experiments and settings, candidate evidence JSONB, jurors, jury votes and docking metadata persist in PostgreSQL. The API reconstructs the blinded packet from saved candidate evidence. File references and checksums point to large graph and pose files held in file storage. Saved experiments can be reopened, compared, archived and restored."
+  },
+  {
+    "term": "Optional structural exploration",
+    "description": "Docker-based preparation with RDKit and Meeko prepares molecular inputs for AutoDock Vina. Supported drug\u2013protein pairs use experimental RCSB PDB structures. Predicted binding poses can be inspected in 3D; docking does not determine candidate ranking."
+  },
+  {
+    "term": "Research interpretation",
+    "description": "Protein paths explain shortest-path proximity, rather than RWR diffusion. Rankings, AI reviews and docking poses remain hypotheses for investigation."
+  }
+]

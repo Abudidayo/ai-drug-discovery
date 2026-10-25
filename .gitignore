@@ -20,3 +20,6 @@ __pycache__/
 !/.env.example
 /.aws/
 /secrets/
+
+# Local Conductor collaboration files, screenshots and prototype build output.
+/.context/

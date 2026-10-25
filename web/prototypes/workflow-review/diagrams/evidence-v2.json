@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "From source records to cited evidence",
+    "quality_profile": "showcase",
+    "animation": "none",
+    "viewBox": [
+      1100,
+      550
+    ],
+    "legend": {
+      "mode": "hidden"
+    }
+  },
+  "components": [
+    {
+      "id": "records",
+      "type": "database",
+      "label": "Open Targets + ChEMBL",
+      "sublabel": "Associations, mechanisms, bioactivity",
+      "pos": [
+        40,
+        80
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "Approval + safety records"
+    },
+    {
+      "id": "context",
+      "type": "database",
+      "label": "STRING + Reactome",
+      "sublabel": "Protein paths + shared pathways",
+      "pos": [
+        40,
+        340
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "items",
+      "type": "backend",
+      "label": "Traceable evidence items",
+      "sublabel": "E-ID + statement + numeric values",
+      "pos": [
+        425,
+        80
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "Source ID \u00b7 URL \u00b7 pinned release"
+    },
+    {
+      "id": "storage",
+      "type": "database",
+      "label": "TigerData \u00b7 PostgreSQL",
+      "sublabel": "Candidate evidence in JSONB",
+      "pos": [
+        425,
+        340
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "Store original statement wording"
+    },
+    {
+      "id": "packet",
+      "type": "backend",
+      "label": "Candidate-bound packet",
+      "sublabel": "C-labels + assigned evidence IDs",
+      "pos": [
+        810,
+        80
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "Network ranks withheld"
+    },
+    {
+      "id": "source",
+      "type": "frontend",
+      "label": "Inspect cited evidence",
+      "sublabel": "Exact stored text + source record",
+      "pos": [
+        810,
+        340
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "Recorded example: E2"
+    }
+  ],
+  "connections": [
+    {
+      "from": "records",
+      "to": "items"
+    },
+    {
+      "from": "context",
+      "to": "items"
+    },
+    {
+      "from": "items",
+      "to": "storage"
+    },
+    {
+      "from": "storage",
+      "to": "packet"
+    },
+    {
+      "from": "storage",
+      "to": "source"
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "How drug–disease associations are found",
+    "quality_profile": "showcase",
+    "animation": "none",
+    "viewBox": [
+      1100,
+      550
+    ],
+    "legend": {
+      "mode": "hidden"
+    }
+  },
+  "components": [
+    {
+      "id": "disease",
+      "type": "database",
+      "label": "Open Targets",
+      "sublabel": "Disease-linked Ensembl genes",
+      "pos": [
+        40,
+        125
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "drug",
+      "type": "database",
+      "label": "ChEMBL",
+      "sublabel": "Drug targets + action type",
+      "pos": [
+        40,
+        335
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "join",
+      "type": "backend",
+      "label": "Join stable gene IDs",
+      "sublabel": "Match drugs to disease biology",
+      "pos": [
+        425,
+        230
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "shared",
+      "type": "backend",
+      "label": "Shared targets",
+      "sublabel": "Drug targets intersect disease genes",
+      "pos": [
+        810,
+        40
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "Direct evidence route"
+    },
+    {
+      "id": "network",
+      "type": "backend",
+      "label": "Network relevance",
+      "sublabel": "STRING physical graph + RWR",
+      "pos": [
+        810,
+        230
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "Indirect association"
+    },
+    {
+      "id": "pathway",
+      "type": "backend",
+      "label": "Shared pathways",
+      "sublabel": "Reactome gene-membership joins",
+      "pos": [
+        810,
+        420
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "Biological context"
+    }
+  ],
+  "connections": [
+    {
+      "from": "disease",
+      "to": "join"
+    },
+    {
+      "from": "drug",
+      "to": "join"
+    },
+    {
+      "from": "join",
+      "to": "shared"
+    },
+    {
+      "from": "join",
+      "to": "network"
+    },
+    {
+      "from": "join",
+      "to": "pathway"
+    }
+  ]
+}

@@ -1,0 +1,277 @@
+/* The illustration is the entire first viewport; all reading and controls overlay it. */
+.keynote[data-tab="why"] {
+  --bg: #07172b;
+  --paper: #0b2038;
+  --soft: #152d48;
+  --ink: #f2f6fc;
+  --muted: #b7c9dc;
+  --line: #344f6b;
+  --accent: #cee5ff;
+  --action-ink: #10233c;
+}
+.keynote[data-tab="why"] .keynote-header {
+  position: absolute;
+  inset: 12px 0 auto;
+  height: 64px;
+  z-index: 5;
+  padding: 0 3.3%;
+  border: 0;
+  background: transparent;
+}
+.keynote[data-tab="why"] .keynote-header .r2-brand {
+  color: #eef5ff;
+}
+.keynote[data-tab="why"] .keynote-header .r2-tabs {
+  display: none;
+  background: #07172bb8;
+  border: 1px solid #607a9866;
+  padding: 4px;
+}
+.keynote[data-tab="why"] .keynote-header .r2-tabs button {
+  color: #bdcde1;
+}
+.keynote[data-tab="why"] .keynote-header .r2-tabs button[aria-current] {
+  background: #d4e8ff;
+  color: #0b2340;
+  box-shadow: none;
+}
+.keynote[data-tab="why"] .presentation-label {
+  display: none;
+}
+.keynote[data-tab="why"] .keynote-main {
+  max-width: none;
+  padding: 0;
+  margin: 0;
+}
+.keynote .keynote-introduction {
+  position: relative;
+  height: 100svh;
+  width: 100%;
+  overflow: hidden;
+  background: #07172b;
+}
+.keynote .keynote-introduction .keynote-deck {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #07172b;
+  overflow: hidden;
+}
+.keynote .keynote-introduction .problem-story,
+.keynote .keynote-introduction .animated-lab,
+.keynote .keynote-introduction .laboratory-scene {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+}
+.keynote .keynote-introduction .problem-story {
+  display: block;
+}
+.keynote .keynote-introduction .animated-lab {
+  border-radius: 0;
+}
+.keynote .keynote-introduction .problem-story-context {
+  display: none;
+}
+.keynote .keynote-introduction .keynote-deck::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    linear-gradient(90deg, #061328dc 0%, #0613289e 25%, #06132812 47%, transparent 65%),
+    linear-gradient(0deg, #061328db 0%, transparent 22%, transparent 87%, #06132866 100%);
+}
+.keynote .keynote-introduction > .keynote-copy {
+  position: absolute;
+  left: 3.3%;
+  bottom: 155px;
+  width: min(370px, 29vw);
+  z-index: 3;
+  padding: 0;
+}
+.keynote .keynote-copy h1 {
+  font-size: clamp(32px, 3.4vw, 52px);
+  line-height: 1.08;
+}
+.keynote .keynote-copy h1 em {
+  color: #b4d8ff;
+}
+.keynote .keynote-copy > p {
+  color: #d4e1f2;
+  font-size: clamp(16px, 1.2vw, 19px);
+  line-height: 1.65;
+  margin: 20px 0 28px;
+  max-width: 43ch;
+  text-align: justify;
+  text-align-last: left;
+  hyphens: none;
+}
+.keynote .keynote-intro-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 22px;
+}
+.keynote .keynote-story-action,
+.keynote .keynote-example-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #e6f0fc;
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.keynote .keynote-story-action {
+  gap: 12px;
+}
+.keynote .keynote-action-orbit {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #8eafd399;
+  border-radius: 50%;
+  color: #d9eaff;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease;
+}
+.keynote .keynote-action-orbit svg {
+  margin-left: 2px;
+}
+.keynote .keynote-example-action {
+  gap: 8px;
+  color: #bfd1e7;
+  font-size: 14px;
+  font-weight: 400;
+}
+.keynote .keynote-introduction .deck-controls {
+  position: absolute;
+  left: 3.3%;
+  right: 3.3%;
+  bottom: 30px;
+  z-index: 3;
+  padding: 16px 0 0;
+  border-top: 1px solid #a3bfdf45;
+  background: transparent;
+}
+.keynote .keynote-introduction .chapter-nav button {
+  color: #b7c9dc;
+}
+.keynote .keynote-introduction .chapter-nav button > span {
+  border-color: #7995b57a;
+}
+.keynote .keynote-introduction .chapter-nav button[aria-pressed="true"] {
+  color: #fff;
+}
+.keynote .keynote-introduction .chapter-nav button[aria-pressed="true"] > span {
+  background: #d4e8ff;
+  border-color: #d4e8ff;
+  color: #10233c;
+}
+.keynote .keynote-introduction .r2-playback > button {
+  background: #0c223bd6;
+  color: #e0edfc;
+  border-color: #6783a477;
+}
+.keynote[data-tab="why"] .keynote-main > .development-source {
+  margin: 0 3.3%;
+  padding-top: 25px;
+}
+.keynote[data-tab="why"] .keynote-takeaway {
+  padding: 36px 3.3%;
+}
+.keynote[data-tab="why"] .r2-sources {
+  padding: 24px 3.3%;
+}
+@media (max-width: 1050px) {
+  .keynote .keynote-introduction > .keynote-copy {
+    width: 31vw;
+    bottom: 145px;
+  }
+  .keynote .keynote-copy h1 {
+    font-size: 34px;
+  }
+  .keynote .keynote-copy > p {
+    font-size: 16px;
+  }
+}
+@media (max-width: 700px) {
+  .keynote[data-tab="why"] .keynote-header {
+    inset: 16px 0 auto;
+    height: auto;
+    display: block;
+    padding: 0 20px;
+  }
+  .keynote[data-tab="why"] .keynote-header .r2-tabs {
+    margin-top: 14px;
+    width: max-content;
+  }
+  .keynote .keynote-introduction > .keynote-copy {
+    left: 20px;
+    bottom: 180px;
+    width: min(300px, 70vw);
+  }
+  .keynote .keynote-copy h1 {
+    font-size: 32px;
+  }
+  .keynote .r2-brand {
+    font-size: 26px;
+  }
+  .keynote .r2-brand > svg {
+    width: 34px;
+    height: 34px;
+  }
+  .keynote .keynote-copy > p {
+    font-size: 16px;
+    margin: 14px 0 22px;
+  }
+  .keynote .keynote-introduction .deck-controls {
+    left: 20px;
+    right: 20px;
+    bottom: 20px;
+    gap: 10px;
+  }
+  .keynote .keynote-introduction .chapter-nav {
+    gap: 8px;
+  }
+  .keynote .keynote-introduction .chapter-nav button {
+    font-size: 9px;
+  }
+  .keynote .keynote-introduction .chapter-nav button > span {
+    width: 21px;
+    height: 21px;
+  }
+  .keynote .keynote-introduction .keynote-deck::after {
+    background:
+      linear-gradient(90deg, #061328dc, #06132866 65%, transparent),
+      linear-gradient(0deg, #061328ee, transparent 35%);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .keynote[data-tab="why"] .keynote-header .r2-tabs button[aria-current]:hover {
+    background: #e7f2ff;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .keynote .keynote-story-action:hover .keynote-action-orbit {
+    background: #a1c5ee18;
+    border-color: #d4e8ff;
+  }
+  .keynote .keynote-story-action:hover,
+  .keynote .keynote-example-action:hover {
+    color: #fff;
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "tool": "Built-in image_gen",
+  "purpose": "Remove bottom UI baked into story artwork so the footer can remain transparent.",
+  "prompt": "Use case: precise-object-edit. This approved website image has already had its TOP navigation removed. Preserve that clean top exactly. Remove ONLY the website controls baked into the BOTTOM of the image: the long thin horizontal divider, numbered chapter circles and chapter labels, pause button, replay button, any button outlines, and any flat or gradient dark footer overlay behind those controls. Reconstruct the underlying illustrated scene naturally in that bottom strip so the laboratory bench, cell illustration or research desk continues all the way to the bottom edge. There must be NO separate footer band, flat navy rectangle, dark overlay, gradient cover, new border or new UI. Match the existing faceted illustration and local colors. Preserve original canvas size, framing, every character, object, body-text paragraph, main headline, evidence label and the rest of the artwork as closely as possible. The small explanatory sentence about proteins above the bottom divider, if present, is content and must remain. Change only the bottom website UI strip (roughly the last 13% of the image). Do not crop, zoom, rearrange, add a logo, add navigation or change any upper-page content.",
+  "assets": [
+    {
+      "source": "story-1-header-clean.png",
+      "output": "story-1-navigation-clean.png"
+    },
+    {
+      "source": "story-2-header-clean.png",
+      "output": "story-2-navigation-clean.png"
+    },
+    {
+      "source": "story-3-header-clean.png",
+      "output": "story-3-navigation-clean.png"
+    }
+  ]
+}

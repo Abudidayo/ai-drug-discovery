@@ -1,0 +1,788 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-25T06:06:40.860982+00:00",
+  "title": "Design System: SEGESTA comparison — PROVISIONAL",
+  "extensions": {
+    "colorMeta": {
+      "horizon-ground": {
+        "role": "neutral",
+        "displayName": "Horizon Ground",
+        "tonalRamp": [
+          "oklch(15% 0.0362 306.66)",
+          "oklch(26% 0.0362 306.66)",
+          "oklch(38% 0.0362 306.66)",
+          "oklch(49% 0.0362 306.66)",
+          "oklch(61% 0.0362 306.66)",
+          "oklch(72% 0.0362 306.66)",
+          "oklch(84% 0.0362 306.66)",
+          "oklch(95% 0.0362 306.66)"
+        ]
+      },
+      "horizon-paper": {
+        "role": "neutral",
+        "displayName": "Horizon Paper",
+        "tonalRamp": [
+          "oklch(15% 0.0366 305.75)",
+          "oklch(26% 0.0366 305.75)",
+          "oklch(38% 0.0366 305.75)",
+          "oklch(49% 0.0366 305.75)",
+          "oklch(61% 0.0366 305.75)",
+          "oklch(72% 0.0366 305.75)",
+          "oklch(84% 0.0366 305.75)",
+          "oklch(95% 0.0366 305.75)"
+        ]
+      },
+      "horizon-ink": {
+        "role": "neutral",
+        "displayName": "Horizon Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0080 36.55)",
+          "oklch(26% 0.0080 36.55)",
+          "oklch(38% 0.0080 36.55)",
+          "oklch(49% 0.0080 36.55)",
+          "oklch(61% 0.0080 36.55)",
+          "oklch(72% 0.0080 36.55)",
+          "oklch(84% 0.0080 36.55)",
+          "oklch(95% 0.0080 36.55)"
+        ]
+      },
+      "horizon-muted": {
+        "role": "neutral",
+        "displayName": "Horizon Muted",
+        "tonalRamp": [
+          "oklch(15% 0.0327 312.79)",
+          "oklch(26% 0.0327 312.79)",
+          "oklch(38% 0.0327 312.79)",
+          "oklch(49% 0.0327 312.79)",
+          "oklch(61% 0.0327 312.79)",
+          "oklch(72% 0.0327 312.79)",
+          "oklch(84% 0.0327 312.79)",
+          "oklch(95% 0.0327 312.79)"
+        ]
+      },
+      "horizon-rule": {
+        "role": "neutral",
+        "displayName": "Horizon Rule",
+        "tonalRamp": [
+          "oklch(15% 0.0419 310.06)",
+          "oklch(26% 0.0419 310.06)",
+          "oklch(38% 0.0419 310.06)",
+          "oklch(49% 0.0419 310.06)",
+          "oklch(61% 0.0419 310.06)",
+          "oklch(72% 0.0419 310.06)",
+          "oklch(84% 0.0419 310.06)",
+          "oklch(95% 0.0419 310.06)"
+        ]
+      },
+      "horizon-soft": {
+        "role": "neutral",
+        "displayName": "Horizon Soft",
+        "tonalRamp": [
+          "oklch(15% 0.0392 305.97)",
+          "oklch(26% 0.0392 305.97)",
+          "oklch(38% 0.0392 305.97)",
+          "oklch(49% 0.0392 305.97)",
+          "oklch(61% 0.0392 305.97)",
+          "oklch(72% 0.0392 305.97)",
+          "oklch(84% 0.0392 305.97)",
+          "oklch(95% 0.0392 305.97)"
+        ]
+      },
+      "horizon-accent": {
+        "role": "primary",
+        "displayName": "Horizon Accent",
+        "tonalRamp": [
+          "oklch(15% 0.0327 152.42)",
+          "oklch(26% 0.0327 152.42)",
+          "oklch(38% 0.0327 152.42)",
+          "oklch(49% 0.0327 152.42)",
+          "oklch(61% 0.0327 152.42)",
+          "oklch(72% 0.0327 152.42)",
+          "oklch(84% 0.0327 152.42)",
+          "oklch(95% 0.0327 152.42)"
+        ]
+      },
+      "horizon-accent-ink": {
+        "role": "neutral",
+        "displayName": "Horizon Accent Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0313 169.65)",
+          "oklch(26% 0.0313 169.65)",
+          "oklch(38% 0.0313 169.65)",
+          "oklch(49% 0.0313 169.65)",
+          "oklch(61% 0.0313 169.65)",
+          "oklch(72% 0.0313 169.65)",
+          "oklch(84% 0.0313 169.65)",
+          "oklch(95% 0.0313 169.65)"
+        ]
+      },
+      "horizon-disease": {
+        "role": "secondary",
+        "displayName": "Horizon Disease",
+        "tonalRamp": [
+          "oklch(15% 0.0728 35.00)",
+          "oklch(26% 0.0728 35.00)",
+          "oklch(38% 0.0728 35.00)",
+          "oklch(49% 0.0728 35.00)",
+          "oklch(61% 0.0728 35.00)",
+          "oklch(72% 0.0728 35.00)",
+          "oklch(84% 0.0728 35.00)",
+          "oklch(95% 0.0728 35.00)"
+        ]
+      },
+      "horizon-tertiary": {
+        "role": "tertiary",
+        "displayName": "Horizon Tertiary",
+        "tonalRamp": [
+          "oklch(15% 0.0786 292.76)",
+          "oklch(26% 0.0786 292.76)",
+          "oklch(38% 0.0786 292.76)",
+          "oklch(49% 0.0786 292.76)",
+          "oklch(61% 0.0786 292.76)",
+          "oklch(72% 0.0786 292.76)",
+          "oklch(84% 0.0786 292.76)",
+          "oklch(95% 0.0786 292.76)"
+        ]
+      },
+      "horizon-network-rule": {
+        "role": "neutral",
+        "displayName": "Horizon Network Rule",
+        "tonalRamp": [
+          "oklch(15% 0.0454 314.10)",
+          "oklch(26% 0.0454 314.10)",
+          "oklch(38% 0.0454 314.10)",
+          "oklch(49% 0.0454 314.10)",
+          "oklch(61% 0.0454 314.10)",
+          "oklch(72% 0.0454 314.10)",
+          "oklch(84% 0.0454 314.10)",
+          "oklch(95% 0.0454 314.10)"
+        ]
+      },
+      "horizon-network-node": {
+        "role": "neutral",
+        "displayName": "Horizon Network Node",
+        "tonalRamp": [
+          "oklch(15% 0.0565 314.06)",
+          "oklch(26% 0.0565 314.06)",
+          "oklch(38% 0.0565 314.06)",
+          "oklch(49% 0.0565 314.06)",
+          "oklch(61% 0.0565 314.06)",
+          "oklch(72% 0.0565 314.06)",
+          "oklch(84% 0.0565 314.06)",
+          "oklch(95% 0.0565 314.06)"
+        ]
+      },
+      "specimen-ground": {
+        "role": "neutral",
+        "displayName": "Specimen Ground",
+        "tonalRamp": [
+          "oklch(15% 0.0093 99.98)",
+          "oklch(26% 0.0093 99.98)",
+          "oklch(38% 0.0093 99.98)",
+          "oklch(49% 0.0093 99.98)",
+          "oklch(61% 0.0093 99.98)",
+          "oklch(72% 0.0093 99.98)",
+          "oklch(84% 0.0093 99.98)",
+          "oklch(95% 0.0093 99.98)"
+        ]
+      },
+      "specimen-paper": {
+        "role": "neutral",
+        "displayName": "Specimen Paper",
+        "tonalRamp": [
+          "oklch(15% 0.0080 98.88)",
+          "oklch(26% 0.0080 98.88)",
+          "oklch(38% 0.0080 98.88)",
+          "oklch(49% 0.0080 98.88)",
+          "oklch(61% 0.0080 98.88)",
+          "oklch(72% 0.0080 98.88)",
+          "oklch(84% 0.0080 98.88)",
+          "oklch(95% 0.0080 98.88)"
+        ]
+      },
+      "specimen-ink": {
+        "role": "neutral",
+        "displayName": "Specimen Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0312 158.78)",
+          "oklch(26% 0.0312 158.78)",
+          "oklch(38% 0.0312 158.78)",
+          "oklch(49% 0.0312 158.78)",
+          "oklch(61% 0.0312 158.78)",
+          "oklch(72% 0.0312 158.78)",
+          "oklch(84% 0.0312 158.78)",
+          "oklch(95% 0.0312 158.78)"
+        ]
+      },
+      "specimen-muted": {
+        "role": "neutral",
+        "displayName": "Specimen Muted",
+        "tonalRamp": [
+          "oklch(15% 0.0279 141.44)",
+          "oklch(26% 0.0279 141.44)",
+          "oklch(38% 0.0279 141.44)",
+          "oklch(49% 0.0279 141.44)",
+          "oklch(61% 0.0279 141.44)",
+          "oklch(72% 0.0279 141.44)",
+          "oklch(84% 0.0279 141.44)",
+          "oklch(95% 0.0279 141.44)"
+        ]
+      },
+      "specimen-rule": {
+        "role": "neutral",
+        "displayName": "Specimen Rule",
+        "tonalRamp": [
+          "oklch(15% 0.0234 117.65)",
+          "oklch(26% 0.0234 117.65)",
+          "oklch(38% 0.0234 117.65)",
+          "oklch(49% 0.0234 117.65)",
+          "oklch(61% 0.0234 117.65)",
+          "oklch(72% 0.0234 117.65)",
+          "oklch(84% 0.0234 117.65)",
+          "oklch(95% 0.0234 117.65)"
+        ]
+      },
+      "specimen-soft": {
+        "role": "neutral",
+        "displayName": "Specimen Soft",
+        "tonalRamp": [
+          "oklch(15% 0.0254 114.17)",
+          "oklch(26% 0.0254 114.17)",
+          "oklch(38% 0.0254 114.17)",
+          "oklch(49% 0.0254 114.17)",
+          "oklch(61% 0.0254 114.17)",
+          "oklch(72% 0.0254 114.17)",
+          "oklch(84% 0.0254 114.17)",
+          "oklch(95% 0.0254 114.17)"
+        ]
+      },
+      "specimen-accent": {
+        "role": "primary",
+        "displayName": "Specimen Accent",
+        "tonalRamp": [
+          "oklch(15% 0.0536 161.60)",
+          "oklch(26% 0.0536 161.60)",
+          "oklch(38% 0.0536 161.60)",
+          "oklch(49% 0.0536 161.60)",
+          "oklch(61% 0.0536 161.60)",
+          "oklch(72% 0.0536 161.60)",
+          "oklch(84% 0.0536 161.60)",
+          "oklch(95% 0.0536 161.60)"
+        ]
+      },
+      "specimen-accent-ink": {
+        "role": "neutral",
+        "displayName": "Specimen Accent Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0198 100.58)",
+          "oklch(26% 0.0198 100.58)",
+          "oklch(38% 0.0198 100.58)",
+          "oklch(49% 0.0198 100.58)",
+          "oklch(61% 0.0198 100.58)",
+          "oklch(72% 0.0198 100.58)",
+          "oklch(84% 0.0198 100.58)",
+          "oklch(95% 0.0198 100.58)"
+        ]
+      },
+      "specimen-disease": {
+        "role": "secondary",
+        "displayName": "Specimen Disease",
+        "tonalRamp": [
+          "oklch(15% 0.1007 35.98)",
+          "oklch(26% 0.1007 35.98)",
+          "oklch(38% 0.1007 35.98)",
+          "oklch(49% 0.1007 35.98)",
+          "oklch(61% 0.1007 35.98)",
+          "oklch(72% 0.1007 35.98)",
+          "oklch(84% 0.1007 35.98)",
+          "oklch(95% 0.1007 35.98)"
+        ]
+      },
+      "specimen-tertiary": {
+        "role": "tertiary",
+        "displayName": "Specimen Tertiary",
+        "tonalRamp": [
+          "oklch(15% 0.0629 92.07)",
+          "oklch(26% 0.0629 92.07)",
+          "oklch(38% 0.0629 92.07)",
+          "oklch(49% 0.0629 92.07)",
+          "oklch(61% 0.0629 92.07)",
+          "oklch(72% 0.0629 92.07)",
+          "oklch(84% 0.0629 92.07)",
+          "oklch(95% 0.0629 92.07)"
+        ]
+      },
+      "specimen-network-rule": {
+        "role": "neutral",
+        "displayName": "Specimen Network Rule",
+        "tonalRamp": [
+          "oklch(15% 0.0648 135.43)",
+          "oklch(26% 0.0648 135.43)",
+          "oklch(38% 0.0648 135.43)",
+          "oklch(49% 0.0648 135.43)",
+          "oklch(61% 0.0648 135.43)",
+          "oklch(72% 0.0648 135.43)",
+          "oklch(84% 0.0648 135.43)",
+          "oklch(95% 0.0648 135.43)"
+        ]
+      },
+      "specimen-network-node": {
+        "role": "neutral",
+        "displayName": "Specimen Network Node",
+        "tonalRamp": [
+          "oklch(15% 0.0657 135.66)",
+          "oklch(26% 0.0657 135.66)",
+          "oklch(38% 0.0657 135.66)",
+          "oklch(49% 0.0657 135.66)",
+          "oklch(61% 0.0657 135.66)",
+          "oklch(72% 0.0657 135.66)",
+          "oklch(84% 0.0657 135.66)",
+          "oklch(95% 0.0657 135.66)"
+        ]
+      },
+      "relay-ground": {
+        "role": "neutral",
+        "displayName": "Relay Ground",
+        "tonalRamp": [
+          "oklch(15% 0.0041 91.45)",
+          "oklch(26% 0.0041 91.45)",
+          "oklch(38% 0.0041 91.45)",
+          "oklch(49% 0.0041 91.45)",
+          "oklch(61% 0.0041 91.45)",
+          "oklch(72% 0.0041 91.45)",
+          "oklch(84% 0.0041 91.45)",
+          "oklch(95% 0.0041 91.45)"
+        ]
+      },
+      "relay-paper": {
+        "role": "neutral",
+        "displayName": "Relay Paper",
+        "tonalRamp": [
+          "oklch(15% 0.0000 89.88)",
+          "oklch(26% 0.0000 89.88)",
+          "oklch(38% 0.0000 89.88)",
+          "oklch(49% 0.0000 89.88)",
+          "oklch(61% 0.0000 89.88)",
+          "oklch(72% 0.0000 89.88)",
+          "oklch(84% 0.0000 89.88)",
+          "oklch(95% 0.0000 89.88)"
+        ]
+      },
+      "relay-ink": {
+        "role": "neutral",
+        "displayName": "Relay Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0188 238.80)",
+          "oklch(26% 0.0188 238.80)",
+          "oklch(38% 0.0188 238.80)",
+          "oklch(49% 0.0188 238.80)",
+          "oklch(61% 0.0188 238.80)",
+          "oklch(72% 0.0188 238.80)",
+          "oklch(84% 0.0188 238.80)",
+          "oklch(95% 0.0188 238.80)"
+        ]
+      },
+      "relay-muted": {
+        "role": "neutral",
+        "displayName": "Relay Muted",
+        "tonalRamp": [
+          "oklch(15% 0.0164 231.46)",
+          "oklch(26% 0.0164 231.46)",
+          "oklch(38% 0.0164 231.46)",
+          "oklch(49% 0.0164 231.46)",
+          "oklch(61% 0.0164 231.46)",
+          "oklch(72% 0.0164 231.46)",
+          "oklch(84% 0.0164 231.46)",
+          "oklch(95% 0.0164 231.46)"
+        ]
+      },
+      "relay-rule": {
+        "role": "neutral",
+        "displayName": "Relay Rule",
+        "tonalRamp": [
+          "oklch(15% 0.0067 160.06)",
+          "oklch(26% 0.0067 160.06)",
+          "oklch(38% 0.0067 160.06)",
+          "oklch(49% 0.0067 160.06)",
+          "oklch(61% 0.0067 160.06)",
+          "oklch(72% 0.0067 160.06)",
+          "oklch(84% 0.0067 160.06)",
+          "oklch(95% 0.0067 160.06)"
+        ]
+      },
+      "relay-soft": {
+        "role": "neutral",
+        "displayName": "Relay Soft",
+        "tonalRamp": [
+          "oklch(15% 0.0069 124.45)",
+          "oklch(26% 0.0069 124.45)",
+          "oklch(38% 0.0069 124.45)",
+          "oklch(49% 0.0069 124.45)",
+          "oklch(61% 0.0069 124.45)",
+          "oklch(72% 0.0069 124.45)",
+          "oklch(84% 0.0069 124.45)",
+          "oklch(95% 0.0069 124.45)"
+        ]
+      },
+      "relay-accent": {
+        "role": "primary",
+        "displayName": "Relay Accent",
+        "tonalRamp": [
+          "oklch(15% 0.1416 29.20)",
+          "oklch(26% 0.1416 29.20)",
+          "oklch(38% 0.1416 29.20)",
+          "oklch(49% 0.1416 29.20)",
+          "oklch(61% 0.1416 29.20)",
+          "oklch(72% 0.1416 29.20)",
+          "oklch(84% 0.1416 29.20)",
+          "oklch(95% 0.1416 29.20)"
+        ]
+      },
+      "relay-accent-ink": {
+        "role": "neutral",
+        "displayName": "Relay Accent Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0124 75.37)",
+          "oklch(26% 0.0124 75.37)",
+          "oklch(38% 0.0124 75.37)",
+          "oklch(49% 0.0124 75.37)",
+          "oklch(61% 0.0124 75.37)",
+          "oklch(72% 0.0124 75.37)",
+          "oklch(84% 0.0124 75.37)",
+          "oklch(95% 0.0124 75.37)"
+        ]
+      },
+      "relay-disease": {
+        "role": "secondary",
+        "displayName": "Relay Disease",
+        "tonalRamp": [
+          "oklch(15% 0.1239 75.57)",
+          "oklch(26% 0.1239 75.57)",
+          "oklch(38% 0.1239 75.57)",
+          "oklch(49% 0.1239 75.57)",
+          "oklch(61% 0.1239 75.57)",
+          "oklch(72% 0.1239 75.57)",
+          "oklch(84% 0.1239 75.57)",
+          "oklch(95% 0.1239 75.57)"
+        ]
+      },
+      "relay-tertiary": {
+        "role": "tertiary",
+        "displayName": "Relay Tertiary",
+        "tonalRamp": [
+          "oklch(15% 0.0663 195.36)",
+          "oklch(26% 0.0663 195.36)",
+          "oklch(38% 0.0663 195.36)",
+          "oklch(49% 0.0663 195.36)",
+          "oklch(61% 0.0663 195.36)",
+          "oklch(72% 0.0663 195.36)",
+          "oklch(84% 0.0663 195.36)",
+          "oklch(95% 0.0663 195.36)"
+        ]
+      },
+      "relay-network-node": {
+        "role": "neutral",
+        "displayName": "Relay Network Node",
+        "tonalRamp": [
+          "oklch(15% 0.0265 186.92)",
+          "oklch(26% 0.0265 186.92)",
+          "oklch(38% 0.0265 186.92)",
+          "oklch(49% 0.0265 186.92)",
+          "oklch(61% 0.0265 186.92)",
+          "oklch(72% 0.0265 186.92)",
+          "oklch(84% 0.0265 186.92)",
+          "oklch(95% 0.0265 186.92)"
+        ]
+      },
+      "relay-network-rule": {
+        "role": "neutral",
+        "displayName": "Relay Network Rule",
+        "tonalRamp": [
+          "oklch(15% 0.0265 186.92)",
+          "oklch(26% 0.0265 186.92)",
+          "oklch(38% 0.0265 186.92)",
+          "oklch(49% 0.0265 186.92)",
+          "oklch(61% 0.0265 186.92)",
+          "oklch(72% 0.0265 186.92)",
+          "oklch(84% 0.0265 186.92)",
+          "oklch(95% 0.0265 186.92)"
+        ]
+      },
+      "specimen-plate": {
+        "role": "neutral",
+        "displayName": "Specimen Plate",
+        "tonalRamp": [
+          "oklch(15% 0.0420 105.71)",
+          "oklch(26% 0.0420 105.71)",
+          "oklch(38% 0.0420 105.71)",
+          "oklch(49% 0.0420 105.71)",
+          "oklch(61% 0.0420 105.71)",
+          "oklch(72% 0.0420 105.71)",
+          "oklch(84% 0.0420 105.71)",
+          "oklch(95% 0.0420 105.71)"
+        ]
+      },
+      "relay-rail": {
+        "role": "neutral",
+        "displayName": "Relay Rail",
+        "tonalRamp": [
+          "oklch(15% 0.0183 231.94)",
+          "oklch(26% 0.0183 231.94)",
+          "oklch(38% 0.0183 231.94)",
+          "oklch(49% 0.0183 231.94)",
+          "oklch(61% 0.0183 231.94)",
+          "oklch(72% 0.0183 231.94)",
+          "oklch(84% 0.0183 231.94)",
+          "oklch(95% 0.0183 231.94)"
+        ]
+      },
+      "relay-ticket": {
+        "role": "neutral",
+        "displayName": "Relay Ticket",
+        "tonalRamp": [
+          "oklch(15% 0.0082 91.48)",
+          "oklch(26% 0.0082 91.48)",
+          "oklch(38% 0.0082 91.48)",
+          "oklch(49% 0.0082 91.48)",
+          "oklch(61% 0.0082 91.48)",
+          "oklch(72% 0.0082 91.48)",
+          "oklch(84% 0.0082 91.48)",
+          "oklch(95% 0.0082 91.48)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "horizon-display": {
+        "displayName": "Horizon Display",
+        "purpose": "Observed prototype role; scoped by world prefix."
+      },
+      "specimen-display": {
+        "displayName": "Specimen Display",
+        "purpose": "Observed prototype role; scoped by world prefix."
+      },
+      "relay-display": {
+        "displayName": "Relay Display",
+        "purpose": "Observed prototype role; scoped by world prefix."
+      },
+      "interface-body": {
+        "displayName": "Interface Body",
+        "purpose": "Observed prototype role; scoped by world prefix."
+      },
+      "specimen-body": {
+        "displayName": "Specimen Body",
+        "purpose": "Observed prototype role; scoped by world prefix."
+      },
+      "motion-label": {
+        "displayName": "Motion Label",
+        "purpose": "Observed prototype role; scoped by world prefix."
+      },
+      "horizon-results-title": {
+        "displayName": "Horizon Results Title",
+        "purpose": "Observed prototype role; scoped by world prefix."
+      },
+      "specimen-results-title": {
+        "displayName": "Specimen Results Title",
+        "purpose": "Observed prototype role; scoped by world prefix."
+      },
+      "relay-results-title": {
+        "displayName": "Relay Results Title",
+        "purpose": "Observed prototype role; scoped by world prefix."
+      }
+    },
+    "shadows": [
+      {
+        "name": "relay-evidence-ticket",
+        "value": "0 5px 12px #26392b08",
+        "purpose": "Soft lift beneath moving Relay evidence tickets only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "shared-ease",
+        "value": "cubic-bezier(0.23, 1, 0.32, 1)",
+        "purpose": "Shared reviewer motion."
+      },
+      {
+        "name": "button-color",
+        "value": "160ms ease-out",
+        "purpose": "Control color and background transitions."
+      },
+      {
+        "name": "button-press",
+        "value": "140ms ease-out",
+        "purpose": "Control transform transition."
+      },
+      {
+        "name": "horizon-camera",
+        "value": "18s ease-in-out infinite",
+        "purpose": "Laboratory camera drift."
+      },
+      {
+        "name": "horizon-inspection",
+        "value": "5s linear infinite",
+        "purpose": "Microscope inspection ring."
+      },
+      {
+        "name": "horizon-compounds",
+        "value": "6s ease-in-out infinite",
+        "purpose": "Inspected compound dots."
+      },
+      {
+        "name": "horizon-bubbles",
+        "value": "3.7s linear infinite",
+        "purpose": "Flask bubbles."
+      },
+      {
+        "name": "specimen-ledger",
+        "value": "4.8s ease-in-out infinite",
+        "purpose": "Research ledger traveler."
+      },
+      {
+        "name": "relay-press",
+        "value": "5s linear infinite",
+        "purpose": "Evidence press signal."
+      },
+      {
+        "name": "relay-tickets",
+        "value": "5s ease-in-out infinite",
+        "purpose": "Floating evidence tickets."
+      },
+      {
+        "name": "relay-map",
+        "value": "4s linear infinite",
+        "purpose": "Orthogonal network signal."
+      },
+      {
+        "name": "relay-sort",
+        "value": "6s cubic-bezier(0.77, 0, 0.175, 1) infinite",
+        "purpose": "Illustrative candidate reordering."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "relay-density",
+        "value": "1250px"
+      },
+      {
+        "name": "horizon-specimen-density",
+        "value": "1200px"
+      },
+      {
+        "name": "relay-stack",
+        "value": "1000px"
+      },
+      {
+        "name": "shared-stack",
+        "value": "900px"
+      },
+      {
+        "name": "relay-header",
+        "value": "650px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Horizon primary action — provisional",
+      "kind": "button",
+      "refersTo": "horizon-button-primary",
+      "description": "Whole-world action treatment; no production selection.",
+      "html": "<button class=\"ds-horizon-button\">Explore the workflow <svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" aria-hidden=\"true\"><path d=\"M5 12h14m-5-5 5 5-5 5\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg></button>",
+      "css": ".ds-horizon-button { display:inline-flex; align-items:center; justify-content:space-between; gap:20px; background:#d2e8d7; color:#263c34; border:1px solid #d2e8d7; border-radius:3px; padding:14px 19px; font:600 12px/1.6 \"Instrument Sans Variable\",sans-serif; cursor:pointer; transition:color 160ms ease-out,background-color 160ms ease-out,transform 140ms ease-out; } .ds-horizon-button:hover { filter:brightness(1.06); } .ds-horizon-button:focus-visible { outline:2px solid #d2e8d7; outline-offset:5px; } .ds-horizon-button:active { transform:scale(.98); } @media(prefers-reduced-motion:reduce) { .ds-horizon-button { transition:none; } }"
+    },
+    {
+      "name": "Specimen primary action — provisional",
+      "kind": "button",
+      "refersTo": "specimen-button-primary",
+      "description": "Whole-world action treatment; no production selection.",
+      "html": "<button class=\"ds-specimen-button\">Explore the workflow <svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" aria-hidden=\"true\"><path d=\"M5 12h14m-5-5 5 5-5 5\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg></button>",
+      "css": ".ds-specimen-button { display:inline-flex; align-items:center; justify-content:space-between; gap:20px; background:#3d6350; color:#faf8e9; border:1px solid #3d6350; border-radius:0; padding:14px 20px; font:600 12px/1.6 \"Scene DM Sans\",sans-serif; cursor:pointer; transition:color 160ms ease-out,background-color 160ms ease-out,transform 140ms ease-out; } .ds-specimen-button:hover { filter:brightness(1.06); } .ds-specimen-button:focus-visible { outline:2px solid #3d6350; outline-offset:5px; } .ds-specimen-button:active { transform:scale(.98); } @media(prefers-reduced-motion:reduce) { .ds-specimen-button { transition:none; } }"
+    },
+    {
+      "name": "Relay primary action — provisional",
+      "kind": "button",
+      "refersTo": "relay-button-primary",
+      "description": "Whole-world action treatment; no production selection.",
+      "html": "<button class=\"ds-relay-button\">Explore the workflow <svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" aria-hidden=\"true\"><path d=\"M5 12h14m-5-5 5 5-5 5\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg></button>",
+      "css": ".ds-relay-button { display:inline-flex; align-items:center; justify-content:space-between; gap:20px; background:#ac4236; color:#fff9f1; border:1px solid #ac4236; border-radius:7px; padding:14px 18px; font:600 12px/1.6 \"Instrument Sans Variable\",sans-serif; cursor:pointer; transition:color 160ms ease-out,background-color 160ms ease-out,transform 140ms ease-out; } .ds-relay-button:hover { filter:brightness(1.06); } .ds-relay-button:focus-visible { outline:2px solid #ac4236; outline-offset:5px; } .ds-relay-button:active { transform:scale(.98); } @media(prefers-reduced-motion:reduce) { .ds-relay-button { transition:none; } }"
+    },
+    {
+      "name": "Horizon navigation — provisional",
+      "kind": "nav",
+      "description": "Visual navigation sample; the app supplies selection state and content switching.",
+      "html": "<nav class=\"ds-horizon-nav\" aria-label=\"Explore the project\"><button aria-current=\"page\">Problem &amp; solution</button><button>Workflow</button><button>Results</button></nav>",
+      "css": ".ds-horizon-nav { display:flex; gap:26px; background:#21182a;  } .ds-horizon-nav button { position:relative; background:transparent; border:0; border-bottom:1px solid transparent; padding:12px 0; color:#bdb0c5; font:12px/1.6 \"Instrument Sans Variable\",sans-serif; cursor:pointer; } .ds-horizon-nav button[aria-current] { color:#f7f0ee; } .ds-horizon-nav button[aria-current]::after { content:\"\"; position:absolute; left:50%; bottom:1px; width:4px; height:4px; border-radius:50%; background:#d2e8d7; } .ds-horizon-nav button:hover { color:#d2e8d7; } .ds-horizon-nav button:focus-visible { outline:2px solid #d2e8d7; outline-offset:5px; } .ds-horizon-nav button:active { transform:scale(.98); }"
+    },
+    {
+      "name": "Specimen navigation — provisional",
+      "kind": "nav",
+      "description": "Visual navigation sample; the app supplies selection state and content switching.",
+      "html": "<nav class=\"ds-specimen-nav\" aria-label=\"Explore the project\"><button aria-current=\"page\">Problem &amp; solution</button><button>Workflow</button><button>Results</button></nav>",
+      "css": ".ds-specimen-nav { display:flex; gap:26px; background:#f6f5ee; border-bottom:1px solid #d1d5c4; } .ds-specimen-nav button { position:relative; background:transparent; border:0; border-bottom:1px solid transparent; padding:17px 0; color:#637061; font:12px/1.6 \"Instrument Sans Variable\",sans-serif; cursor:pointer; } .ds-specimen-nav button[aria-current] { color:#293c31; } .ds-specimen-nav button[aria-current] { border-bottom-color:#293c31; } .ds-specimen-nav button:hover { color:#3d6350; } .ds-specimen-nav button:focus-visible { outline:2px solid #3d6350; outline-offset:5px; } .ds-specimen-nav button:active { transform:scale(.98); }"
+    },
+    {
+      "name": "Relay navigation — provisional",
+      "kind": "nav",
+      "description": "Visual navigation sample; the app supplies selection state and content switching.",
+      "html": "<nav class=\"ds-relay-nav\" aria-label=\"Explore the project\"><button aria-current=\"page\">Problem &amp; solution</button><button>Workflow</button><button>Results</button></nav>",
+      "css": ".ds-relay-nav { display:flex; gap:26px; background:#fcfbf8; flex-direction:column; padding:16px; background:#29343a; } .ds-relay-nav button { position:relative; background:transparent; border:0; border-bottom:1px solid transparent; padding:14px 12px; color:#bdcbc9; font:12px/1.6 \"Instrument Sans Variable\",sans-serif; cursor:pointer; } .ds-relay-nav button[aria-current] { color:#242e35; } .ds-relay-nav button[aria-current] { background:#455451; color:#f5f6ef; } .ds-relay-nav button:hover { color:#ac4236; } .ds-relay-nav button:focus-visible { outline:2px solid #ac4236; outline-offset:5px; } .ds-relay-nav button:active { transform:scale(.98); }"
+    },
+    {
+      "name": "Horizon search — provisional",
+      "kind": "input",
+      "refersTo": "horizon-search",
+      "description": "Compound/protein search; local world colors and compact height.",
+      "html": "<label class=\"ds-search\">Search compounds<input aria-label=\"Search compounds or proteins\" placeholder=\"Compound or protein\" type=\"search\"></label>",
+      "css": ".ds-search { display:flex; gap:9px; align-items:center; padding:0 12px; height:39px; border:1px solid #493c53; background:#2b2235; border-radius:3px; color:#bdb0c5; font:11px/1.6 \"Instrument Sans Variable\",sans-serif; } .ds-search input { width:100%; border:0; background:transparent; color:#f7f0ee; font:inherit; } .ds-search input::placeholder { color:#bdb0c5; opacity:1; } .ds-search input:focus-visible { outline:2px solid #d2e8d7; outline-offset:4px; }"
+    },
+    {
+      "name": "Specimen reference metadata — provisional",
+      "kind": "chip",
+      "description": "Known-reference metadata; static, not an action or efficacy status.",
+      "html": "<span class=\"ds-reference\">Known reference</span>",
+      "css": ".ds-reference { display:inline-block; padding:4px 7px; color:#293c31; background:#e9ecd9; white-space:nowrap; font:8px/1.6 \"Scene DM Sans\",sans-serif; }"
+    },
+    {
+      "name": "Relay evidence ticket — provisional",
+      "kind": "card",
+      "description": "Ticket material from the animated evidence press; static preview preserves the source geometry.",
+      "html": "<div class=\"ds-ticket\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" aria-hidden=\"true\"><path d=\"M5 12h14m-5-5 5 5-5 5\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg><span>Compound targets</span></div>",
+      "css": ".ds-ticket { display:flex; align-items:center; gap:15px; width:78%; padding:16px 20px; background:#fffdf7; color:#242e35; border:1px solid #d0d8ca; border-radius:7px; box-shadow:0 5px 12px #26392b08; font:13px/1.6 \"Instrument Sans Variable\",sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Three complete worlds, awaiting a choice",
+    "overview": "PROVISIONAL: this file records three implemented, unselected alternatives. It applies only to this local comparison, not the production application or earlier prototype rounds. No approved comp or winning design exists. The user must select a direction before production integration.\n\nHorizon makes the researcher story cinematic through an original illustrated laboratory. Specimen makes evidence feel like an annotated scientific field guide. Relay makes the same research leads feel like a working research workspace. SEGESTA informed animation and storytelling; it did not establish a mountain or city identity.",
+    "keyCharacteristics": [
+      "Three complete websites with Problem & solution, Workflow and Results.",
+      "Distinct palettes, display type, navigation, diagrams, reading order and motion.",
+      "Shared labelled example data, inspectable evidence and explicit research limitations.",
+      "Laptop-first comparison; narrower layouts are fallbacks, not a phone design commitment."
+    ],
+    "rules": [
+      {
+        "name": "The Separate Worlds Rule",
+        "body": "Keep the three worlds distinct until a direction is selected; do not combine their palettes or component treatments into a production identity.",
+        "section": "colors"
+      },
+      {
+        "name": "The Explainable Motion Rule",
+        "body": "Motion explains a research step and retains pause, replay and reduced-motion alternatives.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do preserve each world’s display family, palette and navigation when extending this comparison.",
+      "Do keep example-data and scientific limitations visible beside research results.",
+      "Do keep the candidate title and reference badge free to wrap independently.",
+      "Do use authored SVG icons and functional stage counts.",
+      "Do preserve labelled controls, keyboard focus and reduced-motion behavior."
+    ],
+    "donts": [
+      "Don’t promote any of these provisional worlds to the root production design system before the user chooses.",
+      "Don’t treat SEGESTA as authority for mountain scenery.",
+      "Don’t relabel legacy proximity fixture scores as current RWR results or a recorded conformer as a docking pose.",
+      "Don’t reintroduce redundant heading eyebrows or Unicode glyph icons removed by finish review."
+    ]
+  }
+}

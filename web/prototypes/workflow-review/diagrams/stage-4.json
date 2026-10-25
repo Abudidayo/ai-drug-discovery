@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Inspect evidence and optional binding poses",
+    "quality_profile": "showcase",
+    "animation": "none",
+    "viewBox": [
+      1100,
+      550
+    ]
+  },
+  "components": [
+    {
+      "id": "comparison",
+      "type": "frontend",
+      "label": "Compare candidates",
+      "sublabel": "Computational rank + jury assessment",
+      "pos": [
+        40,
+        80
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "inspection",
+      "type": "frontend",
+      "label": "Inspect sources + paths",
+      "sublabel": "Proximity paths and source evidence",
+      "pos": [
+        425,
+        80
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "saved",
+      "type": "database",
+      "label": "Reproducible experiment",
+      "sublabel": "Data versions, settings and evidence",
+      "pos": [
+        810,
+        80
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "structures",
+      "type": "database",
+      "label": "RCSB PDB + ligand",
+      "sublabel": "Supported drug–protein pairs only",
+      "pos": [
+        40,
+        340
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "preparation",
+      "type": "backend",
+      "label": "Docker preparation",
+      "sublabel": "Prepare molecular inputs",
+      "pos": [
+        425,
+        340
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "vina",
+      "type": "backend",
+      "label": "AutoDock Vina",
+      "sublabel": "Predicted poses for 3D inspection",
+      "pos": [
+        810,
+        340
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "Optional structural exploration"
+    }
+  ],
+  "connections": [
+    {
+      "from": "comparison",
+      "to": "inspection"
+    },
+    {
+      "from": "inspection",
+      "to": "saved"
+    },
+    {
+      "from": "structures",
+      "to": "preparation"
+    },
+    {
+      "from": "preparation",
+      "to": "vina"
+    }
+  ]
+}

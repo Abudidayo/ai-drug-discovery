@@ -1,0 +1,420 @@
+.specimen {
+  --ground: #f6f5ee;
+  --paper: #fbfaf4;
+  --ink: #293c31;
+  --muted: #637061;
+  --rule: #d1d5c4;
+  --soft: #e9ecd9;
+  --accent: #3d6350;
+  --accent-ink: #faf8e9;
+  --disease: #af6551;
+  --tertiary: #827449;
+  --network-rule: #6d8760;
+  --network-node: #78936b;
+  --radius: 0;
+  font-family: "Scene DM Sans", sans-serif;
+}
+.specimen-header {
+  height: 101px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 35px;
+  margin: 0 5%;
+  border-bottom: 1px solid var(--rule);
+}
+.specimen .site-brand {
+  font-size: 13px;
+}
+.specimen .site-brand small {
+  letter-spacing: 0.03em;
+  font-size: 11px;
+}
+.specimen-header > span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.specimen-edition {
+  font-family: "Scene Newsreader", serif;
+  font-size: 18px !important;
+  font-style: italic;
+}
+.specimen > .site-tabs {
+  margin: 0 5%;
+  border-bottom: 1px solid var(--rule);
+  gap: 38px;
+}
+.specimen .site-tabs button {
+  font-size: 12px;
+  padding: 17px 0;
+  margin-bottom: -1px;
+  border-bottom: 1px solid transparent;
+}
+.specimen .site-tabs button[aria-current] {
+  border-bottom-color: var(--ink);
+}
+.specimen main {
+  padding: 0 5%;
+}
+.specimen-hero {
+  display: grid;
+  grid-template-columns: 1.08fr 1fr;
+  gap: 7%;
+  padding: 55px 0 56px;
+  align-items: start;
+}
+.specimen h1,
+.specimen h2 {
+  font-family: "Scene Newsreader", Georgia, serif;
+}
+.specimen-hero h1 {
+  font-size: clamp(61px, 6.7vw, 96px);
+  font-weight: 350;
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+.specimen h1 em,
+.specimen h2 em {
+  font-weight: inherit;
+}
+.specimen-lead > p {
+  max-width: 42ch;
+  margin-top: 25px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.specimen-lead > .site-action {
+  margin-top: 26px;
+  font-size: 12px;
+  padding: 14px 20px;
+}
+.specimen-margin-note {
+  border-top: 1px solid var(--rule);
+  margin-top: 35px;
+  padding-top: 16px;
+  display: flex;
+  gap: 35px;
+  align-items: flex-start;
+}
+.specimen-margin-note > span {
+  font-size: 10px;
+  color: var(--muted);
+  padding-top: 3px;
+  white-space: nowrap;
+}
+.specimen-margin-note p {
+  font-family: "Scene Newsreader", serif;
+  font-size: 22px;
+  line-height: 1.35;
+  font-style: italic;
+}
+.specimen-plate {
+  background: #eeedcd;
+  border: 1px solid #d6d9bc;
+  padding: 23px 25px 15px;
+  position: relative;
+  margin-top: 6px;
+}
+.plate-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  font-size: 9px;
+  color: #5e6b50;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #cfd2b4;
+}
+.specimen-plate .biology-network {
+  margin: 24px 0 25px;
+}
+.specimen-plate .biology-network svg {
+  max-height: 305px;
+}
+.specimen-plate .network-tag {
+  background: #eeedcd;
+  border-color: #c4c9aa;
+  font-size: 9px;
+}
+.specimen-plate .diagram-caption {
+  color: #606c52;
+  font-size: 9px;
+  margin-top: 18px;
+}
+.specimen-plate figcaption {
+  display: flex;
+  gap: 19px;
+  padding: 18px 0;
+  border-top: 1px solid #cfd2b4;
+  border-bottom: 1px solid #cfd2b4;
+}
+.plate-letter {
+  font-family: "Scene Newsreader", serif;
+  font-style: italic;
+  font-size: 44px;
+  line-height: 1;
+}
+.specimen-plate figcaption p {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.specimen-plate figcaption strong {
+  font-weight: 500;
+}
+.specimen-plate .motion-controls {
+  margin-top: 9px;
+  font-size: 10px;
+  justify-content: space-between;
+  gap: 8px;
+}
+.specimen-plate .motion-status {
+  color: #5b684e;
+}
+.specimen-argument {
+  border-top: 1px solid var(--rule);
+  padding: 45px 0;
+  display: grid;
+  grid-template-columns: 1.08fr 1fr;
+  gap: 7%;
+}
+.specimen-argument h2 {
+  font-size: 39px;
+  line-height: 1.13;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+}
+.specimen-argument > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 30px;
+}
+.specimen-argument p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.specimen-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  font-size: 11px;
+  grid-column: 1 / -1;
+  margin-top: 20px;
+}
+.specimen-link svg {
+  margin-left: 15px;
+}
+.specimen .source-strip {
+  margin-bottom: 45px;
+}
+.specimen .site-footer {
+  margin: 0 5%;
+}
+.specimen .workflow-page,
+.specimen .results-page {
+  padding: 45px 0;
+}
+.specimen .page-title h1 {
+  font-size: clamp(45px, 4.8vw, 71px);
+  line-height: 1.02;
+  font-weight: 350;
+}
+.specimen .page-title > p,
+.specimen .page-title > div {
+  font-size: 12px;
+}
+.specimen .workflow-canvas {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  border-top: 1px solid var(--rule);
+}
+.specimen .stage-list {
+  padding: 30px 35px 0 0;
+  border-right: 1px solid var(--rule);
+}
+.specimen .stage-list button {
+  padding: 22px 0;
+  width: 100%;
+  border-bottom: 1px solid var(--rule);
+}
+.specimen .stage-list button > svg {
+  opacity: 0;
+}
+.specimen .stage-list button[aria-pressed="true"] > svg {
+  opacity: 1;
+}
+.specimen .stage-list button[aria-pressed="true"] .stage-number {
+  color: var(--accent);
+  background: var(--soft);
+}
+.specimen .stage-number {
+  display: inline-flex;
+  width: 31px;
+  height: 31px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+}
+.specimen .workflow-explanation {
+  padding: 32px 0 0 45px;
+}
+.specimen .stage-description {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 35px;
+}
+.specimen .stage-description .step-count {
+  grid-column: 1 / -1;
+}
+.specimen .stage-description h2 {
+  font-size: 31px;
+  margin-top: 10px;
+}
+.specimen .stage-description > p {
+  padding-top: 12px;
+  font-size: 12px;
+}
+.specimen .stage-visual {
+  background: #eeedcd;
+  border: 1px solid #d6d9bc;
+  margin-top: 22px;
+  min-height: 340px;
+  padding: 10px 25px;
+}
+.specimen .stage-visual .network-tag {
+  background: #eeedcd;
+}
+.specimen .stage-visual .biology-network {
+  max-width: 550px;
+  margin: auto;
+}
+.specimen .stage-output {
+  padding: 18px 0;
+  font-size: 10px;
+}
+.specimen .workflow-close {
+  margin-top: 15px;
+}
+.specimen .demo-label {
+  background: #eeedcd;
+  font-size: 10px;
+  padding: 10px 13px;
+}
+.specimen .results-layout {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.5fr);
+  gap: 5%;
+}
+.specimen .evidence-sheet {
+  background: transparent;
+  padding: 0 30px 0 0;
+  border: 0;
+  border-right: 1px solid var(--rule);
+}
+.specimen .evidence-title h3 {
+  font-family: "Scene Newsreader", serif;
+  font-size: 37px;
+}
+.specimen .reference-label {
+  font-size: 8px;
+}
+.specimen .table-title h2 {
+  font-family: "Scene Newsreader", serif;
+  font-size: 30px;
+  font-weight: 400;
+}
+.specimen .table-title > span {
+  font-size: 9px;
+}
+.specimen .rank-explainer {
+  border-top: 1px solid var(--rule);
+  padding-top: 32px;
+  margin-top: 40px;
+}
+.specimen .rank-copy h2 {
+  font-size: 39px;
+}
+.specimen .rank-ledger-row {
+  padding: 18px 12px;
+}
+.specimen .ledger-traveler {
+  border-radius: 0;
+  width: 5px;
+  height: 9px;
+  top: -4px;
+  animation-duration: 4.8s;
+}
+.specimen .method-note {
+  margin-top: 0;
+}
+@media (max-width: 1200px) {
+  .specimen-hero {
+    gap: 5%;
+  }
+  .specimen-hero h1 {
+    font-size: 75px;
+  }
+  .specimen .workflow-canvas {
+    grid-template-columns: 265px minmax(0, 1fr);
+  }
+  .specimen .workflow-explanation {
+    padding-left: 30px;
+  }
+  .specimen .stage-description {
+    gap: 0 20px;
+  }
+  .specimen .stage-list {
+    padding-right: 22px;
+  }
+}
+@media (max-width: 900px) {
+  .specimen-header {
+    height: 88px;
+  }
+  .specimen-edition {
+    display: none;
+  }
+  .specimen-hero {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+  .specimen-hero h1 {
+    font-size: 71px;
+  }
+  .specimen-plate {
+    max-width: 600px;
+  }
+  .specimen-argument {
+    grid-template-columns: 1fr;
+    gap: 25px;
+  }
+  .specimen-argument > div {
+    gap: 25px;
+  }
+  .specimen .workflow-canvas {
+    grid-template-columns: 1fr;
+  }
+  .specimen .stage-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border: 0;
+    padding: 0;
+    gap: 0 22px;
+  }
+  .specimen .workflow-explanation {
+    padding-left: 0;
+  }
+  .specimen .results-layout {
+    grid-template-columns: 1fr;
+  }
+  .specimen .evidence-sheet {
+    border: 0;
+    padding: 20px;
+    background: var(--soft);
+    order: 2;
+  }
+  .specimen .page-title h1 {
+    font-size: 54px;
+  }
+}

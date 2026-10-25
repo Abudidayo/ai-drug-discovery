@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "How network relevance becomes a shortlist",
+    "quality_profile": "showcase",
+    "animation": "none",
+    "viewBox": [
+      1100,
+      550
+    ],
+    "legend": {
+      "mode": "hidden"
+    }
+  },
+  "components": [
+    {
+      "id": "physical",
+      "type": "database",
+      "label": "Physical STRING graph",
+      "sublabel": "Top 50 evidence-only disease seeds",
+      "pos": [
+        40,
+        100
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "evidence",
+      "type": "database",
+      "label": "Open Targets evidence",
+      "sublabel": "Direct disease–target associations",
+      "pos": [
+        40,
+        330
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "rwr",
+      "type": "backend",
+      "label": "Random Walk with Restart",
+      "sublabel": "Mean stationary mass at drug targets",
+      "pos": [
+        425,
+        100
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "10 places · default restart 0.3"
+    },
+    {
+      "id": "direct",
+      "type": "backend",
+      "label": "Direct-evidence ranking",
+      "sublabel": "Disease–target evidence score",
+      "pos": [
+        425,
+        330
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "5 evidence places"
+    },
+    {
+      "id": "select",
+      "type": "backend",
+      "label": "Deduplicate + refill",
+      "sublabel": "Up to 15 unique candidates",
+      "pos": [
+        810,
+        215
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "Missing coverage stays explicit"
+    }
+  ],
+  "connections": [
+    {
+      "from": "physical",
+      "to": "rwr"
+    },
+    {
+      "from": "evidence",
+      "to": "direct"
+    },
+    {
+      "from": "rwr",
+      "to": "select"
+    },
+    {
+      "from": "direct",
+      "to": "select"
+    }
+  ]
+}

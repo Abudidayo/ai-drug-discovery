@@ -1,0 +1,559 @@
+.horizon {
+  --ground: #21182a;
+  --paper: #2b2235;
+  --ink: #f7f0ee;
+  --muted: #bdb0c5;
+  --rule: #493c53;
+  --soft: #352b40;
+  --accent: #d2e8d7;
+  --accent-ink: #263c34;
+  --disease: #dba192;
+  --tertiary: #b2a8df;
+  --radius: 3px;
+  --network-rule: #c5b2cf;
+  --network-node: #ab94b7;
+}
+.horizon-header {
+  height: 102px;
+  padding: 0 5.3%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 35px;
+  border-bottom: 1px solid var(--rule);
+  background: #21182a;
+}
+.horizon .site-brand {
+  font-family: "Scene Sora", sans-serif;
+  font-size: 12px;
+}
+.horizon .site-brand small {
+  font-size: 9px;
+  margin-top: 4px;
+}
+.horizon-header .header-context {
+  font-size: 10px;
+  color: var(--muted);
+}
+.horizon .site-tabs {
+  gap: 32px;
+}
+.horizon .site-tabs button {
+  font-size: 12px;
+  position: relative;
+}
+.horizon .site-tabs button[aria-current]::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 1px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.horizon-hero {
+  min-height: 650px;
+  height: calc(100vh - 232px);
+  max-height: 780px;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.horizon-art {
+  position: absolute;
+  inset: -1.5%;
+  z-index: -2;
+  background: #3c2c43 url("./assets/laboratory.jpg") center 54% / cover no-repeat;
+  animation: lab-camera 18s ease-in-out infinite;
+}
+.horizon-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, rgba(23, 17, 33, 0.85), rgba(26, 19, 35, 0.45) 38%, transparent 70%),
+    linear-gradient(0deg, rgba(27, 19, 35, 0.7), transparent 24%);
+}
+.horizon-hero-content {
+  padding: 97px 5.3% 0;
+  position: relative;
+  z-index: 2;
+  max-width: 790px;
+}
+.horizon h1,
+.horizon h2 {
+  font-family: "Scene Sora", sans-serif;
+}
+.horizon-hero h1 {
+  font-size: clamp(52px, 5.2vw, 80px);
+  line-height: 1.16;
+  font-weight: 400;
+  letter-spacing: -0.04em;
+}
+.horizon-hero-content > p {
+  font-size: 15px;
+  color: #e1d5e3;
+  line-height: 1.8;
+  margin-top: 26px;
+}
+.hero-actions {
+  display: flex;
+  gap: 26px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 31px;
+}
+.horizon .site-action {
+  font-size: 12px;
+  padding: 14px 19px;
+}
+.horizon .hero-actions .text-action {
+  font-size: 11px;
+}
+.horizon-scene-caption {
+  position: absolute;
+  right: 5.3%;
+  bottom: 85px;
+  text-align: right;
+  font-size: 11px;
+  color: #f1e4ec;
+}
+.horizon-scene-caption small {
+  display: block;
+  font-size: 9px;
+  color: #cfbcd1;
+  margin-top: 4px;
+}
+.horizon-story-control {
+  position: absolute;
+  bottom: 28px;
+  left: 5.3%;
+}
+.horizon-hero .motion-status {
+  color: #e0d3e2;
+}
+.microscope-inspection {
+  position: absolute;
+  right: 16%;
+  top: 38%;
+  width: 138px;
+  height: 138px;
+  border: 1px solid #e2cfb577;
+  border-radius: 50%;
+  background: #442f4a12;
+  pointer-events: none;
+}
+.inspection-ring {
+  position: absolute;
+  inset: 12px;
+  border: 1px solid #e9dac061;
+  border-radius: 50%;
+  transform-origin: center;
+  animation: inspection-scan 5s linear infinite;
+}
+.compound-dot {
+  width: 12px;
+  height: 12px;
+  position: absolute;
+  top: 60px;
+  left: 33px;
+  border-radius: 50%;
+  background: #dcf3df;
+  animation: inspect-compound 6s ease-in-out infinite;
+}
+.compound-dot.dot-b {
+  width: 9px;
+  height: 9px;
+  left: 71px;
+  top: 41px;
+  background: #e8b4a5;
+  animation-delay: -2s;
+}
+.compound-dot.dot-c {
+  width: 7px;
+  height: 7px;
+  left: 77px;
+  top: 83px;
+  background: #d4c7f0;
+  animation-delay: -4s;
+}
+.lab-bubbles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.flask-bubble {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border: 1px solid #def6ebaa;
+  border-radius: 50%;
+  left: 46.2%;
+  top: 76%;
+  animation: flask-bubble 3.7s linear infinite;
+}
+.bubble-two {
+  left: 46.8%;
+  top: 78%;
+  width: 3px;
+  height: 3px;
+  animation-delay: -1.8s;
+}
+.bubble-three {
+  left: 52.7%;
+  top: 79%;
+  border-color: #ffd7b7bb;
+  animation-delay: -0.8s;
+}
+.bubble-four {
+  left: 59%;
+  top: 77%;
+  border-color: #ffe6a9bb;
+  width: 4px;
+  height: 4px;
+  animation-delay: -2.2s;
+}
+.lab-story {
+  position: absolute;
+  left: 5.3%;
+  bottom: 95px;
+  max-width: 455px;
+}
+.lab-story-steps {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+.lab-story-steps button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 9px;
+  color: #d5c5dc;
+  text-align: left;
+}
+.lab-story-steps button > span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  min-width: 90px;
+  background: #a78bab5c;
+  margin-bottom: 10px;
+}
+.lab-story-steps button[aria-pressed="true"] {
+  color: #f8eff3;
+}
+.lab-story-steps button[aria-pressed="true"] > span {
+  background: #d4e8d8;
+}
+.lab-story > p {
+  color: #d6c5dd;
+  font-size: 10px;
+  margin-top: 12px;
+  max-width: 48ch;
+}
+@keyframes lab-camera {
+  0%,
+  100% {
+    transform: translateX(-0.5%) scale(1.005);
+  }
+  50% {
+    transform: translateX(0.5%) scale(1.02);
+  }
+}
+@keyframes flask-bubble {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.9;
+  }
+  85% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(4px, -52px);
+    opacity: 0;
+  }
+}
+.horizon-problem {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 90px;
+  padding: 72px 5.3% 42px;
+}
+.horizon-problem h2 {
+  font-size: clamp(25px, 2.5vw, 38px);
+  line-height: 1.35;
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  margin-bottom: 24px;
+}
+.horizon-problem p {
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--muted);
+  max-width: 57ch;
+}
+.landscape-route {
+  position: relative;
+  margin-top: 22px;
+}
+.landscape-route svg {
+  width: 100%;
+  display: block;
+}
+.landscape-route path {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-dasharray: 2 6;
+}
+.landscape-route circle {
+  fill: var(--accent);
+}
+.landmark {
+  position: absolute;
+  font-size: 10px;
+  color: var(--ink);
+}
+.landmark-disease {
+  left: 0;
+  bottom: 10%;
+}
+.landmark-network {
+  left: 41%;
+  top: 15%;
+}
+.landmark-medicine {
+  right: 0;
+  top: 56%;
+}
+.route-traveler {
+  animation: route-travel 5s linear infinite;
+}
+.horizon-problem .quiet-note {
+  font-size: 9px;
+  margin-top: 15px;
+}
+.horizon .source-strip {
+  margin: 0 5.3%;
+}
+.horizon-close {
+  padding: 60px 5.3%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+}
+.horizon-close h2 {
+  font-size: 27px;
+  line-height: 1.45;
+  font-weight: 400;
+  letter-spacing: -0.025em;
+}
+.horizon .site-footer {
+  margin: 0 5.3%;
+}
+.horizon .workflow-page,
+.horizon .results-page {
+  padding: 58px 5.3% 30px;
+}
+.horizon .page-title h1 {
+  font-size: clamp(38px, 4vw, 60px);
+  font-weight: 400;
+  line-height: 1.2;
+}
+.horizon .workflow-canvas {
+  display: flex;
+  flex-direction: column-reverse;
+}
+.horizon .workflow-explanation {
+  background: var(--paper);
+  padding: 30px 35px 20px;
+  border: 1px solid var(--rule);
+  display: grid;
+  grid-template-columns: 0.9fr 1.2fr;
+  column-gap: 50px;
+  align-items: center;
+}
+.horizon .stage-description h2 {
+  font-size: 29px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+.horizon .stage-description p {
+  font-size: 13px;
+}
+.horizon .stage-visual {
+  min-height: 310px;
+}
+.horizon .spatial-network > svg {
+  transform: perspective(750px) rotateX(23deg) rotateZ(-10deg);
+  overflow: visible;
+}
+.horizon .spatial-network .network-edges path {
+  stroke-width: 1.8;
+  opacity: 0.38;
+}
+.horizon .stage-output {
+  grid-column: 1 / -1;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+  margin-top: 15px;
+}
+.horizon .stage-list {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: 18px;
+  border-bottom: 1px solid var(--rule);
+}
+.horizon .stage-list button {
+  padding: 20px 14px;
+  border-bottom: 1px solid transparent;
+  align-items: flex-start;
+}
+.horizon .stage-list button > svg {
+  display: none;
+}
+.horizon .stage-list button[aria-pressed="true"] {
+  background: var(--soft);
+  border-bottom-color: var(--accent);
+}
+.horizon .stage-list strong {
+  font-size: 12px;
+}
+.horizon .stage-list small {
+  font-size: 10px;
+}
+.horizon .results-layout {
+  grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+  gap: 30px;
+}
+.horizon .evidence-sheet {
+  border-radius: 3px;
+}
+.horizon .rank-copy h2 {
+  font-family: "Scene Sora", sans-serif;
+  font-size: 26px;
+  line-height: 1.4;
+}
+.horizon .candidate-records td {
+  padding-top: 17px;
+  padding-bottom: 17px;
+}
+@keyframes inspection-scan {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.23);
+    opacity: 0;
+  }
+}
+@keyframes inspect-compound {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  30% {
+    transform: translate(18px, -15px);
+  }
+  65% {
+    transform: translate(-8px, 17px);
+  }
+}
+@keyframes route-travel {
+  0%,
+  5% {
+    transform: translate(0, 0);
+  }
+  45% {
+    transform: translate(240px, -95px);
+  }
+  95%,
+  100% {
+    transform: translate(475px, -63px);
+  }
+}
+@media (max-width: 1200px) {
+  .horizon .header-context {
+    display: none;
+  }
+  .horizon .hero-actions {
+    gap: 15px;
+  }
+  .horizon-problem {
+    gap: 45px;
+  }
+  .horizon .results-layout {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 22px;
+  }
+  .horizon .evidence-sheet {
+    padding: 20px;
+  }
+  .horizon .stage-list button {
+    padding-left: 8px;
+    padding-right: 8px;
+    gap: 10px;
+  }
+}
+@media (max-width: 900px) {
+  .horizon-header {
+    padding: 20px 5%;
+    height: auto;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .horizon .site-tabs {
+    gap: 20px;
+  }
+  .horizon-hero {
+    min-height: 670px;
+  }
+  .horizon-hero-content {
+    padding-top: 65px;
+  }
+  .horizon-art {
+    background-position: 62% center;
+  }
+  .horizon-hero h1 {
+    font-size: 52px;
+  }
+  .horizon-problem {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+  .horizon-close {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .horizon .results-layout {
+    grid-template-columns: 1fr;
+  }
+  .horizon .workflow-explanation {
+    grid-template-columns: 1fr;
+    padding: 25px;
+  }
+  .horizon .stage-list {
+    grid-template-columns: 1fr 1fr;
+  }
+  .horizon .stage-output {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .microscope-inspection {
+    right: 9%;
+    top: 58%;
+  }
+  .horizon-scene-caption {
+    bottom: 100px;
+    font-size: 9px;
+  }
+}

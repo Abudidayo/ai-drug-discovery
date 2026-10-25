@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "TigerData preserves the research trail",
+    "quality_profile": "showcase",
+    "animation": "none",
+    "viewBox": [
+      1100,
+      550
+    ],
+    "legend": {
+      "mode": "hidden"
+    }
+  },
+  "components": [
+    {
+      "id": "experiment",
+      "type": "frontend",
+      "label": "Experiment + candidates",
+      "sublabel": "Disease, versions and ranking settings",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "reviews",
+      "type": "frontend",
+      "label": "Evidence + jury votes",
+      "sublabel": "Statements, rationales and cited E-IDs",
+      "pos": [
+        40,
+        230
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "docking",
+      "type": "frontend",
+      "label": "Docking metadata",
+      "sublabel": "Job state, scores, paths + hashes",
+      "pos": [
+        40,
+        420
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "tiger",
+      "type": "database",
+      "label": "TigerData · PostgreSQL",
+      "sublabel": "Experiments · candidates · jury_votes",
+      "pos": [
+        425,
+        230
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "Plus jurors, dock_jobs, file metadata"
+    },
+    {
+      "id": "reopen",
+      "type": "frontend",
+      "label": "Reopen + compare",
+      "sublabel": "Restore evidence and exact reviews",
+      "pos": [
+        810,
+        130
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "archive",
+      "type": "frontend",
+      "label": "Archive + restore",
+      "sublabel": "Keep the experiment history",
+      "pos": [
+        810,
+        330
+      ],
+      "size": [
+        245,
+        110
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "experiment",
+      "to": "tiger"
+    },
+    {
+      "from": "reviews",
+      "to": "tiger"
+    },
+    {
+      "from": "docking",
+      "to": "tiger"
+    },
+    {
+      "from": "tiger",
+      "to": "reopen"
+    },
+    {
+      "from": "tiger",
+      "to": "archive"
+    }
+  ]
+}

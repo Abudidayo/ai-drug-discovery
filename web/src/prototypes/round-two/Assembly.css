@@ -1,0 +1,1532 @@
+.assembly {
+  --bg: #f7f6f0;
+  --paper: #fffef8;
+  --ink: #22251f;
+  --muted: #64665a;
+  --line: #d7d8c9;
+  --accent: #ead85b;
+  --soft: #eeedde;
+  --warning: #684719;
+  --warn-bg: #f0e8cd;
+  --focus: #22251f;
+  --sans: "Assembly Sans", sans-serif;
+  --display: "Assembly Sans", sans-serif;
+  font-size: 15px;
+}
+
+.assembly ::selection {
+  color: var(--ink);
+  background: var(--accent);
+}
+.assembly :is(input, select) {
+  caret-color: var(--ink);
+}
+.assembly :is(button, input, select, .r2-safety-note) {
+  border-radius: 0;
+}
+.assembly button {
+  letter-spacing: -0.01em;
+}
+.assembly main {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 40px;
+}
+.asm-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--bg);
+  border-bottom: 1px solid var(--ink);
+}
+.asm-masthead {
+  height: 84px;
+  padding: 0 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.assembly .r2-brand {
+  font-size: 15px;
+  font-weight: 650;
+}
+.assembly .r2-brand > svg {
+  width: 34px;
+  height: 34px;
+}
+.assembly .r2-brand > span > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.asm-header-note {
+  text-align: right;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.asm-header-note > span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+.asm-navigation {
+  height: 55px;
+  margin: 0 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  border-top: 1px solid var(--line);
+}
+.asm-navigation > span {
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+}
+.assembly .r2-tabs {
+  gap: 0;
+}
+.assembly .r2-tabs > button {
+  padding: 12px 24px;
+  border-right: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink);
+}
+.assembly .r2-tabs > button:first-child {
+  border-left: 1px solid var(--line);
+}
+.assembly .r2-tabs > button[aria-current] {
+  background: var(--accent);
+  font-weight: 650;
+}
+.assembly .r2-action {
+  color: var(--ink);
+  background: var(--accent);
+  border-color: var(--ink);
+  border-radius: 0;
+  min-height: 49px;
+  font-weight: 600;
+}
+.assembly .r2-action-secondary {
+  background: transparent;
+  border-color: var(--line);
+}
+.assembly .r2-playback {
+  gap: 0;
+}
+.assembly .r2-playback > button {
+  color: inherit;
+  border-color: currentColor;
+  border-radius: 0;
+  min-height: 31px;
+  padding: 6px 10px;
+  font-size: 11px;
+}
+.assembly .r2-playback > button + button {
+  border-left: 0;
+}
+.assembly .r2-demo-label {
+  font-size: 12px;
+  padding: 10px 0;
+}
+.assembly .r2-demo-label > span {
+  background: var(--ink);
+  border-radius: 0;
+  width: 5px;
+  height: 5px;
+}
+.assembly .r2-footer {
+  font-size: 12px;
+  max-width: 1600px;
+  margin: 36px auto 0;
+  padding: 28px 40px 34px;
+  border-color: var(--ink);
+}
+.assembly .r2-sources {
+  gap: 22px;
+}
+.assembly .r2-sources > span {
+  font-size: 11px;
+}
+.assembly .r2-sources > a {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.asm-intro {
+  display: grid;
+  grid-template-columns: 1fr 1.18fr;
+  margin-top: 34px;
+  border: 1px solid var(--ink);
+}
+.asm-intro-copy {
+  display: flex;
+  flex-direction: column;
+  padding: 34px 34px 28px;
+}
+.asm-intro h1 {
+  font-size: clamp(42px, 3.8vw, 58px);
+  line-height: 1.025;
+  font-weight: 550;
+  letter-spacing: -0.04em;
+  text-wrap: initial;
+}
+.asm-intro h1 > span {
+  color: var(--muted);
+}
+.asm-intro-copy > p {
+  max-width: 37ch;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--muted);
+  margin-top: 24px;
+}
+.asm-intro-copy em {
+  color: var(--ink);
+  font-style: normal;
+}
+.asm-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 26px;
+  flex-wrap: wrap;
+}
+.asm-actions .r2-action {
+  font-size: 12px;
+  padding: 12px 16px;
+  gap: 12px;
+}
+.asm-intro-note {
+  display: grid;
+  grid-template-columns: 98px 1fr;
+  gap: 16px;
+  margin-top: auto;
+  padding-top: 28px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.asm-intro-note > span {
+  color: var(--muted);
+}
+.asm-intro-note > p {
+  max-width: 31ch;
+}
+.asm-sorting {
+  background: var(--accent);
+  color: var(--ink);
+  border-left: 1px solid var(--ink);
+  padding: 27px 24px 18px;
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.asm-figure-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+}
+.asm-figure-heading h2 {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+}
+.asm-figure-heading > span {
+  font-size: 11px;
+}
+.asm-sortboard {
+  height: 330px;
+  position: relative;
+  margin-top: 24px;
+}
+.asm-sort-labels {
+  display: grid;
+  grid-template-columns: 33% 36% 31%;
+  font-size: 11px;
+  border-top: 1px solid rgba(34, 37, 31, 0.45);
+  padding-top: 10px;
+}
+.asm-sort-grid {
+  position: absolute;
+  left: 34%;
+  right: 32%;
+  top: 55px;
+  bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  border-left: 1px solid rgba(34, 37, 31, 0.25);
+  border-right: 1px solid rgba(34, 37, 31, 0.25);
+}
+.asm-sort-grid > i {
+  display: block;
+  border-top: 1px dashed rgba(34, 37, 31, 0.24);
+}
+.asm-sort-source {
+  position: absolute;
+  left: 0;
+  bottom: 5px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.asm-sort-source > span {
+  display: block;
+}
+.asm-source-record {
+  position: absolute;
+  left: 34%;
+  width: 32%;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  animation: asm-record-sort 8.4s var(--ease-in-out) infinite;
+  z-index: 2;
+}
+.asm-source-record > div {
+  flex: 1;
+  min-width: 0;
+}
+.asm-source-record strong {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.asm-source-record > div > span {
+  font-size: 11px;
+  line-height: 1.3;
+  display: block;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.asm-record-square {
+  width: 7px;
+  height: 7px;
+  background: var(--ink);
+  flex-shrink: 0;
+}
+.asm-sort-output {
+  position: absolute;
+  right: 0;
+  top: 57px;
+  width: 28%;
+  padding: 13px 12px 15px;
+  color: var(--paper);
+  background: var(--ink);
+  z-index: 3;
+}
+.asm-output-title {
+  display: block;
+  font-size: 19px;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  margin-bottom: 19px;
+  font-weight: 500;
+}
+.asm-output-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 11px;
+  padding: 10px 0;
+  border-top: 1px solid #5e6053;
+}
+.asm-output-row > b {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--accent);
+}
+.asm-output-note {
+  display: block;
+  font-size: 11px;
+  line-height: 1.5;
+  padding-top: 12px;
+  color: #d1d1c3;
+}
+.asm-sort-arrow {
+  position: absolute;
+  width: 28px;
+  height: 16px;
+  top: 188px;
+  right: 28%;
+}
+.asm-sorting > figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  border-top: 1px solid rgba(34, 37, 31, 0.4);
+  padding-top: 13px;
+}
+.asm-source-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--line);
+}
+.asm-source-strip > span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.asm-problem-solution {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 66px;
+}
+.asm-problem-solution > div {
+  padding: 0 64px 14px 0;
+}
+.asm-problem-solution > div + div {
+  padding: 0 34px 14px 64px;
+  border-left: 1px solid var(--line);
+}
+.asm-problem-solution h2 {
+  font-size: 35px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1.13;
+}
+.asm-problem-solution p {
+  max-width: 49ch;
+  color: var(--muted);
+  line-height: 1.85;
+  margin-top: 21px;
+  font-size: 14px;
+}
+.asm-problem-solution button {
+  margin-top: 22px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+  padding: 7px 0;
+  font-size: 12px;
+}
+.asm-selection-strip {
+  margin-top: 58px;
+  padding: 32px;
+  display: grid;
+  grid-template-columns: 240px 1fr auto;
+  align-items: center;
+  gap: 35px;
+  background: var(--soft);
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+.asm-selection-equation {
+  display: flex;
+  gap: 20px;
+  align-items: start;
+}
+.asm-selection-equation > span {
+  font-size: 66px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+.asm-selection-equation > span > small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  margin-top: 12px;
+  white-space: nowrap;
+}
+.asm-selection-equation > b {
+  font-size: 30px;
+  font-weight: 400;
+  margin-top: 14px;
+}
+.asm-selection-strip h2 {
+  font-weight: 550;
+  font-size: 21px;
+  line-height: 1.3;
+  letter-spacing: -0.025em;
+}
+.asm-selection-strip p {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.8;
+  margin-top: 10px;
+  max-width: 70ch;
+}
+.asm-selection-strip .r2-action {
+  white-space: nowrap;
+  font-size: 11px;
+  background: var(--paper);
+  border-color: var(--ink);
+}
+.asm-method-wrap {
+  margin-top: 32px;
+}
+.assembly .method-notes {
+  border-color: var(--line);
+}
+.assembly .method-notes > summary {
+  color: var(--ink);
+  font-size: 12px;
+}
+.assembly .method-source {
+  color: var(--ink);
+}
+
+.asm-workflow-heading {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  align-items: end;
+  gap: 80px;
+  padding: 38px 0 31px;
+}
+.asm-workflow-heading h1 {
+  font-size: clamp(38px, 3.35vw, 51px);
+  font-weight: 500;
+  line-height: 1.06;
+  letter-spacing: -0.04em;
+}
+.asm-workflow-heading h1 > span {
+  color: var(--muted);
+}
+.asm-workflow-heading > div {
+  display: flex;
+  align-items: end;
+  gap: 25px;
+}
+.asm-workflow-heading p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+  max-width: 42ch;
+}
+.asm-workflow-heading .r2-playback {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.asm-workflow-heading .r2-playback > button + button {
+  border-left: 1px solid;
+  border-top: 0;
+}
+.asm-conveyor {
+  margin: 0;
+  border: 1px solid var(--ink);
+  background: var(--accent);
+  padding: 20px 20px 15px;
+  overflow: hidden;
+}
+.asm-stations {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid var(--ink);
+}
+.asm-station {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  padding: 18px 20px 16px;
+  background: var(--paper);
+  border: 0;
+  min-width: 0;
+}
+.asm-station + .asm-station {
+  border-left: 1px solid var(--ink);
+}
+.asm-station[data-active="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+.asm-station-number {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.asm-station-number > b {
+  font-size: 11px;
+  font-weight: 500;
+}
+.asm-station[data-active="true"] .asm-station-number {
+  color: var(--accent);
+}
+.asm-station h2 {
+  font-size: 21px;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  margin-top: 20px;
+  line-height: 1.2;
+}
+.asm-station-caption {
+  font-size: 11px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  margin-top: 14px;
+}
+.asm-station[data-active="true"] .asm-station-caption {
+  color: #d2d3c6;
+  border-color: #5c5d51;
+}
+.asm-station-diagram {
+  height: 130px;
+  margin-top: 18px;
+  font-size: 11px;
+}
+.asm-biology {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-content: center;
+  gap: 9px;
+  position: relative;
+}
+.asm-biology > span {
+  border: 1px solid currentColor;
+  padding: 8px 5px;
+  text-align: center;
+}
+.asm-biology > strong {
+  grid-column: 1 / 3;
+  border: 1px solid currentColor;
+  text-align: center;
+  padding: 9px;
+  font-weight: 500;
+  margin-top: 32px;
+}
+.asm-biology > svg {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  top: 47px;
+  height: 39px;
+}
+.asm-selection {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: center;
+}
+.asm-selection > div > strong {
+  display: block;
+  font-size: 53px;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+.asm-selection > div > span {
+  display: block;
+  margin-top: 10px;
+  line-height: 1.4;
+}
+.asm-selection > b {
+  font-size: 22px;
+  font-weight: 400;
+  margin-top: -30px;
+}
+.asm-review {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: center;
+}
+.asm-review > span {
+  font-size: 11px;
+  border: 1px solid currentColor;
+  padding: 6px 9px;
+  align-self: start;
+}
+.asm-review > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.asm-review > div > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.asm-review i {
+  height: 6px;
+  width: 6px;
+  border: 1px solid currentColor;
+  display: block;
+}
+.asm-review > strong {
+  font-size: 11px;
+  font-weight: 400;
+}
+.asm-shortlist {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+.asm-shortlist > div {
+  border: 1px solid currentColor;
+  padding: 4px 10px;
+}
+.asm-shortlist > div > span {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 0;
+}
+.asm-shortlist b {
+  font-size: 11px;
+  font-weight: 400;
+}
+.asm-shortlist i {
+  width: 100%;
+  height: 3px;
+  background: currentColor;
+  opacity: 0.5;
+}
+.asm-shortlist > strong {
+  font-size: 11px;
+  font-weight: 400;
+}
+.asm-conveyor-track {
+  position: relative;
+  height: 26px;
+  margin: 0 15px;
+  border-bottom: 1px solid var(--ink);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+.asm-conveyor-track > i {
+  display: block;
+  border-right: 1px solid var(--ink);
+  height: 6px;
+  margin-top: 20px;
+}
+.asm-conveyor-track > i:last-child {
+  border-right: 0;
+}
+.asm-conveyor-track > span {
+  position: absolute;
+  top: 20px;
+  left: 0;
+  width: 20px;
+  height: 11px;
+  background: var(--ink);
+  animation: asm-conveyor-travel 8s var(--ease-in-out) infinite;
+}
+.asm-conveyor figcaption {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  font-size: 11px;
+  padding-top: 17px;
+}
+.asm-stage-detail {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr;
+  margin-top: 28px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--ink);
+  gap: 34px;
+}
+.asm-stage-title > span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.asm-stage-title h2 {
+  font-size: 27px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+  margin-top: 14px;
+  max-width: 14ch;
+}
+.asm-stage-body {
+  border-left: 1px solid var(--line);
+  padding-left: 30px;
+}
+.asm-stage-body > p {
+  font-size: 13px;
+  line-height: 1.85;
+  color: var(--muted);
+  max-width: 55ch;
+}
+.asm-stage-body > p + p {
+  margin-top: 11px;
+}
+.asm-stage-source {
+  margin-top: 20px;
+  display: flex;
+  gap: 15px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.asm-stage-source > span {
+  color: var(--muted);
+}
+.asm-stage-source > strong {
+  font-weight: 500;
+}
+.asm-stage-output {
+  padding: 19px 21px;
+  background: var(--soft);
+}
+.asm-stage-output > span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.asm-stage-output > h3 {
+  font-size: 18px;
+  line-height: 1.35;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  margin-top: 10px;
+}
+.asm-stage-output > button {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+  background: transparent;
+  padding: 7px 0;
+  margin-top: 16px;
+  font-size: 11px;
+}
+.asm-stage-output > .r2-action {
+  padding: 10px 12px;
+  border: 1px solid var(--ink);
+  background: var(--accent);
+  min-height: 40px;
+}
+.asm-workflow-note {
+  padding: 27px 0 5px;
+  display: flex;
+  justify-content: space-between;
+  gap: 45px;
+  align-items: start;
+}
+.asm-workflow-note > p {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 58ch;
+}
+.asm-workflow-note strong {
+  font-weight: 500;
+  color: var(--ink);
+}
+.asm-workflow-note .r2-sources {
+  gap: 16px;
+  justify-content: end;
+  max-width: 390px;
+}
+
+.asm-results-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  padding-top: 27px;
+}
+.asm-results-heading h1 {
+  font-size: clamp(34px, 3vw, 45px);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+.asm-results-heading p {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 11px;
+}
+.asm-disease-label {
+  font-size: 16px;
+  font-weight: 600;
+  border-left: 1px solid var(--ink);
+  padding-left: 20px;
+  line-height: 1.4;
+}
+.asm-disease-label > small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.asm-rank-ladder {
+  display: grid;
+  grid-template-columns: 245px 1fr;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 20px 24px 12px;
+  margin: 0;
+  column-gap: 36px;
+}
+.asm-ladder-copy h2 {
+  font-size: 23px;
+  line-height: 1.1;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+}
+.asm-ladder-copy > p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #c4c7b8;
+  margin-top: 9px;
+  max-width: 29ch;
+}
+.asm-ladder-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 16px;
+  margin-top: 11px;
+}
+.asm-ladder-legend > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+}
+.asm-ladder-legend i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  background: var(--accent);
+}
+.asm-ladder-legend > span + span i {
+  background: var(--ink);
+  border: 1px solid var(--paper);
+}
+.asm-ladder-chart {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  padding-top: 4px;
+  padding-bottom: 5px;
+}
+.asm-ladder-traveller {
+  position: absolute;
+  left: 27px;
+  top: 17px;
+  width: 10px;
+  height: 3px;
+  background: var(--accent);
+  animation: asm-ladder-traverse 4s linear infinite alternate;
+}
+.asm-ladder-axis {
+  height: 88px;
+  margin-top: 24px;
+  font-size: 11px;
+  color: #b7bbab;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-right: 17px;
+  line-height: 1;
+}
+.asm-ladder-columns {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  flex: 1;
+  gap: 35px;
+}
+.asm-ladder-column {
+  min-width: 0;
+}
+.asm-ladder-column-label {
+  display: block;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.4;
+  margin-bottom: 13px;
+  white-space: nowrap;
+}
+.asm-ladder-rungs {
+  position: relative;
+  height: 88px;
+  border-left: 1px solid #5a5f4f;
+  border-right: 1px solid #5a5f4f;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin: 0 13px;
+}
+.asm-ladder-rungs > i {
+  display: block;
+  border-top: 1px solid #5a5f4f;
+}
+.asm-rank-mark {
+  position: absolute;
+  width: 32px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 600;
+  animation: asm-rank-settle 7.4s var(--ease-in-out) infinite;
+}
+.asm-rank-a {
+  left: calc(50% - 34px);
+  background: var(--accent);
+  color: var(--ink);
+  transform: translateY(-50%);
+}
+.asm-rank-b {
+  left: calc(50% + 2px);
+  background: var(--ink);
+  border: 1px solid #f3f3e6;
+  color: var(--paper);
+  transform: translateY(-50%);
+}
+.asm-rank-unavailable {
+  position: absolute;
+  font-size: 11px;
+  bottom: -10px;
+  white-space: nowrap;
+  background: var(--ink);
+  padding: 3px;
+}
+.asm-rank-ladder > figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  grid-column: 1 / 3;
+  border-top: 1px solid #5a5f4f;
+  padding-top: 9px;
+  margin-top: 14px;
+  font-size: 12px;
+  color: #c4c7b8;
+}
+.asm-rank-ladder .r2-playback > button {
+  min-height: 27px;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+.asm-rank-ladder :is(button, a):focus-visible {
+  outline-color: var(--accent);
+}
+.asm-results-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.82fr) minmax(300px, 1fr);
+  margin-top: 26px;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+.asm-table-column {
+  min-width: 0;
+  padding: 18px 24px 20px 0;
+}
+.asm-table-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  align-items: baseline;
+}
+.asm-table-title > h2 {
+  font-size: 19px;
+  font-weight: 550;
+  line-height: 1.3;
+  letter-spacing: -0.025em;
+}
+.asm-table-title > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.assembly .r2-record-tools {
+  padding: 10px 0 12px;
+  gap: 12px;
+}
+.assembly .r2-search {
+  gap: 8px;
+}
+.assembly .r2-search input {
+  font-size: 12px;
+}
+.assembly .r2-sort {
+  gap: 6px;
+  font-size: 11px;
+}
+.assembly .r2-sort select {
+  font-size: 11px;
+  max-width: 131px;
+  padding: 7px;
+  border-radius: 0;
+}
+.assembly .r2-export {
+  font-size: 11px;
+  padding: 7px 9px;
+  gap: 6px;
+  border-radius: 0;
+  min-height: 33px;
+}
+.asm-record-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+.asm-record-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.asm-record-table thead {
+  background: var(--soft);
+}
+.asm-record-table thead th {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 10px 10px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.asm-record-table th:first-child {
+  padding-left: 11px;
+}
+.asm-record-table tbody > tr {
+  border-bottom: 1px solid var(--line);
+}
+.asm-record-table tbody > tr[data-selected="true"] {
+  background: var(--accent);
+}
+.asm-record-table tbody > tr > td {
+  padding: 12px 10px;
+}
+.asm-record-table tbody > tr > th {
+  padding: 0;
+  font-weight: 400;
+}
+.asm-record-table .r2-candidate-pick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  padding: 13px 11px;
+  border: 0;
+  background: transparent;
+}
+.asm-record-table .r2-candidate-pick strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.asm-record-table .r2-candidate-pick small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-top: 2px;
+}
+.asm-record-table tr[data-selected="true"] .r2-candidate-pick small {
+  color: #50503d;
+}
+.asm-record-table .r2-candidate-pick > svg {
+  opacity: 0;
+}
+.asm-record-table .r2-candidate-pick[aria-pressed="true"] > svg {
+  opacity: 1;
+}
+.asm-safety-cell {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.asm-safety-cell i {
+  display: block;
+  height: 4px;
+  width: 4px;
+  border: 1px solid currentColor;
+  transform: rotate(45deg);
+}
+.asm-fixture-note {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.75;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  max-width: 86ch;
+}
+.asm-evidence-column {
+  padding: 20px 0 24px 24px;
+  border-left: 1px solid var(--ink);
+  min-width: 0;
+}
+.assembly .r2-evidence-heading h3 {
+  font-size: 26px;
+  font-weight: 550;
+  letter-spacing: -0.035em;
+}
+.assembly .r2-evidence-heading > div > p {
+  font-size: 11px;
+}
+.assembly .r2-evidence-heading > span {
+  font-size: 12px;
+  padding: 3px 5px;
+}
+.assembly .r2-targets {
+  margin-top: 8px;
+  font-size: 12px;
+}
+.assembly .r2-detail-tabs {
+  margin-top: 9px;
+  gap: 22px;
+}
+.assembly .r2-detail-tabs > button {
+  min-height: 38px;
+  font-size: 12px;
+}
+.assembly .r2-detail-tabs > button[aria-pressed="true"] {
+  border-bottom-color: var(--ink);
+}
+.assembly .r2-detail-intro {
+  font-size: 13px;
+  margin: 15px 0;
+}
+.assembly .r2-evidence-list {
+  gap: 13px;
+}
+.assembly .r2-evidence-list > li {
+  font-size: 13px;
+  line-height: 1.75;
+}
+.assembly .r2-evidence-list > li > span {
+  border-radius: 0;
+  background: var(--ink);
+}
+.assembly .r2-evidence-list a {
+  font-size: 11px;
+}
+.assembly .r2-safety-note {
+  font-size: 12px;
+  padding: 12px;
+  margin-top: 16px;
+}
+.assembly .r2-evidence-limit {
+  font-size: 12px;
+  line-height: 1.75;
+}
+.assembly .r2-record-count {
+  padding: 8px 0;
+  font-size: 11px;
+}
+.assembly .r2-record-count > button {
+  font-size: 11px;
+}
+.asm-comparison {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 42px;
+  margin-top: 39px;
+  padding-bottom: 30px;
+  border-bottom: 1px solid var(--line);
+}
+.asm-comparison-heading > h2 {
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+.asm-comparison-heading > p {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 16px;
+  max-width: 31ch;
+  line-height: 1.8;
+}
+.asm-comparison table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.7;
+  table-layout: fixed;
+  text-align: left;
+}
+.asm-comparison :is(td, th) {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  font-weight: 400;
+  vertical-align: top;
+}
+.asm-comparison thead th {
+  background: var(--soft);
+  font-size: 15px;
+  font-weight: 550;
+  line-height: 1.5;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.asm-comparison thead th:first-child {
+  width: 24%;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.asm-comparison th > span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+  margin-top: 6px;
+}
+.asm-comparison thead th:nth-child(2) {
+  border-top: 3px solid var(--accent);
+}
+.asm-comparison tbody th {
+  font-size: 11px;
+  color: var(--muted);
+}
+.asm-comparison select {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  width: 100%;
+  padding: 4px 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.asm-result-caveats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 55px;
+  margin-top: 25px;
+}
+.asm-result-caveats > p {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 75ch;
+  line-height: 1.85;
+}
+.asm-result-caveats strong {
+  display: block;
+  color: var(--ink);
+  font-weight: 550;
+  margin-bottom: 5px;
+}
+
+@keyframes asm-ladder-traverse {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(40vw);
+  }
+}
+@keyframes asm-record-sort {
+  0%,
+  10%,
+  100% {
+    transform: translate(var(--from-x), var(--from-y)) rotate(var(--from-r));
+  }
+  42%,
+  77% {
+    transform: translate(0, 0) rotate(0);
+  }
+}
+@keyframes asm-conveyor-travel {
+  0%,
+  8% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(26vw);
+  }
+  50% {
+    transform: translateX(48vw);
+  }
+  75%,
+  90% {
+    transform: translateX(76vw);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+@keyframes asm-rank-settle {
+  0%,
+  8%,
+  100% {
+    transform: translateY(calc(-50% + var(--rank-start)));
+  }
+  36%,
+  84% {
+    transform: translateY(-50%);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .assembly .r2-tabs > button:hover {
+    background: var(--soft);
+  }
+  .assembly .r2-tabs > button[aria-current]:hover {
+    background: var(--accent);
+  }
+  .asm-station:hover {
+    background: var(--soft);
+  }
+  .asm-station[data-active="true"]:hover {
+    background: var(--ink);
+  }
+  .asm-record-table tbody > tr:hover {
+    background: var(--soft);
+  }
+  .asm-record-table tbody > tr[data-selected="true"]:hover {
+    background: var(--accent);
+  }
+  .asm-rank-ladder .r2-playback > button:hover {
+    background: #3e4235;
+  }
+}
+
+@media (max-width: 1320px) {
+  .assembly main {
+    padding: 0 30px;
+  }
+  .asm-masthead {
+    padding: 0 30px;
+  }
+  .asm-navigation {
+    margin: 0 30px;
+  }
+  .asm-intro-copy {
+    padding: 28px 28px 24px;
+  }
+  .asm-intro h1 {
+    font-size: 47px;
+  }
+  .asm-intro-copy > p {
+    font-size: 14px;
+    margin-top: 20px;
+  }
+  .asm-actions {
+    gap: 8px;
+  }
+  .asm-actions .r2-action {
+    font-size: 11px;
+    padding: 12px 13px;
+  }
+  .asm-sorting {
+    padding: 26px 18px 18px;
+  }
+  .asm-figure-heading {
+    gap: 8px;
+  }
+  .asm-figure-heading h2 {
+    font-size: 18px;
+  }
+  .asm-figure-heading > span {
+    font-size: 11px;
+  }
+  .asm-source-record {
+    gap: 6px;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+  .asm-source-record strong {
+    font-size: 11px;
+  }
+  .asm-record-square {
+    width: 5px;
+    height: 5px;
+  }
+  .asm-output-row {
+    gap: 7px;
+    font-size: 11px;
+  }
+  .asm-output-title {
+    font-size: 18px;
+  }
+  .asm-sorting > figcaption {
+    font-size: 11px;
+  }
+  .asm-selection-strip {
+    grid-template-columns: 210px 1fr;
+    gap: 26px;
+  }
+  .asm-selection-strip > .r2-action {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: -8px;
+  }
+  .asm-selection-equation {
+    grid-row: 1 / 3;
+  }
+  .asm-workflow-heading {
+    gap: 40px;
+  }
+  .asm-workflow-heading > div {
+    gap: 20px;
+  }
+  .asm-station {
+    padding: 16px 16px 14px;
+  }
+  .asm-station h2 {
+    font-size: 20px;
+  }
+  .asm-station-diagram {
+    font-size: 11px;
+  }
+  .asm-stage-detail {
+    gap: 26px;
+  }
+  .asm-stage-body {
+    padding-left: 25px;
+  }
+  .asm-ladder-columns {
+    gap: 25px;
+  }
+  .asm-rank-ladder {
+    grid-template-columns: 220px 1fr;
+    column-gap: 24px;
+  }
+  .asm-ladder-copy h2 {
+    font-size: 22px;
+  }
+  .asm-table-column {
+    padding-right: 20px;
+  }
+  .asm-evidence-column {
+    padding-left: 20px;
+  }
+  .asm-record-table thead th {
+    padding: 10px 8px;
+  }
+  .asm-record-table tbody > tr > td {
+    padding: 12px 8px;
+  }
+  .asm-record-table .r2-candidate-pick {
+    gap: 10px;
+  }
+  .asm-comparison {
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 30px;
+  }
+}
+
+.assembly .r2-model-reviews > article {
+  font-size: 13px;
+}
+.assembly .r2-model-reviews > article > div > span,
+.assembly .r2-export-status,
+.assembly .molecule-controls {
+  font-size: 11px;
+}
+.assembly .molecule-note,
+.assembly .molecule-unavailable {
+  font-size: 12px;
+}
+.assembly .molecule-view text {
+  font-size: 11px;
+}

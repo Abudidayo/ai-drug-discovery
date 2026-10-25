@@ -1,0 +1,7 @@
+{
+  "extends": "../../tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "../../../.context/round-two.tsbuildinfo"
+  },
+  "include": ["../../src/prototypes/round-two"]
+}

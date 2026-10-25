@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Select up to 15 research candidates",
+    "quality_profile": "showcase",
+    "animation": "none",
+    "viewBox": [
+      1100,
+      550
+    ]
+  },
+  "components": [
+    {
+      "id": "physical-graph",
+      "type": "database",
+      "label": "Physical STRING graph",
+      "sublabel": "Disease-associated seed proteins",
+      "pos": [
+        40,
+        100
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "disease-evidence",
+      "type": "database",
+      "label": "Open Targets evidence",
+      "sublabel": "Direct disease–target associations",
+      "pos": [
+        40,
+        330
+      ],
+      "size": [
+        245,
+        110
+      ]
+    },
+    {
+      "id": "rwr",
+      "type": "backend",
+      "label": "Random Walk with Restart",
+      "sublabel": "Physical-network candidate ranking",
+      "pos": [
+        425,
+        100
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "10 network places"
+    },
+    {
+      "id": "direct-ranking",
+      "type": "backend",
+      "label": "Direct-evidence ranking",
+      "sublabel": "Disease–target evidence score",
+      "pos": [
+        425,
+        330
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "5 evidence places"
+    },
+    {
+      "id": "shortlist",
+      "type": "backend",
+      "label": "Deduplicate + refill",
+      "sublabel": "Up to 15 unique candidates",
+      "pos": [
+        810,
+        215
+      ],
+      "size": [
+        245,
+        110
+      ],
+      "tag": "Coverage stays explicit"
+    }
+  ],
+  "connections": [
+    {
+      "from": "physical-graph",
+      "to": "rwr"
+    },
+    {
+      "from": "disease-evidence",
+      "to": "direct-ranking"
+    },
+    {
+      "from": "rwr",
+      "to": "shortlist"
+    },
+    {
+      "from": "direct-ranking",
+      "to": "shortlist"
+    }
+  ]
+}
