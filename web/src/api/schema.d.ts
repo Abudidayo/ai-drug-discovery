@@ -168,6 +168,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/files/{job_id}/{name}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Download one result file of a finished docking job
+     * @description A job that reuses another job's result (`cached_from`) serves that job's files.
+     */
+    get: operations["get_dock_file"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/health": {
     parameters: {
       query?: never;
@@ -572,28 +592,34 @@ export interface components {
        */
       target_id: string;
     };
-    /** DockFiles */
+    /** DockFile */
+    DockFile: {
+      /**
+       * Sha256
+       * @description SHA-256 of the file's bytes, in hex.
+       */
+      sha256: string;
+      /**
+       * Url
+       * @description Where to download the file: /api/files/{job_id}/{name}. A job that reuses another job's result links to that job's files.
+       */
+      url: string;
+    };
+    /**
+     * DockFiles
+     * @description A finished job's files. Each field's file name is in `DOCK_FILE_NAMES`.
+     */
     DockFiles: {
-      /**
-       * Log
-       * @description URL of the docking log, plain text.
-       */
-      log: string;
-      /**
-       * Poses
-       * @description URL of the predicted poses, SDF format.
-       */
-      poses: string;
-      /**
-       * Receptor
-       * @description URL of the prepared receptor, PDB format.
-       */
-      receptor: string;
-      /**
-       * Scores
-       * @description URL of the per-pose scores, JSON.
-       */
-      scores: string;
+      /** @description crystal_ligand.sdf: the structure's co-crystal ligand where the crystal shows it, SDF format. Draw it over a pose to compare them (the redocking check). */
+      crystal_ligand: components["schemas"]["DockFile"];
+      /** @description log.txt: what was run and how, plain text. */
+      log: components["schemas"]["DockFile"];
+      /** @description poses.sdf: the predicted poses, best first, SDF format. In fixture results pose 1 is a labelled copy of the crystal ligand, not a docking result. */
+      poses: components["schemas"]["DockFile"];
+      /** @description receptor.pdb: the docked protein chain, protein atoms only, PDB format. */
+      receptor: components["schemas"]["DockFile"];
+      /** @description scores.json: the per-pose scores, JSON. */
+      scores: components["schemas"]["DockFile"];
     };
     /**
      * DockJob
@@ -632,7 +658,7 @@ export interface components {
        * @description The Experiment it belongs to; null for controls.
        */
       experiment_id: string | null;
-      /** @description Result files; null until done, and null for fixture results. */
+      /** @description Result files; null until done. In fixture mode only the precomputed demo jobs have files; results made up on request have scores only. */
       files: components["schemas"]["DockFiles"] | null;
       /**
        * Finished At
@@ -1057,6 +1083,11 @@ export interface components {
       model_id: string;
       /** @description pending: not started. running: reviewing now. valid: review passed every check. invalid: replied, but no reply passed the checks. failed: never replied. */
       status: components["schemas"]["JurorStatus"];
+      /**
+       * Token Usage
+       * @description Tokens each attempt used, for cost reporting. A null count means the full cost is unknown; counts are never estimated.
+       */
+      token_usage?: components["schemas"]["TokenUsage"][];
     };
     /** @enum {string} */
     JurorStatus: "pending" | "running" | "valid" | "invalid" | "failed";
@@ -1080,6 +1111,13 @@ export interface components {
        * @description Version of the review prompt, e.g. jury-v3.
        */
       prompt_version: string;
+      /**
+       * Reasoning Effort
+       * @description Reasoning effort sent to each model that takes one, by model ID, e.g. {'gpt-5.4': 'low'}. Models without an entry use their default.
+       */
+      reasoning_effort?: {
+        [key: string]: string;
+      };
       /**
        * Shuffle Seed
        * @description Seed for the order each juror sees the Candidates in.
@@ -1463,6 +1501,27 @@ export interface components {
     };
     /** @enum {string} */
     TargetExcludedReason: "not_in_graph" | "outside_largest_component";
+    /**
+     * TokenUsage
+     * @description Tokens one attempt used, as the provider reported them. Null means not reported.
+     */
+    TokenUsage: {
+      /**
+       * Attempt
+       * @description Which attempt, starting at 1.
+       */
+      attempt: number;
+      /**
+       * Input Tokens
+       * @description Tokens sent; null if not reported.
+       */
+      input_tokens: number | null;
+      /**
+       * Output Tokens
+       * @description Tokens returned; null if not reported.
+       */
+      output_tokens: number | null;
+    };
     /** UnprocessableResponse */
     UnprocessableResponse: {
       /**
@@ -1918,6 +1977,51 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Experiment"];
+        };
+      };
+      /** @description Not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description The request cannot be carried out. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["UnprocessableResponse"];
+        };
+      };
+    };
+  };
+  get_dock_file: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        job_id: string;
+        /** @description receptor.pdb, poses.sdf, crystal_ligand.sdf, scores.json or log.txt. The URLs are listed in the job's `files`. */
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The file, in its own format. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
+          "chemical/x-mdl-sdfile": string;
+          "chemical/x-pdb": string;
+          "text/plain": string;
         };
       };
       /** @description Not found. */

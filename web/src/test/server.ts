@@ -3,7 +3,14 @@ import { setupServer } from "msw/node";
 import { createOpenApiHttp } from "openapi-msw";
 import type { components, paths } from "../api/schema";
 import type { Experiment } from "../api/types";
-import { conformers, covidExperiment, searchDiseases } from "./fixtures";
+import {
+  conformers,
+  covidExperiment,
+  covidJury,
+  searchDiseases,
+  structures,
+  summaryOf,
+} from "./fixtures";
 
 /** MSW handlers typed by the generated contract: a wrong path or body fails `tsc`. */
 export const http = createOpenApiHttp<paths>({ baseUrl: window.location.origin });
@@ -19,8 +26,29 @@ export const fakeApi = {
     covidExperiment("building", "ranking", id),
     covidExperiment("ready", null, id),
   ],
+  /** What the Experiment answers to its GETs once the jury is asked, in order. */
+  jurySequence: (experiment: Experiment): Experiment[] => [
+    { ...experiment, jury: covidJury("done") },
+  ],
   created: 0,
 };
+
+/** The Experiment's current state: the last answer its GETs will give. */
+function latest(id: string): Experiment | undefined {
+  return fakeApi.experiments.get(id)?.at(-1);
+}
+
+/** Changes every answer an Experiment's GETs will give. */
+function update(
+  id: string,
+  change: (experiment: Experiment) => Experiment,
+): Experiment | undefined {
+  const sequence = fakeApi.experiments.get(id);
+  if (sequence === undefined) return undefined;
+  const changed = sequence.map(change);
+  fakeApi.experiments.set(id, changed);
+  return changed.at(-1);
+}
 
 /**
  * The contract's own Experiment type. It differs from the app's only in fixed-length tuples
@@ -59,6 +87,67 @@ export const handlers = [
     }
     return response(200).json(contract(next));
   }),
+
+  http.get("/api/experiments", ({ query, response }) => {
+    const archived = query.get("archived") === "true";
+    const items = [...fakeApi.experiments.values()]
+      .flatMap((sequence) => sequence.slice(-1))
+      .filter((experiment) => experiment.status === "ready")
+      .filter((experiment) => (experiment.archived_at !== null) === archived)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .map(summaryOf);
+    return response(200).json({ items });
+  }),
+
+  http.post("/api/experiments/{experiment_id}/jury", ({ params, response }) => {
+    const experiment = latest(params.experiment_id);
+    if (!experiment) {
+      return response(404).json({ detail: "There is no saved Experiment with this ID." });
+    }
+    if (experiment.archived_at !== null) {
+      return response(409).json({
+        detail: "This Experiment is archived. Restore it to ask the Model jury.",
+      });
+    }
+    if (experiment.jury !== null) {
+      return response(409).json({
+        detail:
+          "The Model jury has already reviewed this Experiment. Each Experiment has one jury review.",
+      });
+    }
+    fakeApi.experiments.set(experiment.id, fakeApi.jurySequence(experiment));
+    return response(202).json(covidJury("queued"));
+  }),
+
+  http.post("/api/experiments/{experiment_id}/archive", ({ params, response }) => {
+    const experiment = latest(params.experiment_id);
+    if (!experiment) {
+      return response(404).json({ detail: "There is no saved Experiment with this ID." });
+    }
+    if (experiment.dock_jobs.some((job) => job.status === "queued" || job.status === "running")) {
+      return response(409).json({
+        detail:
+          "A binding pose is still being computed for this Experiment. Archive it once the docking job has finished.",
+      });
+    }
+    const archivedAt = experiment.archived_at ?? "2026-10-25T10:00:00Z";
+    const archived = update(experiment.id, (e) => ({ ...e, archived_at: archivedAt }));
+    return response(200).json(contract(archived ?? experiment));
+  }),
+
+  http.post("/api/experiments/{experiment_id}/restore", ({ params, response }) => {
+    const restored = update(params.experiment_id, (e) => ({ ...e, archived_at: null }));
+    if (!restored) {
+      return response(404).json({ detail: "There is no saved Experiment with this ID." });
+    }
+    return response(200).json(contract(restored));
+  }),
+
+  http.get("/api/structures", ({ response }) =>
+    response(200).json({
+      structures: structures as components["schemas"]["Structure"][],
+    }),
+  ),
 
   http.get("/api/molecules/{pubchem_cid}/conformer", ({ params, response }) => {
     const conformer = conformers.get(Number(params.pubchem_cid));

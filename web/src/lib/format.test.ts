@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { drugName, listOf, signed } from "./format";
+import { drugName, listOf, releaseName, signed } from "./format";
 
 describe("drugName", () => {
   it.each([
@@ -27,5 +27,14 @@ describe("listOf", () => {
     expect(listOf(["A"])).toBe("A");
     expect(listOf(["A", "B"])).toBe("A and B");
     expect(listOf(["A", "B", "C"])).toBe("A, B and C");
+  });
+});
+
+describe("releaseName", () => {
+  it("names known sources and leaves others as they are", () => {
+    expect(releaseName("opentargets-26.09")).toBe("Open Targets 26.09");
+    expect(releaseName("chembl-37")).toBe("ChEMBL 37");
+    expect(releaseName("string-12.5")).toBe("STRING 12.5");
+    expect(releaseName("pdb-2026")).toBe("pdb-2026");
   });
 });

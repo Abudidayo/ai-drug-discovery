@@ -30,3 +30,29 @@ export function listOf(items: readonly string[]): string {
   if (items.length <= 1) return items.join("");
   return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1] ?? ""}`;
 }
+
+const SOURCES: Record<string, string> = {
+  opentargets: "Open Targets",
+  chembl: "ChEMBL",
+  string: "STRING",
+};
+
+/** A pinned data release in words, e.g. opentargets-26.09 as "Open Targets 26.09". */
+export function releaseName(release: string): string {
+  const [source = "", ...version] = release.split("-");
+  const name = SOURCES[source];
+  return name === undefined ? release : `${name} ${version.join("-")}`;
+}
+
+const DATE_TIME = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/** A moment in the reader's time zone, e.g. "25 Oct 2026, 09:00". */
+export function dateTime(iso: string): string {
+  return DATE_TIME.format(new Date(iso));
+}

@@ -1,6 +1,8 @@
 import type { components } from "../api/schema";
 
 type BuildStage = components["schemas"]["BuildStage"];
+type Decision = components["schemas"]["Decision"];
+type JurorStatus = components["schemas"]["JurorStatus"];
 type EvidenceSource = components["schemas"]["EvidenceSource"];
 type TargetExcludedReason = components["schemas"]["TargetExcludedReason"];
 
@@ -172,18 +174,65 @@ export const copy = {
   },
 
   jury: {
-    decisions: { investigate: "Investigate", watch: "Watch", deprioritise: "Set aside" },
+    ask: "Ask the Model jury",
+    /** Before the jury is asked: who will review. */
+    panel: (models: string) => `${models} will each review the evidence for every drug.`,
+    askFailed: "The jury couldn’t be asked. The server isn’t answering.",
+    archived: "This experiment is archived. Restore it in Saved experiments to ask the jury.",
+    progressLabel: "Model jury progress",
+    queued: "Waiting to start",
+    jurorStatus: {
+      pending: "Waiting",
+      running: "Reviewing the evidence",
+      valid: "Done",
+      invalid: "Its answers didn’t pass our checks",
+      failed: "Didn’t answer",
+    } satisfies Record<JurorStatus, string>,
+    unavailable: "Review unavailable",
+    plotLabel: "Each model’s rank and decision for every drug",
+    drug: "Drug",
+    rank: "Rank by each model",
+    rankOf: (model: string, rank: number) => `${model}: rank ${String(rank)}`,
+    decisions: {
+      investigate: "Investigate",
+      watch: "Watch",
+      deprioritise: "Set aside",
+    } satisfies Record<Decision, string>,
     agreement: "Agreement",
     agreementHelp:
       "0 means no agreement between the models, 1 means full agreement. It isn’t a chance of success.",
-    objectionTitle: (model: string) => `${model}’s objection`,
+    agreementMissing: "Fewer than two models answered, so agreement can’t be measured.",
+    objectionTitle: (model: string, drug: string) => `${model}’s objection to ${drug}`,
     contestedTitle: "Split decision",
-    check: "One model cited a source it wasn’t given, so it was asked again.",
+    contestedNote: "The models chose different next steps for this drug.",
+    retried: (count: number) =>
+      count === 1
+        ? "One model’s first answer didn’t pass our checks, so it was asked again."
+        : `${String(count)} models’ first answers didn’t pass our checks, so they were asked again.`,
+    excluded: {
+      invalid: (model: string) =>
+        `${model}’s answers didn’t pass our checks, so it has no votes here.`,
+      failed: (model: string) => `${model} didn’t answer, so it has no votes here.`,
+    },
   },
 
   compare: {
     pick: "Change drug",
-    dockable: "Binding pose",
+    tableLabel: "Candidate drugs side by side",
+    decision: "Jury decision",
+    targets: "Targets",
+    moreTargets: (shown: string, more: number) => `${shown} and ${String(more)} more`,
+    approval: "Approval",
+    notRecorded: "Not recorded",
+    noWarnings: "None recorded",
+    /** Not "Binding pose": that is the next step's name, already in the navigation. */
+    dockable: "Docking",
+    pose: {
+      done: (target: string) => `Computed in ${target}`,
+      running: (target: string) => `Being computed in ${target}`,
+      possible: (target: string) => `Possible in ${target}`,
+      unavailable: "Not available",
+    },
     none: "None",
   },
 
@@ -205,11 +254,20 @@ export const copy = {
   },
 
   history: {
+    viewLabel: "Which experiments to list",
+    listLabel: "Experiments",
     active: "Saved",
     archived: "Archived",
     archive: "Archive",
     restore: "Restore",
     current: "Open",
+    loading: "Loading saved experiments",
+    unavailable: "Saved experiments couldn’t be loaded. The server isn’t answering.",
+    emptyActive: "No saved experiments yet.",
+    emptyArchived: "No archived experiments.",
+    counts: (candidates: number, docked: number) =>
+      `${String(candidates)} candidate ${candidates === 1 ? "drug" : "drugs"}, ${String(docked)} binding ${docked === 1 ? "pose" : "poses"}`,
+    actionFailed: "That didn’t work. The server isn’t answering.",
     data: (versions: readonly string[]) => `Data: ${versions.join(", ")}`,
   },
 

@@ -3,7 +3,18 @@
  * `api/oxhack_api/fixtures`), so the web tests and the API serve one copy of the data.
  */
 import covidFile from "@api-fixtures/MONDO_0100096/experiment.json";
-import type { BuildStage, Conformer, DiseaseSearchResult, Experiment } from "../api/types";
+import juryFile from "@api-fixtures/MONDO_0100096/jury.json";
+import structuresFile from "@api-fixtures/structures.json";
+import type {
+  BuildStage,
+  Conformer,
+  DiseaseSearchResult,
+  DockJob,
+  Experiment,
+  ExperimentSummary,
+  JuryRun,
+  Structure,
+} from "../api/types";
 
 /** The shape of `fixtures/<disease_id>/experiment.json` (the API's `ExperimentFixture`). */
 type ExperimentFixture = Pick<
@@ -71,4 +82,104 @@ export function searchDiseases(query: string): DiseaseSearchResult[] {
   const synonym = covid.synonyms.find((s) => s.toLowerCase().includes(needle));
   if (synonym === undefined) return [];
   return [{ ...covid.disease, description: covid.description, matched_synonym: synonym }];
+}
+
+/** The shape of `fixtures/<disease_id>/jury.json`: one recorded jury run. */
+type JuryFixture = Pick<JuryRun, "jurors" | "votes" | "consensus" | "agreement" | "contested">;
+
+const covidJuryFile = juryFile as unknown as JuryFixture;
+
+export const structures = (structuresFile as unknown as { structures: Structure[] }).structures;
+
+/**
+ * The COVID-19 jury run in any state. `finished` jurors have answered (with their recorded
+ * votes), the next one is reviewing and the rest wait. Done by default: the recorded run.
+ */
+export function covidJury(status: JuryRun["status"] = "done", finished = 3): JuryRun {
+  const data = structuredClone(covidJuryFile);
+  const models = structuredClone(covid.jury_config.models);
+  const done = status === "done";
+  const jurors = data.jurors.map((juror, index) => {
+    if (done || index < finished) return juror;
+    const running = status === "running" && index === finished;
+    return {
+      ...juror,
+      status: running ? ("running" as const) : ("pending" as const),
+      attempts: running ? 1 : 0,
+      latency_ms: null,
+      errors: [],
+    };
+  });
+  const answered = new Set(
+    jurors.filter((juror) => juror.status === "valid").map((juror) => juror.model_id),
+  );
+  return {
+    status,
+    models,
+    jurors,
+    votes: data.votes.filter((vote) => answered.has(vote.model_id)),
+    consensus: done ? data.consensus : null,
+    agreement: done ? data.agreement : null,
+    contested: done ? data.contested : [],
+    error: status === "failed" ? "The Model jury is unavailable right now." : null,
+    created_at: "2026-10-25T09:05:00Z",
+    started_at: status === "queued" ? null : "2026-10-25T09:05:01Z",
+    finished_at: done || status === "failed" ? "2026-10-25T09:07:48Z" : null,
+  };
+}
+
+/** The ready COVID-19 Experiment with its jury in the given state. */
+export function covidWithJury(status: JuryRun["status"] = "done", finished = 3): Experiment {
+  return { ...covidExperiment(), jury: covidJury(status, finished) };
+}
+
+/** A docking job for baricitinib in 6WTO. */
+export function dockJob(status: DockJob["status"], id = "5d0c7a43-8c3e-4b8e-9a51-0e7f0c2b1a01") {
+  const structure = structures[0];
+  if (structure === undefined) throw new Error("No structures in the fixture");
+  const job: DockJob = {
+    id,
+    kind: "candidate",
+    status,
+    experiment_id: EXPERIMENT_ID,
+    candidate_id: "CHEMBL2105759",
+    target_id: structure.target_id,
+    structure_id: structure.id,
+    settings: {
+      engine: "vina",
+      engine_version: "1.2.7",
+      exhaustiveness: 16,
+      seed: 42,
+      n_poses: 9,
+      box: structure.box,
+      meeko_version: null,
+      rdkit_version: null,
+    },
+    scores: null,
+    files: null,
+    control_rmsd: null,
+    error: null,
+    cached_from: null,
+    fixture: true,
+    created_at: "2026-10-25T09:10:00Z",
+    started_at: status === "queued" ? null : "2026-10-25T09:10:01Z",
+    finished_at: null,
+  };
+  return job;
+}
+
+/** What the history list says about an Experiment. */
+export function summaryOf(experiment: Experiment): ExperimentSummary {
+  return {
+    id: experiment.id,
+    status: experiment.status,
+    disease: experiment.disease,
+    data_releases: experiment.data_releases,
+    juror_count: experiment.jury_config.models.length,
+    jury_status: experiment.jury?.status ?? null,
+    candidate_count: experiment.candidates.length,
+    docked_count: experiment.dock_jobs.filter((job) => job.status === "done").length,
+    created_at: experiment.created_at,
+    archived_at: experiment.archived_at,
+  };
 }

@@ -5,7 +5,7 @@ import styles from "./Figure.module.css";
  * A step's figure composition (docs/design.md, "One step, one figure"): at most three panels on
  * one grid. `layout` picks the grid; each panel names its own area in it.
  */
-export type FigureLayout = "search" | "biology" | "candidates" | "evidence" | "single";
+export type FigureLayout = "search" | "biology" | "candidates" | "evidence" | "jury" | "single";
 
 export function FigureGrid({ layout, children }: { layout: FigureLayout; children: ReactNode }) {
   return (
@@ -15,7 +15,17 @@ export function FigureGrid({ layout, children }: { layout: FigureLayout; childre
   );
 }
 
-export type PanelArea = "search" | "net" | "targets" | "slope" | "molecule" | "evidence" | "main";
+export type PanelArea =
+  | "search"
+  | "net"
+  | "targets"
+  | "slope"
+  | "molecule"
+  | "evidence"
+  | "plot"
+  | "agreement"
+  | "objection"
+  | "main";
 
 interface PanelProps {
   area: PanelArea;

@@ -132,6 +132,49 @@ export interface Plate {
   dispose(): void;
 }
 
+/** A transparent, antialiased WebGL renderer on `canvas`, or null when the browser has no WebGL. */
+export function createRenderer(canvas: HTMLCanvasElement): WebGLRenderer | null {
+  let renderer: WebGLRenderer;
+  try {
+    renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true });
+  } catch {
+    return null;
+  }
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.outputColorSpace = SRGBColorSpace;
+  renderer.setClearColor(0xffffff, 0);
+  return renderer;
+}
+
+/** Follows `prefers-reduced-motion` as it changes. */
+export function watchReducedMotion(): { reduced: () => boolean; dispose: () => void } {
+  const query = window.matchMedia(REDUCED_MOTION);
+  let reduced = query.matches;
+  const onChange = (event: MediaQueryListEvent) => {
+    reduced = event.matches;
+  };
+  query.addEventListener("change", onChange);
+  return {
+    reduced: () => reduced,
+    dispose: () => {
+      query.removeEventListener("change", onChange);
+    },
+  };
+}
+
+/** Releases every mesh's geometry and material in `scene`. */
+export function disposeScene(scene: Scene): void {
+  scene.traverse((object) => {
+    if (object instanceof Mesh) {
+      (object.geometry as { dispose(): void }).dispose();
+      const materials: unknown[] = Array.isArray(object.material)
+        ? object.material
+        : [object.material];
+      for (const material of materials) (material as { dispose(): void }).dispose();
+    }
+  });
+}
+
 /**
  * Starts a plate on a new canvas inside `host`, or returns null when the browser has no WebGL.
  * The canvas is removed again on dispose.
@@ -139,16 +182,9 @@ export interface Plate {
 export function createPlate(host: HTMLElement, canvasClass: string): Plate | null {
   const canvas = document.createElement("canvas");
   canvas.className = canvasClass;
-  let renderer: WebGLRenderer;
-  try {
-    renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true });
-  } catch {
-    return null;
-  }
+  const renderer = createRenderer(canvas);
+  if (renderer === null) return null;
   host.prepend(canvas);
-  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-  renderer.outputColorSpace = SRGBColorSpace;
-  renderer.setClearColor(0xffffff, 0);
 
   const scene = new Scene();
   const camera = new PerspectiveCamera(FOV, 1, 0.1, 200);
@@ -159,12 +195,7 @@ export function createPlate(host: HTMLElement, canvasClass: string): Plate | nul
   let frame = 0;
   let last = performance.now();
 
-  const motionQuery = window.matchMedia(REDUCED_MOTION);
-  let reduced = motionQuery.matches;
-  const onMotionChange = (event: MediaQueryListEvent) => {
-    reduced = event.matches;
-  };
-  motionQuery.addEventListener("change", onMotionChange);
+  const motion = watchReducedMotion();
 
   const resize = () => {
     const nextWidth = canvas.clientWidth;
@@ -201,7 +232,7 @@ export function createPlate(host: HTMLElement, canvasClass: string): Plate | nul
     scene,
     camera,
     size: () => ({ width, height }),
-    reducedMotion: () => reduced,
+    reducedMotion: motion.reduced,
     onFrame: (callback) => {
       callbacks.push(callback);
     },
@@ -214,16 +245,8 @@ export function createPlate(host: HTMLElement, canvasClass: string): Plate | nul
       cancelAnimationFrame(frame);
       resizeObserver.disconnect();
       intersectionObserver.disconnect();
-      motionQuery.removeEventListener("change", onMotionChange);
-      scene.traverse((object) => {
-        if (object instanceof Mesh) {
-          (object.geometry as { dispose(): void }).dispose();
-          const materials: unknown[] = Array.isArray(object.material)
-            ? object.material
-            : [object.material];
-          for (const material of materials) (material as { dispose(): void }).dispose();
-        }
-      });
+      motion.dispose();
+      disposeScene(scene);
       renderer.dispose();
       renderer.forceContextLoss();
       canvas.remove();
@@ -242,10 +265,15 @@ export interface Rotation {
 }
 
 /**
- * Drag to rotate `rotation`. Vertical page scrolling still works on touch screens: only sideways
- * drags are captured there. Released drags coast to a stop unless motion is reduced.
+ * Drag `canvas` (or any element) to rotate `rotation`. Vertical page scrolling still works on
+ * touch screens: only sideways drags are captured there. Released drags coast to a stop unless
+ * motion is reduced.
  */
-export function dragToRotate(canvas: HTMLCanvasElement, rotation: Rotation, plate: Plate) {
+export function dragToRotate(
+  canvas: HTMLElement,
+  rotation: Rotation,
+  plate: { reducedMotion(): boolean },
+) {
   let pointer: { id: number; x: number; y: number } | null = null;
   const velocity = { x: 0, y: 0 };
 

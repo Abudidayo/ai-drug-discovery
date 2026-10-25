@@ -1,0 +1,240 @@
+/* Asking, progress and failure: one calm column of text, like the build progress. */
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  align-items: flex-start;
+  max-width: var(--measure);
+  padding-top: var(--space-8);
+}
+
+.lede {
+  font-size: var(--text-body-lg);
+}
+
+.headline {
+  font-size: var(--text-body-lg);
+  font-weight: var(--weight-semibold);
+}
+
+.detail {
+  font-size: var(--text-body);
+  color: var(--color-grey-1);
+}
+
+.ask {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-height);
+  padding: 0 var(--space-24);
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-control);
+  background: var(--color-ink);
+  font-size: var(--text-body-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-paper);
+}
+
+.ask:hover {
+  background: var(--color-ink-hover);
+}
+
+.ask:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.jurors {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.juror {
+  display: grid;
+  grid-template-columns: 12px minmax(10em, auto) auto;
+  column-gap: var(--space-12);
+  align-items: center;
+  font-size: var(--text-body-lg);
+}
+
+.jurorName {
+  font-weight: var(--weight-medium);
+}
+
+.jurorStatus {
+  color: var(--color-grey-1);
+}
+
+.juror[data-state="pending"] .jurorName,
+.juror[data-state="pending"] .jurorStatus {
+  color: var(--color-grey-2);
+}
+
+.juror[data-state="running"] .jurorStatus {
+  color: var(--color-ink);
+}
+
+/* A ring per model: filled when done, turning while it reviews, empty while it waits. */
+.ring {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--color-edge);
+  border-radius: 50%;
+}
+
+.juror[data-state="valid"] .ring {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+}
+
+.juror[data-state="running"] .ring {
+  border-color: var(--color-ink);
+}
+
+.juror[data-state="running"] .ring::after {
+  position: absolute;
+  inset: -1.5px;
+  border: 1.5px solid transparent;
+  border-top-color: var(--color-paper);
+  border-radius: 50%;
+  animation: turn 1.4s linear infinite;
+  content: "";
+}
+
+.juror[data-state="invalid"] .ring,
+.juror[data-state="failed"] .ring {
+  border-style: dashed;
+  border-color: var(--color-ink);
+}
+
+@keyframes turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Notes under the dot plot: models without votes, and retries. */
+.notes {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding-top: var(--space-8);
+}
+
+.note {
+  display: flex;
+  gap: var(--space-12);
+  align-items: baseline;
+  max-width: 62ch;
+  font-size: var(--text-body-sm);
+  color: var(--color-grey-1);
+}
+
+.note > svg {
+  position: relative;
+  top: 1px;
+}
+
+.indent {
+  flex: none;
+  width: 11px;
+}
+
+/* Agreement: a 0 to 1 scale with the value above its point. */
+.agreement {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.scale {
+  position: relative;
+  height: 56px;
+  margin: 0 var(--space-12) 0 var(--space-4);
+  border-bottom: 0;
+}
+
+.scale::before {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  left: 0;
+  border-top: 1px solid var(--color-ink);
+  content: "";
+}
+
+.fill {
+  position: absolute;
+  top: 26px;
+  left: 0;
+  height: 3px;
+  background: var(--color-ink);
+}
+
+.value {
+  position: absolute;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateX(-50%);
+}
+
+.value b {
+  font-size: var(--text-body-lg);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+}
+
+.value i {
+  width: 11px;
+  height: 11px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--color-ink);
+}
+
+.scaleTick {
+  position: absolute;
+  top: 34px;
+  font-size: var(--text-label-sm);
+  line-height: 1;
+  color: var(--color-grey-1);
+  font-variant-numeric: tabular-nums;
+  transform: translateX(-50%);
+}
+
+.scaleTick::before {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  height: 4px;
+  border-left: 1px solid var(--color-ink);
+  content: "";
+}
+
+.help {
+  max-width: 52ch;
+  font-size: var(--text-body-sm);
+  color: var(--color-grey-1);
+}
+
+/* The objection: the model's marker in the title, the words in the serif, quoted. */
+.objectionTitle {
+  display: inline-flex;
+  gap: var(--space-8);
+  align-items: center;
+}
+
+.objection {
+  max-width: 48ch;
+  padding-left: var(--space-16);
+  border-left: 2px solid var(--color-ink);
+  font-family: var(--font-serif);
+  font-size: var(--text-intro);
+  line-height: var(--leading-body);
+}

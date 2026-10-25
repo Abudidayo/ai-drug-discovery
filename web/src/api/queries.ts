@@ -1,8 +1,14 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
 import { api } from "./client";
 import { ApiError, unwrap } from "./errors";
-import type { Conformer, Experiment, ExperimentStatus } from "./types";
+import type { Conformer, Experiment, ExperimentStatus, JuryRun } from "./types";
 
 /** How long typing must pause before the disease search asks the API. */
 export const SEARCH_DEBOUNCE_MS = 250;
@@ -10,12 +16,18 @@ export const SEARCH_DEBOUNCE_MS = 250;
 /** How often a building Experiment is polled. */
 export const BUILD_POLL_MS = 1000;
 
+/** How often an Experiment is polled while its jury or a docking job is still working. */
+export const WORK_POLL_MS = 2000;
+
 const SEARCH_LIMIT = 8;
 
 export const queryKeys = {
   search: (query: string) => ["diseases", "search", query] as const,
   experiment: (id: string) => ["experiments", id] as const,
   conformer: (cid: number) => ["molecules", cid, "conformer"] as const,
+  history: (archived: boolean) => ["history", { archived }] as const,
+  allHistory: ["history"] as const,
+  structures: ["structures"] as const,
 };
 
 /**
@@ -58,7 +70,26 @@ export function isBuilding(experiment: Experiment): boolean {
   return BUILDING.includes(experiment.status);
 }
 
-/** One Experiment, polled every second while it is queued or building. */
+/** Jury runs and docking jobs share these states while they work. */
+const WORKING: readonly JuryRun["status"][] = ["queued", "running"];
+
+/** True while the Model jury is reviewing. */
+export function isJuryWorking(jury: JuryRun | null): boolean {
+  return jury !== null && WORKING.includes(jury.status);
+}
+
+/** True while the jury reviews or a binding pose is being computed. */
+function isWorking(experiment: Experiment): boolean {
+  return (
+    isJuryWorking(experiment.jury) ||
+    experiment.dock_jobs.some((job) => WORKING.includes(job.status))
+  );
+}
+
+/**
+ * One Experiment, polled every second while it is queued or building, and every two seconds
+ * while its jury or a docking job works.
+ */
 export function useExperiment(id: string) {
   return useQuery({
     queryKey: queryKeys.experiment(id),
@@ -71,7 +102,9 @@ export function useExperiment(id: string) {
       ),
     refetchInterval: (query) => {
       const experiment = query.state.data;
-      return experiment !== undefined && isBuilding(experiment) ? BUILD_POLL_MS : false;
+      if (experiment === undefined) return false;
+      if (isBuilding(experiment)) return BUILD_POLL_MS;
+      return isWorking(experiment) ? WORK_POLL_MS : false;
     },
   });
 }
@@ -80,8 +113,8 @@ export function useExperiment(id: string) {
  * The 3D conformer of a small molecule, or null when it has none: antibodies and other biologics
  * have no PubChem compound, and the API answers 404 for compounds without a 3D model.
  */
-export function useConformer(pubchemCid: number | null) {
-  return useQuery({
+export function conformerQuery(pubchemCid: number | null) {
+  return queryOptions({
     queryKey: queryKeys.conformer(pubchemCid ?? 0),
     queryFn: async ({ signal }): Promise<Conformer | null> => {
       if (pubchemCid === null) return null;
@@ -98,6 +131,76 @@ export function useConformer(pubchemCid: number | null) {
       }
     },
     enabled: pubchemCid !== null,
+    staleTime: Infinity,
+  });
+}
+
+export function useConformer(pubchemCid: number | null) {
+  return useQuery(conformerQuery(pubchemCid));
+}
+
+/**
+ * Asks the Model jury to review the Experiment's shortlist. The queued run is put on the cached
+ * Experiment at once, and the Experiment is fetched again so polling follows each juror.
+ */
+export function useAskJury(experimentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      unwrap(
+        api.POST("/api/experiments/{experiment_id}/jury", {
+          params: { path: { experiment_id: experimentId } },
+        }),
+      ),
+    onSuccess: (jury) => {
+      queryClient.setQueryData<Experiment>(queryKeys.experiment(experimentId), (experiment) =>
+        experiment === undefined ? experiment : { ...experiment, jury },
+      );
+    },
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.experiment(experimentId) }),
+  });
+}
+
+/** Saved Experiments, newest first: active ones, or the archived ones. */
+export function useHistory(archived: boolean) {
+  return useQuery({
+    queryKey: queryKeys.history(archived),
+    queryFn: ({ signal }) =>
+      unwrap(api.GET("/api/experiments", { params: { query: { archived } }, signal })).then(
+        (list) => list.items,
+      ),
+  });
+}
+
+/**
+ * Archives or restores an Experiment. The answer is the whole Experiment, so its cached copy is
+ * replaced and both history lists are fetched again.
+ */
+export function useArchive() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, archive }: { id: string; archive: boolean }) => {
+      const params = { path: { experiment_id: id } };
+      return unwrap(
+        archive
+          ? api.POST("/api/experiments/{experiment_id}/archive", { params })
+          : api.POST("/api/experiments/{experiment_id}/restore", { params }),
+      );
+    },
+    onSuccess: (experiment) => {
+      queryClient.setQueryData(queryKeys.experiment(experiment.id), experiment);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.allHistory }),
+  });
+}
+
+/** The prepared protein structures a binding pose can be computed in. They rarely change. */
+export function useStructures() {
+  return useQuery({
+    queryKey: queryKeys.structures,
+    queryFn: ({ signal }) =>
+      unwrap(api.GET("/api/structures", { signal })).then((list) => list.structures),
     staleTime: Infinity,
   });
 }

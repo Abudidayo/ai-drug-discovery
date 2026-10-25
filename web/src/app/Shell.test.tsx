@@ -30,7 +30,7 @@ function expectOnStep(slug: StepSlug) {
 }
 
 /** Steps whose figures later phases build. */
-const PLACEHOLDER_STEPS: StepSlug[] = ["jury", "compare", "pose", "history"];
+const PLACEHOLDER_STEPS: StepSlug[] = ["pose"];
 
 describe("Shell", () => {
   describe.each(stepSlugs)("step %s", (slug) => {

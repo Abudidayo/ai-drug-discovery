@@ -1,4 +1,11 @@
-import { CylinderGeometry, Group, Mesh, SphereGeometry, Vector3 } from "three";
+import {
+  CylinderGeometry,
+  Group,
+  Mesh,
+  type PerspectiveCamera,
+  SphereGeometry,
+  Vector3,
+} from "three";
 import type { Conformer } from "../api/types";
 import {
   clamp,
@@ -8,6 +15,7 @@ import {
   flatMaterial,
   placeCylinder,
   tokenColor,
+  type FlatMaterial,
   type Plate,
 } from "./plate";
 
@@ -22,43 +30,48 @@ interface Atom {
   label: HTMLSpanElement | null;
 }
 
+/** What a molecule needs from the surface it is drawn on: a whole plate, or one slot of a strip. */
+export interface MoleculeView {
+  readonly camera: PerspectiveCamera;
+  /** Drawing size in CSS pixels; 0 while hidden. */
+  size(): { width: number; height: number };
+  reducedMotion(): boolean;
+  pixelsPerUnit(): number;
+  /** Projects a world point to pixels in the view, for the element letters. */
+  project(point: Vector3): { x: number; y: number };
+}
+
+interface Drag {
+  coast(): void;
+  dragging(): boolean;
+}
+
 /**
  * A small molecule as a turning skeletal formula: carbons are small white atoms with ink
  * outlines, other elements larger and lettered, bonds are ink rods (double and triple bonds drawn
- * as parallel rods). Hydrogens are left out, as in a skeletal formula.
+ * as parallel rods). Hydrogens are left out, as in a skeletal formula. It draws into any view, so
+ * one canvas can hold one molecule (MoleculeScene) or several side by side (MoleculeStrip).
  */
-export class MoleculeScene {
-  private readonly plate: Plate;
-  private readonly drag: ReturnType<typeof dragToRotate>;
-  private readonly group = new Group();
-  private readonly rotation = { x: 0.35, y: 0.5 };
+export class Molecule {
+  readonly group = new Group();
+  readonly rotation = { x: 0.35, y: 0.5 };
   private readonly atoms: Atom[] = [];
   private readonly bonds: { mesh: Mesh; thin: boolean }[] = [];
+  private readonly geometries: { dispose(): void }[];
+  private readonly materials: FlatMaterial[];
   private lastSize = { width: 0, height: 0 };
   private readonly world = new Vector3();
 
-  /** Draws `conformer` on a new canvas in `host`; element letters go into `labelLayer`. */
-  static create(
-    host: HTMLElement,
-    canvasClass: string,
-    labelLayer: HTMLElement,
-    conformer: Conformer,
-  ): MoleculeScene | null {
-    const plate = createPlate(host, canvasClass);
-    return plate === null ? null : new MoleculeScene(plate, labelLayer, conformer);
-  }
-
-  private constructor(plate: Plate, labelLayer: HTMLElement, conformer: Conformer) {
-    this.plate = plate;
-    this.drag = dragToRotate(plate.canvas, this.rotation, plate);
-    plate.scene.add(this.group);
-
+  /** Builds `conformer`; its element letters go into `labelLayer`. */
+  constructor(conformer: Conformer, labelLayer: HTMLElement) {
     const ink = tokenColor("--color-ink");
     const sphere = new SphereGeometry(1, 28, 18);
     const cylinder = new CylinderGeometry(1, 1, 1, 10, 1, true);
     const atomMaterial = flatMaterial("#ffffff", { shade: 0.87 });
     const hullMaterial = flatMaterial(ink, { outline: true, shade: 1 });
     const bondMaterial = flatMaterial(ink, { shade: 1 });
+    this.geometries = [sphere, cylinder];
+    this.materials = [atomMaterial, hullMaterial, bondMaterial];
 
     // Heavy atoms only, centred and scaled into the unit sphere.
     const kept = new Map<number, number>();
@@ -135,31 +148,29 @@ export class MoleculeScene {
         this.bonds.push({ mesh, thin: true });
       }
     }
-
-    plate.onFrame((seconds) => {
-      this.frame(seconds);
-    });
   }
 
+  /** Removes the element letters and frees the GPU resources. */
   dispose(): void {
-    this.drag.dispose();
-    this.plate.dispose();
     for (const atom of this.atoms) atom.label?.remove();
+    for (const geometry of this.geometries) geometry.dispose();
+    for (const material of this.materials) material.dispose();
   }
 
-  private frame(seconds: number): void {
-    const { plate, rotation } = this;
-    const size = plate.size();
+  /** One frame: turn, fit the camera to the view, and keep atoms and bonds a steady pixel size. */
+  frame(seconds: number, view: MoleculeView, drag: Drag): void {
+    const { rotation } = this;
+    const size = view.size();
     if (size.width !== this.lastSize.width || size.height !== this.lastSize.height) {
       this.lastSize = size;
-      plate.camera.position.set(0, 0, fitDistance(1.12, size.width / size.height));
+      view.camera.position.set(0, 0, fitDistance(1.12, size.width / size.height));
     }
-    this.drag.coast();
-    if (!plate.reducedMotion() && !this.drag.dragging()) rotation.y += seconds * AUTO_TURN;
+    drag.coast();
+    if (!view.reducedMotion() && !drag.dragging()) rotation.y += seconds * AUTO_TURN;
     this.group.rotation.set(rotation.x, rotation.y, 0);
     this.group.updateMatrixWorld();
 
-    const unit = plate.pixelsPerUnit();
+    const unit = view.pixelsPerUnit();
     const showLetters = clamp(0.072 * unit, 3.6, 8.5) >= 5.6;
     for (const atom of this.atoms) {
       const pixels = atom.hetero ? clamp(0.072 * unit, 3.6, 8.5) : clamp(0.036 * unit, 2.2, 4.4);
@@ -171,7 +182,7 @@ export class MoleculeScene {
         continue;
       }
       this.world.copy(atom.position).applyMatrix4(this.group.matrixWorld);
-      const { x, y } = plate.project(this.world);
+      const { x, y } = view.project(this.world);
       const depth = clamp((this.world.z + 1) / 2, 0, 1); // 1 nearest
       atom.label.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -50%)`;
       atom.label.style.opacity = (0.3 + 0.7 * depth).toFixed(2);
@@ -181,5 +192,39 @@ export class MoleculeScene {
       bond.mesh.scale.x = pixels / unit;
       bond.mesh.scale.z = pixels / unit;
     }
+  }
+}
+
+/** One molecule on its own canvas. Drag to rotate. */
+export class MoleculeScene {
+  private readonly plate: Plate;
+  private readonly molecule: Molecule;
+  private readonly drag: ReturnType<typeof dragToRotate>;
+
+  /** Draws `conformer` on a new canvas in `host`; element letters go into `labelLayer`. */
+  static create(
+    host: HTMLElement,
+    canvasClass: string,
+    labelLayer: HTMLElement,
+    conformer: Conformer,
+  ): MoleculeScene | null {
+    const plate = createPlate(host, canvasClass);
+    return plate === null ? null : new MoleculeScene(plate, labelLayer, conformer);
+  }
+
+  private constructor(plate: Plate, labelLayer: HTMLElement, conformer: Conformer) {
+    this.plate = plate;
+    this.molecule = new Molecule(conformer, labelLayer);
+    this.drag = dragToRotate(plate.canvas, this.molecule.rotation, plate);
+    plate.scene.add(this.molecule.group);
+    plate.onFrame((seconds) => {
+      this.molecule.frame(seconds, plate, this.drag);
+    });
+  }
+
+  dispose(): void {
+    this.drag.dispose();
+    this.plate.dispose();
+    this.molecule.dispose();
   }
 }

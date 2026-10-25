@@ -30,6 +30,14 @@
   grid-template-areas: "molecule evidence net";
 }
 
+.grid[data-layout="jury"] {
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 7.6fr) minmax(0, 4.4fr);
+  grid-template-areas:
+    "plot agreement"
+    "plot objection";
+}
+
 .grid[data-layout="single"] {
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "main";
@@ -75,6 +83,18 @@
 
 .panel[data-area="evidence"] {
   grid-area: evidence;
+}
+
+.panel[data-area="plot"] {
+  grid-area: plot;
+}
+
+.panel[data-area="agreement"] {
+  grid-area: agreement;
+}
+
+.panel[data-area="objection"] {
+  grid-area: objection;
 }
 
 .panel[data-area="main"] {
@@ -197,6 +217,10 @@
 
   .grid[data-layout="evidence"] {
     grid-template-areas: "molecule" "evidence" "net";
+  }
+
+  .grid[data-layout="jury"] {
+    grid-template-areas: "plot" "agreement" "objection";
   }
 
   .panel[data-area="net"] {

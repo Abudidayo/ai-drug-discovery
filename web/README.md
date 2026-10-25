@@ -12,17 +12,17 @@ npm ci
 npm run dev        # http://localhost:5173, with /api proxied to FastAPI on 127.0.0.1:8000
 ```
 
-| Script                    | What it does                                                           |
-| ------------------------- | ---------------------------------------------------------------------- |
-| `dev`                     | Vite dev server with the `/api` proxy                                  |
-| `build`                   | Type-checks, then builds to `dist/`                                    |
-| `preview`                 | Serves `dist/` (also proxies `/api`)                                   |
-| `typecheck`               | `tsc -b`                                                               |
-| `lint`                    | ESLint (typescript-eslint, react-hooks, jsx-a11y), no warnings allowed |
-| `format` / `format:check` | Prettier                                                               |
-| `test`                    | Vitest with jsdom, Testing Library and MSW                             |
-| `e2e`                     | Playwright: starts the fixture API and `vite preview`, walks steps 1-4 |
-| `gen:api`                 | Regenerates `src/api/schema.d.ts` from `../api/openapi.json`           |
+| Script                    | What it does                                                                 |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| `dev`                     | Vite dev server with the `/api` proxy                                        |
+| `build`                   | Type-checks, then builds to `dist/`                                          |
+| `preview`                 | Serves `dist/` (also proxies `/api`)                                         |
+| `typecheck`               | `tsc -b`                                                                     |
+| `lint`                    | ESLint (typescript-eslint, react-hooks, jsx-a11y), no warnings allowed       |
+| `format` / `format:check` | Prettier                                                                     |
+| `test`                    | Vitest with jsdom, Testing Library and MSW                                   |
+| `e2e`                     | Playwright: starts the fixture API and `vite preview`, walks steps 1-6 and 8 |
+| `gen:api`                 | Regenerates `src/api/schema.d.ts` from `../api/openapi.json`                 |
 
 `VITE_API_BASE` sets the API's origin (default: the page's own origin, whose `/api` Vite proxies).
 `OXHACK_API_ORIGIN` points the dev and preview proxies at an API other than
@@ -46,14 +46,21 @@ Locally it reuses servers already running on ports 8000 and 4173; `E2E_API_PORT`
 - `src/api/client.ts`: the `openapi-fetch` client, typed by the generated `schema.d.ts`. Don't
   edit `schema.d.ts` by hand; run `npm run gen:api` after the API contract changes.
   `src/api/queries.ts` holds the TanStack Query hooks: debounced disease search, creating an
-  Experiment, the Experiment (polled every second while it builds) and molecule conformers.
+  Experiment, the Experiment (polled every second while it builds, every two while its jury or a
+  docking job works), asking the jury, history with archive and restore, the prepared structures
+  and molecule conformers.
 - `src/app/routes/ExperimentLayout.tsx`: `/e/:experimentId/:step` loads the Experiment once,
   shows its build progress or failure, and owns the figure grid and the persistent protein
   network, so the network is mounted once and survives step changes. Each step
   (`src/steps/`) only adds its own panels and points the network at what it is about.
 - `src/three/`: the print-style WebGL plates (`NetworkFigure`, `MoleculeFigure`), loaded lazily.
-  Drag rotates; ambient rotation and easing stop under `prefers-reduced-motion`.
+  Drag rotates; ambient rotation and easing stop under `prefers-reduced-motion`. `MoleculeStrip`
+  draws Compare's molecules side by side on one shared canvas, so a step never needs more than
+  three WebGL contexts (the hidden network keeps its own).
 - `src/charts/SlopeChart.tsx`: closeness, network rank and evidence rank on one row per drug.
+- `src/charts/DotPlot.tsx`: the Model jury, one row per drug and one marker shape per model
+  (`Marker.tsx`), with a split decision drawn once in the contested colour. `src/lib/jury.ts`
+  picks the rows, the counted models and the one objection shown.
 - `src/lib/format.ts`: `drugName()` and the other display formatters; use them everywhere.
 - Tests: `src/test/` has the MSW server (handlers typed by the contract via `openapi-msw`), the
   WebGL and layout stand-ins for jsdom, and fixtures read straight from

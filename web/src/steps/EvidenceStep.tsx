@@ -5,8 +5,8 @@ import type { Candidate, EvidenceItem, Experiment } from "../api/types";
 import { FigureNote, Panel } from "../app/Figure";
 import { useNetworkHover } from "../app/networkHover";
 import { copy } from "../copy/en";
-import { focusCandidate } from "../lib/candidates";
-import { capitalise, drugName, listOf } from "../lib/format";
+import { focusCandidate, warningSentence } from "../lib/candidates";
+import { drugName } from "../lib/format";
 import styles from "./EvidenceStep.module.css";
 
 /** The query parameter that picks which Candidate the Evidence step is about. */
@@ -57,22 +57,6 @@ function MoleculePanel({ candidate }: { candidate: Candidate }) {
       {body}
     </Panel>
   );
-}
-
-/**
- * The label risks as one plain sentence, from each cited warning's summary, e.g. "Serious
- * infections, cancer and lung problems."
- */
-function warningSentence(candidate: Candidate): string {
-  const byId = new Map(candidate.evidence.map((item) => [item.id, item]));
-  const risks: string[] = [];
-  for (const warning of candidate.warnings) {
-    const summary = byId.get(warning.evidence_id)?.summary.replace(/\.$/, "");
-    if (summary === undefined) continue;
-    const risk = summary.charAt(0).toLowerCase() + summary.slice(1);
-    if (!risks.includes(risk)) risks.push(risk);
-  }
-  return `${capitalise(listOf(risks))}.`;
 }
 
 function WarningBox({ candidate }: { candidate: Candidate }) {
