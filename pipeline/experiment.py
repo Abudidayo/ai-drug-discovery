@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from jury.client import CortexModel, mock_model, run_jury, validate_packet
 from pipeline import disease_targets as a1
+from pipeline.drugs import Cache
 from pipeline.opentargets import OpenTargetsClient, OpenTargetsError, URL
 from pipeline.packets import CHEMBL_URL, EvidenceSources, OT_RELEASE, REGULATORS, build_evidence_packet
 
@@ -38,7 +39,7 @@ def normalize_evidence_urls(updates, packet):
 
 
 def bioactivity_consistency(drugs, updates, sources):
-    """Expose A2/A4 measurement differences without rewriting either source."""
+    """Check that A4 preserves A2's authoritative A7 measurements."""
     by_id = {d["drug_id"]: d for d in drugs["drugs"]}
     differences = []
     for candidate in updates:
@@ -85,7 +86,8 @@ class ExperimentSources(EvidenceSources):
                 self.target_records = {}
                 for path in sorted((self.inputs.data_dir / "chembl-37").glob("*.json")):
                     saved = read_json(path)
-                    if (saved["release"] == "chembl-37" and isinstance(saved["request"], dict)
+                    # This directory also holds manifests and retrieval metadata.
+                    if (saved.get("release") == "chembl-37" and isinstance(saved.get("request"), dict)
                             and saved["request"].get("url") == CHEMBL_URL + "target.json"):
                         for record in saved["response"]["targets"]:
                             self.target_records[record["target_chembl_id"]] = record
@@ -98,6 +100,16 @@ class ExperimentSources(EvidenceSources):
         if self.association_scores is None:
             raise ValueError("Fetch and score the complete A1 associations first")
         return self.association_scores
+
+    def bioactivity_target_ids(self, source_ids):
+        cache = Cache(self.inputs.data_dir, None, offline=True)
+        try:
+            return {row["target_chembl_id"] for source_id in source_ids for row in cache.pages("activity", {
+                "molecule_chembl_id": source_id, "pchembl_value__gte": 5,
+                "target_organism": "Homo sapiens", "only": "target_chembl_id,pchembl_value",
+            })}
+        except FileNotFoundError:
+            return super().bioactivity_target_ids(source_ids)
 
 
 class AssociationClient(OpenTargetsClient):
@@ -138,7 +150,8 @@ def direct_shortlist(drugs, scores):
     return [drug_id for _, drug_id in ranked[:15]], len(ranked)
 
 
-def run_experiment(disease_id, out, *, jury="mock", data_dir=ROOT / "data", offline=False):
+def run_experiment(disease_id, out, *, jury="mock", data_dir=ROOT / "data", offline=False,
+                   jury_attempts=2, jury_max_calls=None):
     out, data_dir = Path(out), Path(data_dir)
     out.mkdir(parents=True, exist_ok=True)
     for name in ("run.md", "jury_result.json", "jury_usage.json"):
@@ -180,7 +193,7 @@ def run_experiment(disease_id, out, *, jury="mock", data_dir=ROOT / "data", offl
     differences = bioactivity_consistency(drugs, updates, sources)
     write_json(out / "consistency.json", {
         "bioactivity_matches_a2": not differences, "differences": differences,
-        "reason": "A2 pools parent/salt activities with pChEMBL >=5; A4 uses parent-only non-null activities"})
+        "reason": "A4 reuses A2 A7 median pChEMBL and activity counts, pooled across verified parent/salt sources"})
     by_id = {c["candidate_id"]: c for c in updates}
     if any(not any(e["kind"] == "approval" for e in c["evidence"]) for c in updates):
         raise ValueError("A4 could not confirm regulator-backed approval for the entire shortlist")
@@ -193,17 +206,18 @@ def run_experiment(disease_id, out, *, jury="mock", data_dir=ROOT / "data", offl
     write_json(out / "candidates.json", candidates)
     write_json(out / "evidence_packet.json", packet)
     config = read_json(ROOT / "jury/config.json")
+    config["max_attempts"] = jury_attempts
     if jury == "live":
         if not os.environ.get("SNOWFLAKE_MODELS"):
             raise ValueError("Set SNOWFLAKE_MODELS to three verified model IDs")
         config["models"] = json.loads(os.environ["SNOWFLAKE_MODELS"])
         model = CortexModel()
         try:
-            result = run_jury(packet, config, model)
+            result = run_jury(packet, config, model, max_calls=jury_max_calls)
         finally:
             model.close()
     elif jury == "mock":
-        result = run_jury(packet, config, mock_model)
+        result = run_jury(packet, config, mock_model, max_calls=jury_max_calls)
     else:
         raise ValueError("jury must be mock or live")
     # A5 exposes usage beyond A0's contract; retain it in a separate artifact.
@@ -253,13 +267,12 @@ def run_experiment(disease_id, out, *, jury="mock", data_dir=ROOT / "data", offl
         "Upstream A4 needs the shared verified parent override to retain such drugs. "
         "A2 also accepts an APPROVAL indication backed by an EMA report at WITHDRAWAL; "
         "reuse A4's stricter approval check and backfill when no APPROVAL report exists. "
-        "Upstream A2 should distinguish report stages. No changes to upstream modules.\n\n"
+        "Upstream A2 should distinguish report stages.\n\n"
         "Legacy HTTP FDA evidence links use the same HTTPS document paths (verified on the real outputs). "
         "Mechanism text may contain digits in full protein names; these are identifiers, not measured values.\n\n"
-        "Unresolved upstream issue: A2 pools parent and salt activities with pChEMBL >=5; A4 fetches "
-        "parent-only non-null activities. Their medians/counts and sometimes supported edges disagree. "
-        "Keep the measured A4 evidence unchanged and report the differences; align these policies upstream "
-        "before claiming a fully consistent pipeline.\n\n"
+        "Bioactivity policy: A4 reuses A2's A7 median pChEMBL and activity counts exactly. "
+        "A2 pools verified parent/salt human single-protein activities with pChEMBL >=5; "
+        "A4 activity lookups discover ChEMBL source IDs only and do not recalculate potency.\n\n"
         "Interpretation: retrospective pipeline/known-answer check, not prospective or clinical validation. "
         "Clinical precedence and cancer biomarkers are excluded from Target scores; literature and other residual "
         "indirect leakage remain possible. Drug names are visible to this jury; named-versus-blind advantage was not measured here. "
@@ -275,10 +288,13 @@ def main(argv=None):
     parser.add_argument("disease_id")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--jury", choices=("mock", "live"), default="mock")
+    parser.add_argument("--jury-attempts", type=int, default=2, help="Maximum calls per juror")
+    parser.add_argument("--jury-max-calls", type=int, help="Total call budget, reserving one attempt per juror")
     parser.add_argument("--offline", action="store_true", help="Require recorded HTTP snapshots")
     args = parser.parse_args(argv)
     try:
-        run_experiment(args.disease_id, args.out, jury=args.jury, offline=args.offline)
+        run_experiment(args.disease_id, args.out, jury=args.jury, offline=args.offline,
+                       jury_attempts=args.jury_attempts, jury_max_calls=args.jury_max_calls)
     except Exception as exc:
         # Provider exceptions can contain credentials; only expose the type.
         parser.exit(1, f"Experiment failed ({type(exc).__name__}); no credentials logged.\n")

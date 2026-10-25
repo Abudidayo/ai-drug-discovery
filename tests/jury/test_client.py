@@ -337,12 +337,16 @@ def test_sdk_endpoint_auth_config_model_and_no_hidden_retries(monkeypatch):
 
 
 @pytest.mark.parametrize("model", ["claude-opus-5-5", "claude-sonnet-5", "openai-gpt-5.4", "glm-5.3"])
-def test_endpoint_routing_structured_output_and_usage(monkeypatch, model):
+@pytest.mark.parametrize("candidate_count", [0, 15])
+def test_endpoint_routing_structured_output_and_usage(monkeypatch, model, candidate_count):
     monkeypatch.setenv("SNOWFLAKE_ACCOUNT", "test-account")
     monkeypatch.setenv("SNOWFLAKE_PAT", "fake-test-token")
     real_openai = openai.OpenAI
     calls = []
     raw = json.dumps(reply())
+    prompt = "test prompt"
+    if candidate_count:
+        prompt += "\nEvidence packet:\n" + json.dumps({"candidates": [{}] * candidate_count})
     def handle(request):
         calls.append(request)
         assert request.method == "POST"
@@ -350,11 +354,11 @@ def test_endpoint_routing_structured_output_and_usage(monkeypatch, model):
         assert request.extensions["timeout"]["read"] == 300
         body = json.loads(request.content)
         assert body["model"] == model
-        assert body["messages"] == [{"role": "user", "content": "test prompt"}]
+        assert body["messages"] == [{"role": "user", "content": prompt}]
         if model.startswith("claude-"):
             assert str(request.url) == "https://test-account.snowflakecomputing.com/api/v2/cortex/v1/messages"
             assert request.headers["anthropic-version"] == "2023-06-01"
-            assert body["max_tokens"] == 4096
+            assert body["max_tokens"] == max(4096, 1024 * candidate_count)
             assert "temperature" not in body  # Opus 5.5 rejects sampling parameters.
             assert "response_format" not in body
             assert body["output_config"] == {"format": {
@@ -362,7 +366,7 @@ def test_endpoint_routing_structured_output_and_usage(monkeypatch, model):
             return httpx.Response(200, json={"content": [
                 {"type": "thinking", "thinking": "This is not part of the vote."},
                 {"type": "text", "text": raw[:20]}, {"type": "text", "text": raw[20:]}],
-                "usage": {"input_tokens": 123, "output_tokens": 456}})
+                "usage": {"input_tokens": 123, "output_tokens": 456}, "stop_reason": "end_turn"})
         assert str(request.url) == "https://test-account.snowflakecomputing.com/api/v2/cortex/v1/chat/completions"
         assert body["temperature"] == 0
         assert "anthropic-version" not in request.headers
@@ -377,10 +381,12 @@ def test_endpoint_routing_structured_output_and_usage(monkeypatch, model):
     monkeypatch.setattr(openai, "OpenAI", factory)
     client = CortexModel()
     try:
-        result = client(model, "test prompt", 0)
+        result = client(model, prompt, 0)
     finally:
         client.close()
-    assert result == ModelReply(raw, input_tokens=123, output_tokens=456)
+    assert result == ModelReply(raw, input_tokens=123, output_tokens=456,
+        max_output_tokens=max(4096, 1024 * candidate_count) if model.startswith("claude-") else None,
+        stop_reason="end_turn" if model.startswith("claude-") else None)
     assert validate_reply(result.text, PACKET)[0] is not None
     assert len(calls) == 1
 
@@ -494,3 +500,46 @@ def test_one_real_cortex_call():
         assert isinstance(text, str) and text.strip()
     finally:
         client.close()
+
+
+def test_recorded_covid_objection_requires_its_measurement_citations():
+    case = json.loads((Path(__file__).parent / 'data/covid_gpt_citations.json').read_text())
+    packet, value = case['packet'], case['reply']
+    reviews, flags = validate_reply(json.dumps(value), packet)
+    assert reviews is None
+    assert flags['errors'] == ['C9: unsupported or unparseable number in objection']
+    # Both numbers were supplied, but E68 (STAT3) and E70 (BMP2K) were omitted.
+    value['reviews'][0]['contradicting_evidence_ids'] = ['E68', 'E70']
+    assert validate_reply(json.dumps(value), packet)[0] is not None
+    value['reviews'][0]['objection'] += ' The dose is 99 mg.'
+    assert validate_reply(json.dumps(value), packet)[0] is None
+
+
+def test_retry_explains_validation_failure_without_changing_packet():
+    seen = {}
+    def model_call(model, prompt, temperature):
+        prompts = seen.setdefault(model, [])
+        prompts.append(prompt)
+        if len(prompts) == 1:
+            return 'incomplete JSON'
+        assert prompt.startswith('Your previous reply failed validation: JSON decoding failed')
+        assert json.loads(prompt.split('Evidence packet:\n', 1)[1]) == json.loads(
+            prompts[0].split('Evidence packet:\n', 1)[1])
+        return mock_model(model, prompt, temperature)
+    result = run_jury(PACKET, CONFIG, model_call)
+    assert all(j['status'] == 'valid' and j['attempts'] == 2 for j in result['jurors'])
+
+
+def test_total_call_budget_reserves_one_attempt_per_juror():
+    calls = []
+    def invalid(model, prompt, temperature):
+        calls.append(model)
+        return 'incomplete JSON'
+    result = run_jury(PACKET, CONFIG, invalid, max_calls=4)
+    assert calls == [CONFIG['models'][0], CONFIG['models'][0], *CONFIG['models'][1:]]
+    assert [j['attempts'] for j in result['jurors']] == [2, 1, 1]
+    assert all(j['status'] == 'invalid' for j in result['jurors'])
+    assert all('Total jury call budget exhausted; no further retry' in j['validation']['errors']
+               for j in result['jurors'][1:])
+    with pytest.raises(ValueError, match='at least one attempt'):
+        run_jury(PACKET, CONFIG, invalid, max_calls=2)

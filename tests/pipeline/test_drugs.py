@@ -346,3 +346,20 @@ def test_live_full_universe_from_cache():
     assert drugs["CHEMBL4297528"]["unmapped"] == [
         {"source": "mechanism", "item": "SMN2 pre-mRNA", "reason": "non_protein_target"},
     ]
+
+
+def test_offline_cache_miss_never_uses_network(tmp_path):
+    cache = Cache(tmp_path, None, offline=True)
+    with pytest.raises(FileNotFoundError, match='Missing offline ChEMBL cache'):
+        cache.get(CHEMBL_URL + 'status.json')
+
+
+def test_covid_approval_gap_is_in_pinned_source_records():
+    sample = json.loads((DATA.parent / 'covid_approvals.json').read_text())
+    assert {r['drugId'] for r in sample['indications']} == {'CHEMBL2105759', 'CHEMBL1237022'}
+    assert all(r['maxClinicalStage'] == 'PHASE_3' for r in sample['indications'])
+    toci = next(r for r in sample['reports'] if r['id'] == 'emea/h/c/000955')
+    assert {'diseaseFromSource': 'covid-19 virus infection', 'diseaseId': None} in toci['diseases']
+    # Regulator reports on other indications or an unmapped source phrase cannot
+    # supply a COVID-19 approval through an ID join.
+    assert approval_rows(sample['indications'], sample['reports']) == {}
