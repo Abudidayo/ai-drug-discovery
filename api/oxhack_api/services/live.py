@@ -88,13 +88,14 @@ COMMON_DISEASES = (
     "MONDO_0100096",  # COVID-19: shown first; finds baricitinib, the known-answer check
     "MONDO_0008383",  # rheumatoid arthritis
     "MONDO_0005083",  # psoriasis
-    "MONDO_0004979",  # asthma
-    "MONDO_0005101",  # ulcerative colitis
-    "MONDO_0004975",  # Alzheimer disease
-    "MONDO_0009693",  # plasma cell myeloma
+    "MONDO_0044903",  # myelofibrosis: fedratinib, the known answer, docks into JAK2
+    "MONDO_0009891",  # acquired polycythemia vera: pacritinib, the known answer, into JAK2
+    "MONDO_0004948",  # B-cell chronic lymphocytic leukemia: venetoclax into its own BCL2 crystal
+    "MONDO_0004980",  # atopic eczema: tofacitinib and midostaurin into JAK2
 )
-"""Well-known Diseases offered before a search. Each was built live on 25 Oct 2026 (Open
-Targets 26.09, STRING 12.5): a full shortlist of 15, every Candidate placed on the network."""
+"""Well-known Diseases offered before a search, each with binding poses to show. Each was
+built live on 25 Oct 2026 (Open Targets 26.09, STRING 12.5) to a full shortlist of 15, and at
+least one of its drugs docks into a prepared structure (worker/structures: JAK2, BCL2, CRBN)."""
 
 NOT_DISEASE_AREAS = (
     "EFO_0001444",  # measurement: blood pressure, LDL cholesterol, biomarker levels
