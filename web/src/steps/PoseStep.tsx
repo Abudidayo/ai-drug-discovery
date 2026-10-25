@@ -63,9 +63,8 @@ export function PoseStep({ experiment }: { experiment: Experiment }) {
   return (
     <>
       {chosen === undefined ? (
-        <Panel area="pose" label={title}>
-          <FigureNote>{copy.pose.noneSupported}</FigureNote>
-        </Panel>
+        // Nothing to draw: the reasons take the main area instead of sitting beside an empty one.
+        <UnsupportedPanel groups={choices.unsupported} area="pose" note={copy.pose.noneSupported} />
       ) : (
         <PairView
           key={chosen.candidate.candidate_id}
@@ -85,7 +84,7 @@ export function PoseStep({ experiment }: { experiment: Experiment }) {
           }
         />
       )}
-      <UnsupportedPanel groups={choices.unsupported} />
+      {chosen !== undefined && <UnsupportedPanel groups={choices.unsupported} />}
     </>
   );
 }
@@ -337,10 +336,20 @@ function ScoresPanel({ structure, result }: { structure: Structure; result: Dock
 }
 
 /** The drugs with no pose to offer, one line per reason. */
-function UnsupportedPanel({ groups }: { groups: DockingChoices["unsupported"] }) {
-  if (groups.length === 0) return null;
+function UnsupportedPanel({
+  groups,
+  area = "unsupported",
+  note,
+}: {
+  groups: DockingChoices["unsupported"];
+  area?: "unsupported" | "pose";
+  /** Said first when no drug at all can be docked. */
+  note?: string;
+}) {
+  if (groups.length === 0 && note === undefined) return null;
   return (
-    <Panel area="unsupported" title={copy.pose.unsupportedTitle}>
+    <Panel area={area} title={copy.pose.unsupportedTitle}>
+      {note !== undefined && <FigureNote>{note}</FigureNote>}
       <ul className={styles.unsupported}>
         {groups.map(({ reason, candidates }) => (
           <li key={reason}>
