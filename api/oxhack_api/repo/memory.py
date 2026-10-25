@@ -170,6 +170,11 @@ class MemoryRepo:
             row = self._dock.get(job_id)
             return row.job.model_copy(deep=True) if row else None
 
+    def dock_inputs(self, job_id: UUID) -> DockInputs | None:
+        with self._lock:
+            row = self._dock.get(job_id)
+            return row.inputs if row else None
+
     def update_dock_job(self, job: DockJob) -> None:
         with self._lock:
             self._dock[job.id].job = job.model_copy(deep=True)

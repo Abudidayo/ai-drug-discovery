@@ -121,6 +121,11 @@ class Repo(Protocol):
 
     def get_dock_job(self, job_id: UUID) -> DockJob | None: ...
 
+    def dock_inputs(self, job_id: UUID) -> DockInputs | None:
+        """The cache key and SMILES the job was queued with; the worker docks exactly
+        these, so a request can never be docked with a different ligand."""
+        ...
+
     def update_dock_job(self, job: DockJob) -> None:
         """Save the job's progress and results (status, scores, files, error, times)."""
         ...

@@ -21,6 +21,7 @@ from .routes.api import router
 from .services.docking import DockingBackend, FixtureDocking, VinaDocking
 from .services.evaluation import EvaluationSource, FixtureEvaluation
 from .services.jury import FixtureJury, JuryBackend
+from .services.ligands import ChemblLigands
 from .services.live import LiveSource
 from .services.live_jury import StreamAJury
 from .services.molecules import FixtureMolecules, MoleculeSource, PubChemMolecules
@@ -89,7 +90,15 @@ def open_docking(settings: Settings, repo: Repo) -> DockingBackend:
     (`python -m oxhack_worker.prepare`); only the docking worker runs its jobs."""
     if settings.docking == "fixture":
         return FixtureDocking(settings.fixtures_dir)
-    return VinaDocking(settings.structures_dir, settings.results_dir, settings.fixtures_dir, repo)
+    # Live Candidates beyond the fixture's are docked as ChEMBL's SMILES, cached in data_dir.
+    ligands = ChemblLigands(settings.data_dir / "ligands") if settings.source == "live" else None
+    return VinaDocking(
+        settings.structures_dir,
+        settings.results_dir,
+        settings.fixtures_dir,
+        repo,
+        ligands=ligands,
+    )
 
 
 def open_molecules(settings: Settings) -> MoleculeSource:

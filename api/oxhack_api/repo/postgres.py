@@ -641,6 +641,13 @@ class PostgresRepo:
             ).fetchone()
         return None if row is None else DockJob.model_validate(row)
 
+    def dock_inputs(self, job_id: UUID) -> DockInputs | None:
+        with self.connection() as conn:
+            row = conn.execute(
+                "select cache_key, ligand_smiles from dock_jobs where id = %s", (job_id,)
+            ).fetchone()
+        return None if row is None else DockInputs(row["cache_key"], row["ligand_smiles"])
+
     def update_dock_job(self, job: DockJob) -> None:
         with self.connection() as conn:
             self._update_one(

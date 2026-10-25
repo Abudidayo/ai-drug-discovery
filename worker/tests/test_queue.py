@@ -230,3 +230,37 @@ def test_a_docking_request_runs_end_to_end(stack: Stack) -> None:
         assert again["status"] == "done", "an identical request reuses the result at once"
         assert again["cached_from"] == job["id"]
         assert again["files"] == job["files"]
+
+
+def test_the_worker_docks_the_smiles_the_request_was_queued_with(stack: Stack) -> None:
+    """The ligand is fixed when the request is queued: a later change to where SMILES
+    come from (the list, or ChEMBL) can't change what an already queued job docks."""
+    components = stack()
+    assert isinstance(components.repo, PostgresRepo)
+    docking = components.docking
+    assert isinstance(docking, VinaDocking)
+    pipeline = PostgresWorker(components.repo, components.jobs, queues=("jobs",))
+    with TestClient(create_app(components=components)) as client:
+        experiment = client.post("/api/experiments", json={"disease_id": COVID}).json()
+        while pipeline.run_once():
+            pass
+        queued = client.post(
+            "/api/dock",
+            json={
+                "experiment_id": experiment["id"],
+                "candidate_id": BARICITINIB,
+                "structure_id": "6WTO_A",
+            },
+        ).json()
+        saved = components.repo.dock_inputs(UUID(queued["id"]))
+        assert saved is not None
+        assert saved.ligand_smiles.startswith("CCS(=O)(=O)N1CC(CC#N)")
+
+        docking._smiles[BARICITINIB] = "C"  # pyright: ignore[reportPrivateUsage]
+        worker = docking_worker(components)
+        while worker.run_once():
+            pass
+        job = client.get(f"/api/dock/{queued['id']}").json()
+        assert job["status"] == "done", job
+        poses = client.get(job["files"]["poses"]["url"])
+        assert poses.text.startswith(f"fake poses of {saved.ligand_smiles}")

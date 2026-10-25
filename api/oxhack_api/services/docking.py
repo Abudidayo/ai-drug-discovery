@@ -46,6 +46,7 @@ from ..schemas import (
     StructureId,
     TargetId,
 )
+from .ligands import LigandSource
 
 
 @dataclass(frozen=True)
@@ -335,8 +336,10 @@ class VinaDocking:
         repo: Repo,
         *,
         execute: DockExecutor | None = None,
+        ligands: LigandSource | None = None,
     ) -> None:
         self.structures_dir = structures_dir
+        self._ligands = ligands
         self.results_dir = results_dir
         self._repo = repo
         self._execute = execute
@@ -372,7 +375,10 @@ class VinaDocking:
         return DockSettings(**self._settings.model_dump(), box=structure.box)
 
     def ligand_smiles(self, candidate_id: str) -> str | None:
-        return self._smiles.get(candidate_id)
+        """The hand-checked SMILES, else ChEMBL's for a live Candidate (when given one)."""
+        if candidate_id in self._smiles:
+            return self._smiles[candidate_id]
+        return None if self._ligands is None else self._ligands.smiles(candidate_id)
 
     def control_job_id(self, structure: Structure) -> UUID:
         prepared = self._find(structure.id)
@@ -414,13 +420,10 @@ class VinaDocking:
         prepared = self._find(job.structure_id)
         if prepared is None:
             raise DockingFailed(f"{job.structure_id} is not one of the prepared structures.")
-        smiles = (
-            prepared.control_smiles
-            if job.kind == "redock_control"
-            else self.ligand_smiles(job.candidate_id)
-        )
-        if smiles is None:
-            raise DockingFailed(f"There is no SMILES for {job.candidate_id}.")
+        inputs = self._repo.dock_inputs(job.id)
+        if inputs is None:
+            raise DockingFailed(f"Job {job.id} has no saved ligand to dock.")
+        smiles = inputs.ligand_smiles
         if self._execute is None:
             raise DockingFailed(
                 "This process does not run docking jobs: the docking worker "
