@@ -10,6 +10,7 @@ import tempfile
 
 import duckdb
 
+from pipeline.drugs import is_disease_id
 from pipeline.opentargets import OpenTargetsClient, OpenTargetsError
 
 
@@ -84,7 +85,7 @@ def load_diseases(client):
 
 
 def resolve_disease(client, requested_id):
-    if not re.fullmatch(r"[A-Za-z]+_[A-Za-z0-9]+", requested_id):
+    if not is_disease_id(requested_id):
         raise ValueError("Disease ID must have a letters-only prefix and alphanumeric suffix, separated by an underscore")
     matches = {
         disease_id: name for disease_id, name, obsolete_terms in load_diseases(client)

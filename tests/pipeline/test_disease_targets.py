@@ -90,7 +90,10 @@ def test_unknown_and_ambiguous_ids_are_unmapped(catalogue):
         module.resolve_disease(None, "EFO_0001378")
 
 
-@pytest.mark.parametrize("value", ["multiple myeloma", "MONDO:0009693", "MONDO_0009693\n"])
+@pytest.mark.parametrize("value", [
+    "multiple myeloma", "MONDO:0009693", "MONDO_0009693\n",
+    "MONDO_", "123_0009693", None, 123, [], {},
+])
 def test_invalid_ids_rejected_before_download(value, monkeypatch):
     monkeypatch.setattr(module, "load_diseases", lambda client: pytest.fail("unexpected download"))
     with pytest.raises(ValueError, match="Disease ID"):
