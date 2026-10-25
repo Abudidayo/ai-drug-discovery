@@ -64,14 +64,49 @@ Unlike a single shortest path, the walk counts every route between a drug and th
 
 ## Results
 
-We test whether known approved drugs come back, with rules fixed before each test.
+Every test asks one thing: do known approved drugs come back? Rules, seeds and inputs were frozen before each test ran. Full protocols are in [`results/`](results/).
 
-| Test | Result |
-|---|---|
-| Network shortlist, 14 diseases | Random walk found **15 of 293** known drugs; the older z-score method found 11. Not a significant difference. |
-| Model jury, 14 new diseases, drug names hidden | GPT-5.4 alone ranked the right drug about **twice as well as chance** (MRR 0.46 vs 0.22). The three-model jury did not beat chance. |
+### 1. Network shortlist (14 diseases, 293 known drug–disease pairs)
 
-These are research leads, not treatment advice. Details, protocols and errata are in [`results/`](results/).
+Both methods pick 15 drugs per disease from the same 1,956 approved drugs. Picking at random finds about 0.8%.
+
+| Metric | Z-score shortlist | Random walk shortlist |
+|---|---:|---:|
+| Known pairs retrieved | 11 / 293 | **15 / 293** |
+| Micro Recall@15 | 3.75% | **5.12%** |
+| Macro Recall@15 | 5.05% | **6.89%** |
+| Diseases with at least one hit | 8 / 14 | 8 / 14 |
+
+Random walk was ahead by 1.84 percentage points (macro), winning on 4 diseases, losing on 2 and tying on 8. The 95% paired bootstrap interval is −0.61 to +4.40, so the gain is **not statistically established**. We made random walk the default as a product choice.
+
+### 2. Model jury (14 new diseases, drug names hidden, pre-registered)
+
+Each panel holds 1 approved drug and 14 decoys. Chance: Hits@5 33%, MRR 0.22.
+
+| Method | Hits@5 | MRR | Beats chance? (Holm-adjusted p) |
+|---|---:|---:|---|
+| GPT-5.4 alone | 8 / 14 | **0.461** | **Yes** (0.013) |
+| Claude Opus 5.5 alone | 6 / 14 | **0.422** | **Yes** (0.049) |
+| Kimi K3 alone | 7 / 14 | 0.374 | No (0.19) |
+| Three-model jury | 4 / 14 | 0.210 | No |
+| Direct-evidence ranking | 0 / 14 | 0.111 | No |
+| Network z-score | 3 / 14 | 0.182 | No |
+
+The jury lost because Opus's safety filter refused about half its calls, and a jury then only counted with all three votes. We changed the rule to use every valid juror (at least two) and replaced Opus with GLM-5.3. The new jury (GPT-5.4, GLM-5.3, Kimi K3) was chosen on separate pilot diseases and hasn't been through a full blind test yet.
+
+With drug names shown, models score much higher (MRR about 0.5–0.6 in our pilot) because they recognise the drugs. That's why the tests hide names.
+
+### Coverage
+
+- 1,307 of 1,956 drugs (66.8%) can be scored on the protein network.
+- The rest: 557 have no known targets, 16 have targets not in the network, and 76 have targets outside its largest connected part. They get no network score (never zero), but can still enter through direct evidence.
+
+### Limits
+
+- This tests recovery of known approvals, not whether a drug works.
+- One frozen case used a symptom-measurement ID for multiple sclerosis; dropping it changes no conclusion ([`results/ERRATA.md`](results/ERRATA.md)).
+
+These are research leads, not treatment advice.
 
 ## Data
 
