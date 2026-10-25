@@ -229,12 +229,12 @@ Sort by `(evidence_score, breadth)`. The UI shows every supported target, with n
 
 ## 3. Docking recipes
 
-**C1. Install** on the VM, and on a Mac for local testing:
+**C1. Install.** The dev container already has this toolchain, pinned in `.devcontainer/docking-requirements.txt`. To install it on a Mac for local testing:
 
 ```bash
 sudo apt-get update && sudo apt-get install -y python3-venv python3-pip git
 python3 -m venv ~/dock && source ~/dock/bin/activate
-pip install -U numpy scipy rdkit vina meeko gemmi prody posebusters
+pip install -U numpy scipy rdkit vina meeko gemmi posebusters
 python -c "import vina, rdkit; print(vina.__version__, rdkit.__version__)"
 ```
 
@@ -281,10 +281,11 @@ Avoid the 20S proteasome (5LF3 and similar), XPO1, and any entry where the drug 
 **C3. Prepare a receptor** with `worker/prepare.py`. Run it once per structure and commit the outputs to `worker/structures/{PDB}/`.
 
 1. Download `https://files.rcsb.org/download/{PDB}.pdb`.
-2. Keep the chosen chain. Remove waters, ions and all ligands, using gemmi or ProDy.
-3. Add hydrogens and write the receptor PDBQT with Meeko's `mk_prepare_receptor.py`. Follow the Vina "basic docking" tutorial for the flags that match the installed Meeko version (`mk_prepare_receptor.py --help`).
-4. Download the crystal ligand pose from `https://models.rcsb.org/v1/{PDB}/ligand?label_comp_id={COMP}&encoding=sdf`. The box centre is the ligand's heavy-atom centroid; the box is a 25 Å cube.
-5. Write `meta.json` containing `pdb_id`, `chain`, `uniprot`, `symbol`, `ligand_comp_id`, `box_center`, `box_size` and `control_smiles`.
+2. Keep the chosen chain. Remove waters, ions, all ligands and alternate conformations with gemmi.
+3. Make every residue match a Meeko template. Meeko 0.8.0's `mk_prepare_receptor.py` refuses any residue with missing heavy atoms (`REMARK 470`; 6WTO has 34, 6WTN 25). Cut each such side chain back to the atoms the crystal has: alanine when CB is there, else glycine. Do not rebuild them: PDBFixer's rebuilt side chains had distorted geometry, so Meeko saw extra bonds and still refused them. A phosphorylated residue (PTR, SEP, TPO) loses its phosphate, and MSE becomes MET, only outside the box; inside it, refuse the structure. 6WTO's phosphotyrosines (PTR 1007-1008) lie more than 20 Å from the box centre, so they become TYR. Record every change in `meta.json`.
+4. Write the receptor PDBQT with Meeko's `mk_prepare_receptor.py`. Follow the Vina "basic docking" tutorial for the flags that match the installed Meeko version (`mk_prepare_receptor.py --help`).
+5. Download the crystal ligand pose from `https://models.rcsb.org/v1/{PDB}/ligand?label_comp_id={COMP}&encoding=sdf`. The box centre is the ligand's heavy-atom centroid; the box is a 25 Å cube.
+6. Write `meta.json` containing `pdb_id`, `chain`, `uniprot`, `symbol`, `ligand_comp_id`, `box_center`, `box_size` and `control_smiles`.
 
 **C4. Prepare a ligand.** Take the SMILES from ChEMBL (`molecule_structures.canonical_smiles`):
 
@@ -316,7 +317,7 @@ energies = v.energies(n_poses=9)  # column 0 is the total score per pose
 
 - Convert poses to SDF with `mk_export.py poses.pdbqt -s poses.sdf`.
 - Write `scores.json` and `log.txt` alongside.
-- Before wiring the queue, measure runtime on the VM at exhaustiveness 8, 16 and 32. Pick the highest setting that stays well inside the job timeout.
+- Runtime for baricitinib into 6WTO on the 4-core codespace (24 Oct 2026): 10.8 s at exhaustiveness 8, 21.9 s at 16 and 43.6 s at 32. All are well inside the 180-second job timeout. Pick the highest setting that still leaves room for receptor and ligand preparation.
 
 **C6. Redocking control.** Ship it as a visible feature.
 
@@ -332,6 +333,8 @@ energies = v.energies(n_poses=9)  # column 0 is the total score per pose
    pose = Chem.RemoveHs(next(Chem.SDMolSupplier("poses.sdf")))
    rmsd = rdMolAlign.CalcRMS(pose, Chem.RemoveHs(ref))  # success if rmsd <= 2.0
    ```
+
+   Measured controls (25 Oct 2026, C3 preparation above, exhaustiveness 8, seed 42): 6O0K venetoclax 1.08 Å and 7BQU thalidomide 0.41 Å pass. 6WTO baricitinib 2.43 Å and 6WTN ruxolitinib 2.83 Å **fail the 2.0 Å threshold**: in both JAK2 top poses the pyrrolopyrimidine is turned, while a 1.4-1.6 Å pose ranks lower. Exhaustiveness 16 and 32 do not change it. Do not tune settings until the control passes; that would overfit the control.
 
 3. Run PoseBusters: `bust poses.sdf -l crystal_ligand.sdf -p receptor.pdb`. Show pass or fail per check group.
 4. **Negative control:** dock an unrelated approved drug into the same box. The viewer still draws a convincing-looking pose, which shows why a pose is not evidence.

@@ -17,6 +17,12 @@ uv sync --all-packages
 uv venv --allow-existing --python /usr/local/bin/python "$DOCKING_VENV"
 uv pip install --python "$DOCKING_VENV/bin/python" -r .devcontainer/docking-requirements.txt
 
+# remoteEnv puts the venv first, but login shells re-prepend the image's
+# Python in /etc/profile.d, so put it first again in interactive shells.
+for rc in ~/.bashrc ~/.zshrc; do
+  grep -qs 'DOCKING_VENV/bin' "$rc" || echo 'export PATH="$DOCKING_VENV/bin:$PATH"' >> "$rc"
+done
+
 sudo mkdir -p "$RESULTS_DIR"
 sudo chown "$(id -u):$(id -g)" "$RESULTS_DIR"
 
