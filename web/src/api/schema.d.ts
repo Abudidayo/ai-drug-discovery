@@ -252,7 +252,8 @@ export interface paths {
     };
     /**
      * Get a small molecule's 3D conformer for drawing
-     * @description Display only. Antibodies and other biologics have none, so they answer 404.
+     * @description Display only. A compound with no 3D model (antibodies and other biologics have none)
+     *     answers 404; 503 means PubChem couldn't be asked, not that there is no model.
      */
     get: operations["get_conformer"];
     put?: never;
@@ -2319,6 +2320,15 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["UnprocessableResponse"];
+        };
+      };
+      /** @description A data source is unavailable. */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
         };
       };
     };

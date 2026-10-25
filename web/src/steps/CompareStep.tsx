@@ -1,17 +1,18 @@
 import { useQueries } from "@tanstack/react-query";
 import { type CSSProperties, lazy, Suspense, useState, type ReactNode } from "react";
 import { conformerQuery, useStructures } from "../api/queries";
-import type { Candidate, DockJob, Experiment, JuryRun, Structure } from "../api/types";
+import type { Candidate, Conformer, DockJob, Experiment, JuryRun, Structure } from "../api/types";
 import { DrugPicker } from "../app/DrugPicker";
-import { Panel } from "../app/Figure";
+import { FigureNote, Panel } from "../app/Figure";
 import { Marker } from "../charts/Marker";
 import { copy, stepCopy } from "../copy/en";
 import {
   approvals,
+  comparableDrugs,
   defaultPicks,
   isPlaced,
+  type ModelState,
   networkRank,
-  noModelText,
   warningSentence,
 } from "../lib/candidates";
 import { structureFor } from "../lib/docking";
@@ -102,27 +103,88 @@ function Decision({ jury, candidateId }: { jury: JuryRun; candidateId: string })
 }
 
 /**
- * Step 6: three drugs side by side, each swappable for another on this Experiment's shortlist.
- * Each row is labelled once, on the left; the molecules share one canvas, so the step costs a
- * single WebGL context however many columns it draws.
+ * Each drug's 3D model, asked for once per PubChem compound (React Query caches them, so other
+ * steps and later visits reuse the answers), and what is known of it.
+ */
+function useModels(candidates: readonly Candidate[]) {
+  const cids = [...new Set(candidates.flatMap((candidate) => candidate.pubchem_cid ?? []))];
+  const queries = useQueries({ queries: cids.map((cid) => conformerQuery(cid)) });
+  const byCid = new Map(cids.map((cid, index) => [cid, queries[index]]));
+  const queryOf = ({ pubchem_cid }: Candidate) =>
+    pubchem_cid === null ? undefined : byCid.get(pubchem_cid);
+  const conformerOf = (candidate: Candidate): Conformer | undefined =>
+    queryOf(candidate)?.data ?? undefined;
+  const modelOf = (candidate: Candidate): ModelState => {
+    const query = queryOf(candidate);
+    // No PubChem compound (antibodies), or PubChem has no 3D conformer for it (the API's 404).
+    if (query === undefined || query.data === null) return "none";
+    if (query.data !== undefined) return "model";
+    return query.isError ? "failed" : "pending";
+  };
+  return { conformerOf, modelOf };
+}
+
+/**
+ * Step 6: up to three drugs side by side, each swappable for another on this Experiment's
+ * shortlist. Only drugs with a 3D model take part: the others are left out entirely. Each row is
+ * labelled once, on the left; the molecules share one canvas, so the step costs a single WebGL
+ * context however many columns it draws.
  */
 export function CompareStep({ experiment }: { experiment: Experiment }) {
-  const { candidates, jury } = experiment;
-  const [picks, setPicks] = useState(() => defaultPicks(candidates));
-  const structures = useStructures();
-  const chosen = picks.flatMap((id) => candidates.find((c) => c.candidate_id === id) ?? []);
-  const conformers = useQueries({
-    queries: chosen.map((candidate) => conformerQuery(candidate.pubchem_cid)),
-  });
+  const { candidates } = experiment;
+  const { conformerOf, modelOf } = useModels(candidates);
+  const offered = comparableDrugs(candidates, modelOf);
+  const title = stepCopy("compare").title;
 
-  const items: StripItem[] = chosen.map((candidate, index) => {
+  // Until every drug's model is known the panel stays empty, as the molecules do while they load.
+  if (offered === undefined) {
+    return (
+      <Panel area="main" label={title}>
+        {null}
+      </Panel>
+    );
+  }
+  if (offered.length === 0) {
+    return (
+      <Panel area="main" label={title}>
+        <FigureNote>{copy.compare.noModels}</FigureNote>
+      </Panel>
+    );
+  }
+  return (
+    <CompareTable
+      experiment={experiment}
+      offered={offered}
+      defaults={defaultPicks(candidates, modelOf)}
+      conformerOf={conformerOf}
+    />
+  );
+}
+
+interface CompareTableProps {
+  experiment: Experiment;
+  /** The drugs that can be compared, in shortlist order. */
+  offered: readonly Candidate[];
+  /** The drugs shown until the reader picks others. */
+  defaults: readonly string[];
+  conformerOf: (candidate: Candidate) => Conformer | undefined;
+}
+
+function CompareTable({ experiment, offered, defaults, conformerOf }: CompareTableProps) {
+  const { jury } = experiment;
+  const [choice, setChoice] = useState<readonly string[] | null>(null);
+  const structures = useStructures();
+  const picks = choice ?? defaults;
+  const chosen = picks.flatMap((id) => offered.find((c) => c.candidate_id === id) ?? []);
+
+  // Every drug here has a model or failed to load one; the strip draws the first and says so of
+  // the second.
+  const items: StripItem[] = chosen.map((candidate) => {
     const name = drugName(candidate.name);
-    const query = conformers[index];
-    if (query?.data) return { key: candidate.candidate_id, name, conformer: query.data };
-    let message: string | null = null;
-    if (candidate.pubchem_cid === null || query?.data === null) message = noModelText(candidate);
-    else if (query?.isError) message = copy.evidence.modelUnavailable;
-    return { key: candidate.candidate_id, name, message };
+    const conformer = conformerOf(candidate);
+    return conformer
+      ? { key: candidate.candidate_id, name, conformer }
+      : { key: candidate.candidate_id, name, message: copy.evidence.modelUnavailable };
   });
 
   // With no network ranking, the network-rank row says "not ranked" once, across every drug.
@@ -172,7 +234,7 @@ export function CompareStep({ experiment }: { experiment: Experiment }) {
   ];
 
   const pick = (column: number, id: string) => {
-    setPicks((current) => current.map((value, index) => (index === column ? id : value)));
+    setChoice(chosen.map((candidate, index) => (index === column ? id : candidate.candidate_id)));
   };
 
   return (
@@ -192,12 +254,11 @@ export function CompareStep({ experiment }: { experiment: Experiment }) {
               <DrugPicker
                 label={copy.compare.pick}
                 value={candidate.candidate_id}
-                options={candidates.map((option) => ({
+                options={offered.map((option) => ({
                   id: option.candidate_id,
                   name: drugName(option.name),
                   disabled:
-                    option.candidate_id !== candidate.candidate_id &&
-                    picks.includes(option.candidate_id),
+                    option.candidate_id !== candidate.candidate_id && chosen.includes(option),
                 }))}
                 onChange={(id) => {
                   pick(column, id);

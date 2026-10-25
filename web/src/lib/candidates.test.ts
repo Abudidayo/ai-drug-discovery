@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { Candidate, EvidenceItem } from "../api/types";
 import { covidExperiment } from "../test/fixtures";
-import { byNetworkRank, focusCandidate, listedEvidence, routeOf } from "./candidates";
+import {
+  byNetworkRank,
+  comparableDrugs,
+  defaultPicks,
+  focusCandidate,
+  listedEvidence,
+  type ModelState,
+  routeOf,
+} from "./candidates";
 
 const HASH = "a".repeat(64);
 const TYK2 = "ENSG00000105397";
@@ -29,6 +37,58 @@ describe("focusCandidate", () => {
     expect(focusCandidate(candidates, "CHEMBL0")?.name).toBe("BARICITINIB");
     const withoutKnownAnswer = candidates.map((c) => ({ ...c, known_answer: false })).reverse();
     expect(focusCandidate(withoutKnownAnswer)?.name).toBe("THALIDOMIDE");
+  });
+});
+
+describe("Compare's drugs", () => {
+  const { candidates } = covidExperiment();
+  /** Antibodies have no PubChem compound, so no model; every other drug in the fixture has one. */
+  const modelled = (candidate: Candidate): ModelState =>
+    candidate.pubchem_cid === null ? "none" : "model";
+  const names = (ids: readonly string[]) =>
+    ids.map((id) => candidates.find((c) => c.candidate_id === id)?.name);
+
+  it("offers only drugs with a 3D model, in shortlist order", () => {
+    const offered = comparableDrugs(candidates, modelled)?.map((c) => c.name);
+    expect(offered).toHaveLength(11);
+    expect(offered).not.toContain("TOCILIZUMAB");
+    expect(offered?.slice(0, 3)).toEqual(["BARICITINIB", "RUXOLITINIB", "TOFACITINIB"]);
+  });
+
+  it("offers nothing until every drug's model is known", () => {
+    const one = candidates[4];
+    const pending = (c: Candidate): ModelState => (c === one ? "pending" : modelled(c));
+    expect(comparableDrugs(candidates, pending)).toBeUndefined();
+    expect(comparableDrugs([], modelled)).toEqual([]);
+  });
+
+  it("keeps a drug whose model couldn't be loaded: a failure isn't proof there is none", () => {
+    const failed = (c: Candidate): ModelState => (c.name === "IMATINIB" ? "failed" : modelled(c));
+    expect(comparableDrugs(candidates, failed)?.map((c) => c.name)).toContain("IMATINIB");
+  });
+
+  it("starts at the known answer and skips drugs without a model", () => {
+    expect(names(defaultPicks(candidates, modelled))).toEqual([
+      "BARICITINIB",
+      "RUXOLITINIB",
+      "TOFACITINIB",
+    ]);
+    const fromSiltuximab = candidates.map((c) => ({ ...c, known_answer: c.name === "SILTUXIMAB" }));
+    expect(names(defaultPicks(fromSiltuximab, modelled))).toEqual([
+      "REMDESIVIR",
+      "COLCHICINE",
+      "THALIDOMIDE",
+    ]);
+  });
+
+  it("fills a column with a drug whose model failed only when no modelled drug is left", () => {
+    const fewer = (c: Candidate): ModelState => {
+      if (c.name === "COLCHICINE") return "model";
+      if (c.name === "IMATINIB") return "failed";
+      return "none";
+    };
+    expect(names(defaultPicks(candidates, fewer))).toEqual(["COLCHICINE", "IMATINIB"]);
+    expect(defaultPicks(candidates, () => "none")).toEqual([]);
   });
 });
 

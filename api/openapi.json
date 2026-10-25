@@ -3643,7 +3643,7 @@
     },
     "/api/molecules/{pubchem_cid}/conformer": {
       "get": {
-        "description": "Display only. Antibodies and other biologics have none, so they answer 404.",
+        "description": "Display only. A compound with no 3D model (antibodies and other biologics have none)\nanswers 404; 503 means PubChem couldn't be asked, not that there is no model.",
         "operationId": "get_conformer",
         "parameters": [
           {
@@ -3689,6 +3689,16 @@
               }
             },
             "description": "The request cannot be carried out."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A data source is unavailable."
           }
         },
         "summary": "Get a small molecule's 3D conformer for drawing",

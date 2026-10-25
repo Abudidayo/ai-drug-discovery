@@ -111,17 +111,43 @@ export function approvals(candidate: Candidate): string[] {
 export const COMPARED = 3;
 
 /**
- * The drugs compared first: the known-answer drug and the two after it on the shortlist (or the
- * top three when there is no known answer).
+ * What is known of a drug's 3D model: it loaded, there is none (no PubChem compound, or PubChem
+ * has no 3D conformer), the answer is still coming, or the model couldn't be asked for.
  */
-export function defaultPicks(candidates: readonly Candidate[]): string[] {
-  const ids = candidates.map((candidate) => candidate.candidate_id);
+export type ModelState = "model" | "none" | "pending" | "failed";
+
+/**
+ * The drugs the Compare step offers, in shortlist order: those with a 3D model, and those whose
+ * model couldn't be loaded, since a failure doesn't show there is none. Undefined while any
+ * answer is pending, so no drug is offered that may disappear a moment later.
+ */
+export function comparableDrugs(
+  candidates: readonly Candidate[],
+  modelOf: (candidate: Candidate) => ModelState,
+): Candidate[] | undefined {
+  const states = new Map(candidates.map((candidate) => [candidate, modelOf(candidate)]));
+  if ([...states.values()].includes("pending")) return undefined;
+  return candidates.filter((candidate) => states.get(candidate) !== "none");
+}
+
+/**
+ * The drugs compared first: the known-answer drug and the ones after it on the shortlist (or the
+ * top of the shortlist when there is no known answer), keeping to drugs with a 3D model. Drugs
+ * whose model couldn't be loaded only fill columns no modelled drug can.
+ */
+export function defaultPicks(
+  candidates: readonly Candidate[],
+  modelOf: (candidate: Candidate) => ModelState,
+): string[] {
   const start = Math.max(
     0,
     candidates.findIndex((candidate) => candidate.known_answer),
   );
-  const picks = [...ids.slice(start), ...ids.slice(0, start)];
-  return picks.slice(0, Math.min(COMPARED, ids.length));
+  const order = [...candidates.slice(start), ...candidates.slice(0, start)];
+  const inState = (state: ModelState) => order.filter((candidate) => modelOf(candidate) === state);
+  return [...inState("model"), ...inState("failed")]
+    .slice(0, COMPARED)
+    .map((candidate) => candidate.candidate_id);
 }
 
 /**

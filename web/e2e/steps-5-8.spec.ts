@@ -99,8 +99,15 @@ test("the jury has started on its own; a student compares drugs, then archives a
   await expect(page.getByRole("rowheader", { name: "Jury decision" })).toHaveCount(1);
   await pickers.nth(2).selectOption("CHEMBL107");
   await expect(page.getByText("Split decision", { exact: true })).toHaveCount(1);
-  await pickers.nth(1).selectOption("CHEMBL1237022");
-  await expect(page.getByText("Antibody: no small-molecule 3D model")).toBeVisible();
+  // Only drugs with a 3D model are offered: the antibodies (Tocilizumab and three more) are not.
+  const offered = pickers.nth(1).getByRole("option");
+  await expect(offered).toHaveCount(11);
+  await expect(offered.filter({ hasText: "Tocilizumab" })).toHaveCount(0);
+  await pickers.nth(1).selectOption("CHEMBL384467");
+  await expect(
+    page.getByRole("img", { name: "Dexamethasone in 3D. Drag to rotate." }),
+  ).toBeVisible();
+  await expect(page.getByText(/no (small-molecule )?3D model/i)).toHaveCount(0);
   // The hidden network plus one canvas for every molecule: well within the browser's limit.
   expect(await page.locator("canvas").count()).toBeLessThanOrEqual(3);
 

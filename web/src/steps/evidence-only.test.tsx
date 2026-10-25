@@ -137,7 +137,7 @@ describe("An evidence-only Experiment", () => {
     expect(screen.queryByText(copy.evidence.noModelNeutral)).not.toBeInTheDocument();
   });
 
-  it("step 6 says once per row that no network rank exists, and uses the neutral no-model line", async () => {
+  it("step 6 says once per row that no network rank exists, and leaves out the drug with no model", async () => {
     renderApp(`${E}/compare`);
     await screen.findByRole("table", { name: copy.compare.tableLabel });
     const header = screen.getByRole("rowheader", { name: copy.candidates.networkRank });
@@ -149,7 +149,11 @@ describe("An evidence-only Experiment", () => {
         .map((cell) => cell.textContent),
     ).toEqual([copy.candidates.notRanked]);
     expectOnce(copy.candidates.notRanked);
-    expect(await screen.findByText(copy.evidence.noModelNeutral)).toBeInTheDocument();
+    // Tofacitinib has no PubChem compound here, so no 3D model: Compare doesn't offer it at all.
+    for (const picker of screen.getAllByRole("combobox", { name: copy.compare.pick })) {
+      expect(within(picker).queryByRole("option", { name: "Tofacitinib" })).toBeNull();
+    }
+    expect(screen.queryByText(copy.evidence.noModelNeutral)).not.toBeInTheDocument();
     expect(screen.queryByText(copy.evidence.noModel)).not.toBeInTheDocument();
     expect(screen.queryByText(NO_ROUTE)).not.toBeInTheDocument();
   });

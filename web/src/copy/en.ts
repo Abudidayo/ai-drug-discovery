@@ -311,6 +311,8 @@ export const copy = {
       unavailable: "Not available",
     },
     none: "None",
+    /** Only drugs with a 3D model are compared. */
+    noModels: "None of these drugs has a 3D model, so there are none to compare.",
   },
 
   pose: {

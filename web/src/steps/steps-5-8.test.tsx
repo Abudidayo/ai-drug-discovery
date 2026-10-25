@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import type { Experiment } from "../api/types";
-import { copy } from "../copy/en";
+import { copy, stepCopy } from "../copy/en";
 import { dateTime } from "../lib/format";
 import {
   covidExperiment,
@@ -322,6 +322,43 @@ function picked() {
     .map((select) => (select as HTMLSelectElement).value);
 }
 
+const IMATINIB_CID = 5291;
+const RUXOLITINIB_CID = 25126798;
+
+/** The COVID-19 shortlist's drugs that have a 3D model: all but the four antibodies. */
+const MODELLED = [
+  "Baricitinib",
+  "Ruxolitinib",
+  "Tofacitinib",
+  "Upadacitinib",
+  "Fedratinib",
+  "Fostamatinib",
+  "Dexamethasone",
+  "Imatinib",
+  "Remdesivir",
+  "Colchicine",
+  "Thalidomide",
+];
+
+/** The drugs one column's picker offers, in order. */
+function offeredIn(column: number): (string | null)[] {
+  const select = screen.getAllByRole("combobox", { name: copy.compare.pick })[column];
+  if (select === undefined) throw new Error(`No column ${String(column)}`);
+  return within(select)
+    .getAllByRole("option")
+    .map((option) => option.textContent);
+}
+
+/** Answers one compound's conformer request; every other compound keeps the fixture answer. */
+function conformerOf(
+  cid: number,
+  answer: Parameters<typeof http.get<"/api/molecules/{pubchem_cid}/conformer">>[1],
+) {
+  return http.get("/api/molecules/{pubchem_cid}/conformer", (info) =>
+    Number(info.params.pubchem_cid) === cid ? answer(info) : undefined,
+  );
+}
+
 function cellsOf(label: string): string[] {
   const header = screen.getByRole("rowheader", { name: label });
   const row = header.closest("[role='row']");
@@ -379,16 +416,127 @@ describe("Step 6, Compare", () => {
     // A drug already in another column can't be picked twice.
     expect(within(third).getByRole("option", { name: "Baricitinib" })).toBeDisabled();
 
-    await user.selectOptions(third, "CHEMBL1237022");
-    expect(picked()).toEqual(["CHEMBL2105759", "CHEMBL1789941", "CHEMBL1237022"]);
-    expect(cellsOf(copy.candidates.networkRank)[2]).toBe("1308");
+    await user.selectOptions(third, "CHEMBL384467");
+    expect(picked()).toEqual(["CHEMBL2105759", "CHEMBL1789941", "CHEMBL384467"]);
+    expect(cellsOf(copy.candidates.networkRank)[2]).toBe("7");
     expect(cellsOf(copy.compare.dockable)[2]).toBe(copy.compare.pose.unavailable);
-    expect(await screen.findByText(copy.evidence.noModel)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("img", { name: copy.evidence.moleculeLabel("Dexamethasone") }),
+    ).toBeInTheDocument();
 
     await user.selectOptions(third, "CHEMBL4065616");
     expect(cellsOf(copy.candidates.networkRank)[2]).toBe(copy.candidates.notRanked);
     await user.selectOptions(third, "CHEMBL2103830");
     expect(cellsOf(copy.evidence.warningTitle)[2]).toBe(copy.compare.noWarnings);
+  });
+
+  it("leaves drugs with no 3D model out of every picker", async () => {
+    serveExperiment(covidExperiment());
+    renderApp(`${E}/compare`);
+    await screen.findByRole("table", { name: copy.compare.tableLabel });
+    // The four antibodies have no PubChem compound, so no small-molecule model.
+    for (const column of [0, 1, 2]) expect(offeredIn(column)).toEqual(MODELLED);
+    expect(screen.queryByText(copy.evidence.noModel)).not.toBeInTheDocument();
+    expect(screen.queryByText(copy.evidence.noModelNeutral)).not.toBeInTheDocument();
+  });
+
+  it("leaves out a small molecule PubChem has no 3D model for", async () => {
+    serveExperiment(covidExperiment());
+    server.use(
+      conformerOf(IMATINIB_CID, ({ response }) => response(404).json({ detail: "None." })),
+    );
+    renderApp(`${E}/compare`);
+    await screen.findByRole("table", { name: copy.compare.tableLabel });
+    expect(offeredIn(0)).toEqual(MODELLED.filter((name) => name !== "Imatinib"));
+  });
+
+  it("starts from the drugs with a model when the known answer has none", async () => {
+    const experiment = covidExperiment();
+    serveExperiment({
+      ...experiment,
+      candidates: experiment.candidates.map((candidate) => ({
+        ...candidate,
+        known_answer: candidate.name === "TOCILIZUMAB",
+      })),
+    });
+    renderApp(`${E}/compare`);
+    await screen.findByRole("table", { name: copy.compare.tableLabel });
+    // Tocilizumab, Sarilumab, then the drugs after them: the antibodies are skipped.
+    expect(picked()).toEqual(["CHEMBL4065616", "CHEMBL107", "CHEMBL468"]);
+  });
+
+  it("offers no drug until every drug's model is known", async () => {
+    serveExperiment(covidExperiment());
+    let answer: (() => void) | undefined;
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    server.use(
+      conformerOf(IMATINIB_CID, async ({ response }) => {
+        await answered;
+        return response(404).json({ detail: "None." });
+      }),
+    );
+    renderApp(`${E}/compare`);
+    await screen.findByRole("region", { name: stepCopy("compare").title });
+    // The other drugs' models have loaded, but Imatinib's answer could still take it away.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByRole("combobox", { name: copy.compare.pick })).not.toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+
+    answer?.();
+    await screen.findByRole("table", { name: copy.compare.tableLabel });
+    expect(offeredIn(0)).not.toContain("Imatinib");
+  });
+
+  it("keeps a drug whose model couldn't be loaded, and says so in its column", async () => {
+    serveExperiment(covidExperiment());
+    server.use(
+      conformerOf(RUXOLITINIB_CID, ({ response }) =>
+        response(503).json({ detail: "PubChem isn’t answering." }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp(`${E}/compare`);
+    await screen.findByRole("table", { name: copy.compare.tableLabel });
+    // It isn't shown first (a modelled drug takes its place), but it isn't hidden as modelless.
+    expect(picked()).toEqual(["CHEMBL2105759", "CHEMBL221959", "CHEMBL3622821"]);
+    expect(offeredIn(0)).toEqual(MODELLED);
+
+    const [, , third] = screen.getAllByRole("combobox", { name: copy.compare.pick });
+    if (third === undefined) throw new Error("No third column");
+    await user.selectOptions(third, "CHEMBL1789941");
+    expectOnce(copy.evidence.modelUnavailable);
+    expect(screen.queryByText(copy.evidence.noModelNeutral)).not.toBeInTheDocument();
+  });
+
+  it("compares only as many drugs as have a model", async () => {
+    const experiment = covidExperiment();
+    const keep = (names: string[]): Experiment => ({
+      ...experiment,
+      candidates: experiment.candidates.map((candidate) =>
+        names.includes(candidate.name) ? candidate : { ...candidate, pubchem_cid: null },
+      ),
+    });
+
+    serveExperiment(keep(["COLCHICINE", "THALIDOMIDE"]));
+    const { unmount } = renderApp(`${E}/compare`);
+    await screen.findByRole("table", { name: copy.compare.tableLabel });
+    expect(picked()).toEqual(["CHEMBL107", "CHEMBL468"]);
+    expect(offeredIn(0)).toEqual(["Colchicine", "Thalidomide"]);
+    expect(cellsOf(copy.candidates.evidenceRank)).toHaveLength(2);
+    unmount();
+
+    serveExperiment(keep(["THALIDOMIDE"]));
+    const second = renderApp(`${E}/compare`);
+    await screen.findByRole("table", { name: copy.compare.tableLabel });
+    expect(picked()).toEqual(["CHEMBL468"]);
+    second.unmount();
+
+    serveExperiment(keep([]));
+    renderApp(`${E}/compare`);
+    expect(await screen.findByText(copy.compare.noModels)).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
   it("adds the jury's decision, with a split shown for each model", async () => {

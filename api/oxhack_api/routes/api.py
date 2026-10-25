@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 
 from .. import __version__
 from ..deps import ComponentsDep, ServiceDep
-from ..errors import NotFound, responses
+from ..errors import NotFound, Unavailable, responses
 from ..schemas import (
     CommonDiseases,
     Conformer,
@@ -26,6 +26,7 @@ from ..schemas import (
     StructureList,
 )
 from ..services.docking import FILE_MEDIA_TYPES
+from ..services.molecules import MoleculesUnavailable
 
 router = APIRouter(prefix="/api")
 
@@ -237,14 +238,20 @@ def get_dock_file(
     "/molecules/{pubchem_cid}/conformer",
     tags=["molecules"],
     summary="Get a small molecule's 3D conformer for drawing",
-    responses=responses(404, 422),
+    responses=responses(404, 422, 503),
 )
 def get_conformer(
     components: ComponentsDep,
     pubchem_cid: Annotated[int, Path(gt=0, description="PubChem compound ID.")],
 ) -> Conformer:
-    """Display only. Antibodies and other biologics have none, so they answer 404."""
-    conformer = components.molecules.conformer(pubchem_cid)
+    """Display only. A compound with no 3D model (antibodies and other biologics have none)
+    answers 404; 503 means PubChem couldn't be asked, not that there is no model."""
+    try:
+        conformer = components.molecules.conformer(pubchem_cid)
+    except MoleculesUnavailable as exc:
+        raise Unavailable(
+            f"PubChem isn't answering, so the 3D model of compound {pubchem_cid} can't be loaded."
+        ) from exc
     if conformer is None:
         raise NotFound(f"No 3D structure is available for PubChem compound {pubchem_cid}.")
     return conformer
