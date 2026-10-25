@@ -404,6 +404,11 @@ def test_jury_validation_and_consensus():
     points = {label: sum(n - r["rank"] for r in reviews) for label, reviews in reviews_by_label.items()}
     consensus = result["consensus"]
     assert consensus["method"] == "borda" and consensus["jurors_counted"] == m
+    assert consensus["failed_jurors"] == [j["model"] for j in result["jurors"] if j["status"] != "valid"]
+    assert consensus["reason"] is None
+    assert result["consensus_status"] == {
+        key: consensus[key] for key in ("jurors_counted", "failed_jurors", "reason")
+    }
     ranking = consensus["ranking"]
     assert len(ranking) == n and {r["label"] for r in ranking} == panel.keys()
     assert [r["borda_points"] for r in ranking] == sorted(points.values(), reverse=True)

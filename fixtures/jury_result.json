@@ -6,7 +6,7 @@
       "openai-gpt-5.4",
       "glm-5.3"
     ],
-    "prompt_version": "jury-v1",
+    "prompt_version": "jury-v7",
     "temperature": 0,
     "max_attempts": 2,
     "shuffle_seed": 7,
@@ -326,6 +326,17 @@
     "kendalls_w": 0.9,
     "contested": [
       "C3"
-    ]
+    ],
+    "failed_jurors": [
+      "glm-5.3"
+    ],
+    "reason": null
+  },
+  "consensus_status": {
+    "jurors_counted": 2,
+    "failed_jurors": [
+      "glm-5.3"
+    ],
+    "reason": null
   }
 }
