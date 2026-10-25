@@ -1,32 +1,54 @@
 # Selectable shortlists — handoff, 25 October 2026
 
-Implemented as an opt-in extension. The application default remains **zscore**.
-No existing scoring module, graph, jury code, panel, prompt, frozen manifest or
-previous result was edited. Network association is not treatment-success probability.
+New application shortlists now default to **physical_rwr**: 10 physical RWR
+Candidates plus 5 supported direct-evidence Candidates, using the existing
+deduplication/fill policy. `zscore` remains explicitly selectable. Network
+association is not treatment-success probability.
 
 ## Application selection
 
-```python
-from ranking.shortlist import ShortlistSettings, project_shortlist, select_shortlist
-
-# ranking_payload is an existing full ranking with rwr.physical results.
-settings = ShortlistSettings(method="physical_rwr")
-selection = select_shortlist(ranking_payload, settings)  # versioned selection only
-application_payload = project_shortlist(ranking_payload, settings)  # new deep copy
-```
-
-Jessica and Abudi can explicitly use the new projection; no jury integration
-has been switched. `ShortlistSettings()` and the existing rank command retain
-the original z-score method. The application should choose the method explicitly
-and display `shortlist_selection.selection_method` alongside selection metadata.
+The thin application entry point lives in the existing `workstream_b` directory;
+it calls `project_shortlist`, `adapt_ranking` and `ranking.paths.explain_files`.
+Every existing `ranking/*.py` file is covered by the original seal, so those
+files and their benchmark defaults stay byte-identical. No new package, scoring
+algorithm, graph builder or path implementation is introduced. No jury
+integration, historical output, frozen replication or seal is changed.
 
 ```powershell
-& .\.venv-ranking\Scripts\python.exe -m ranking.shortlist `
+& .\.venv-ranking\Scripts\python.exe -m workstream_b.application_shortlist `
   --ranking data/ranking/shortlist-methods-v1/integration-examples/MONDO_0009693/ranking.json `
-  --method physical_rwr --out data/ranking/application-opt-in-v1/myeloma.json
+  --artifacts data/ranking/string-12.5-c700-e400 `
+  --out data/ranking/application-shortlists-v1/MONDO_0009693
 ```
 
-Use `--method zscore` for the original policy. Output paths must be new files.
+Omitting `--method` selects physical RWR; add `--method zscore` for the original
+policy. Physical RWR requires an existing physical-RWR-enriched ranking matching
+the requested graph manifest. Consume **`application/ranking.json`** for the full
+application payload or **`application/shortlist.json`** for the selected panel.
+Both contain regenerated `network_paths` for every selected Candidate, including
+Candidates outside the old z-score panel. Unavailable paths have an explicit
+status/reason. Full per-Target paths are saved in `application/all_paths.json`.
+`selection.json` retains the intermediate selection for reproducible source
+hashes; `application/manifest.json` checksums the final outputs. Existing output
+directories are never overwritten.
+
+Only the new in-memory selection copy has its old path fields cleared. The
+existing path implementation reconstructs and validates every selected Target
+against the saved graph and distances, keeping at most three representative
+paths per Candidate. These explain **shortest-path proximity, not RWR diffusion**.
+All existing score/rank fields are retained. The original `ShortlistSettings()`
+and `python -m ranking.shortlist` defaults remain z-score for frozen replay;
+new application callers use the entry point above.
+
+Validated myeloma output at the path above: **15/15** shortlisted Candidates have
+available proximity explanations, including **8** outside the old z-score panel.
+The unchanged path provider validated **91** complete paths and selected **37**
+representatives (0.307 s reconstruction/validation; 1.228 s path-bundle runtime).
+All **118 ranking tests pass** (113 previous plus 5 app regression tests). The
+original implementation seal, all 49 official replication result checksums,
+the previous cohort and RWR freezes still verify. Per-run checks are recorded
+in `data/ranking/application-shortlists-v1/MONDO_0009693/validation.json`.
+
 The selector reuses the unchanged legacy quota/fill implementation:
 
 - Initial 10 valid network results plus the first 5 positive direct-evidence results.
@@ -57,7 +79,7 @@ verbatim. The new `shortlist_selection` is authoritative; the retained original
 Paths explain shortest-path proximity, **not RWR diffusion**. RWR Target
 contributions remain in `rwr.physical.highest_contributing_targets`.
 
-## Real integration examples, not replication results
+## Historical integration examples, not replication results
 
 Separate ignored output directory:
 `data/ranking/shortlist-methods-v1/integration-examples/<Disease ID>/`.
@@ -98,12 +120,18 @@ Candidates already carry those proximity explanations. Newly selected Candidates
 without a prior explanation have no invented paths: the existing `ranking.paths`
 provider can reconstruct their proximity paths in a separately generated bundle.
 
-## Independent 14-Disease comparison
+## Independent 14-Disease comparison (historical pre-run instructions)
 
-Code is ready; **the official replication has not run**. Its published protocol,
-frozen 14-Disease list, Target files and versioned reference labels are awaited.
-No replacement cohort was collected or evaluated. The only end-to-end comparison
-test uses explicitly synthetic inputs in a temporary directory.
+The official input comparison has since completed, without changing its seal
+or rules. Its frozen outputs and summary remain under
+`data/evaluation/official-shortlist-14-2026-10-25-v1/`. The instructions below
+record the original pre-run handoff; do not reseal or rerun that experiment as
+part of changing the application default.
+
+At the original handoff, code was ready while the published protocol, frozen
+14-Disease list, Target files and versioned reference labels were awaited.
+No replacement cohort was collected or evaluated. The end-to-end comparison
+unit test uses explicitly synthetic inputs in a temporary directory.
 
 Before any new labels are loaded, create/verify an implementation seal:
 
@@ -177,7 +205,7 @@ wins/losses/ties. No small-sample superiority claim is made. Results are labelle
 retrospective known-relationship recovery because incomplete references and
 residual indirect same-release leakage remain possible.
 
-## Validation
+## Previous validation
 
 `python -m unittest discover -s ranking/tests -v`: **113 passed** (93 existing,
 20 new), 2.183 s. New tests cover deterministic ties, quotas, overlap/deduplication,
