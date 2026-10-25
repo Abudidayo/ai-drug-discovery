@@ -111,7 +111,7 @@ def test_fixture_shapes_and_real_measurements(inputs, sources):
     # only the fictional measurements. Approval can select another real regulator.
     actual = {(e['kind'], e['source_id']): e for e in packet['evidence']}
     for sample in fixture_packet['evidence']:
-        if sample['kind'] == 'approval':
+        if sample['kind'] in {'approval', 'network_path'}:
             continue
         item = actual[sample['kind'], sample['source_id']]
         assert item['values'].keys() == sample['values'].keys()

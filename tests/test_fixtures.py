@@ -80,6 +80,11 @@ def test_ids_and_releases():
                         molecule_id, target_id = value.split("/")
                         matches(DRUG, molecule_id)
                         matches(DRUG, target_id)
+                    elif obj["kind"] == "network_path":
+                        route, digest = value.split("@")
+                        for target_id in route.split(">"):
+                            matches(TARGET, target_id)
+                        matches(r"[0-9a-f]{64}", digest)
                     elif obj["kind"] in {"mechanism", "warning"}:
                         matches(r"[0-9]+", value)
                     else:
@@ -292,10 +297,16 @@ def test_packet_blinding_and_evidence_statements():
         )
     )
     for e in packet["evidence"]:
-        assert e["source"] in {"open_targets", "chembl"}
-        assert e["kind"] in {"target_association", "mechanism", "bioactivity", "approval", "warning"}
+        assert e["source"] in {"open_targets", "chembl", "string"}
+        assert e["kind"] in {"target_association", "mechanism", "bioactivity", "approval", "warning", "network_path"}
         assert e["url"].startswith("https://")
         assert "illustrative" not in e["statement"]
+        if e["kind"] == "network_path":
+            assert e["release"] == "string-12.5"
+            assert e["values"] == {"hops": 0}
+            assert "FGFR3 connects to the Disease Target FGFR3 in 0 steps" in e["statement"]
+            assert "not a proven mechanism" in e["statement"]
+            continue
         prefix = "Open Targets 26.09" if e["source"] == "open_targets" else "ChEMBL 37"
         assert e["statement"].startswith(prefix)
         # Release identifiers and digits inside names (JAK1, Bcl-2) are not measurements.
