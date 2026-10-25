@@ -70,6 +70,8 @@ To check the method works, we hide what we already know. For each disease, we ta
 
 For each disease, each method picks 15 drugs out of 1,956. We count how many of the drugs already approved for that disease made the 15. Across the 14 diseases there are 293 drug–disease pairs where the drug is already approved for that disease. If you instead picked 15 drugs at random for each disease, on average only about **2** of those 293 approved drugs would end up in the picks (calculated: 293 × 15 ÷ 1,956). Our two ranking methods included 11 and 15.
 
+The two methods: **z-score** ranks a drug by how close its target proteins are to the disease's proteins (shortest path), compared with random protein sets of the same connectivity. **Random walk** is explained above.
+
 Higher is better for every number below.
 
 | Metric | What it means | Z-score | Random walk |
@@ -80,6 +82,8 @@ Higher is better for every number below.
 | Diseases with at least one hit | Diseases where at least one approved drug made the 15 | 8 / 14 | 8 / 14 |
 
 **What this shows:** both methods find far more approved drugs than random choice (about 2), and random walk found a few more than the z-score (15 vs 11). But it won on only 4 diseases, lost on 2 and tied on 8. The 95% confidence interval for the gain runs from −0.61 to +4.40 points: since it includes zero, the gain could be luck. We made random walk the default as a product choice, not a proven improvement.
+
+**Why the numbers look low:** each disease has about 21 approved drugs on average, but the shortlist has only 15 places, so even a perfect method couldn't catch them all. Many approved drugs also work on symptoms (for example steroids), not on the disease's own proteins, so a protein-network method can't be expected to find them. The fair comparison is against random choice (about 2), not against 293.
 
 ### 2. Model jury (14 new diseases, drug names hidden, pre-registered)
 
