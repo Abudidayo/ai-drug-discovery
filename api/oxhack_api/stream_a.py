@@ -240,6 +240,7 @@ class EvidenceSources:
                 disease_target_ids=set(network_paths.disease_target_ids),
                 coverage=network_paths.coverage,
             )
+            share_routes(packet)
             by_id = {c["candidate_id"]: c for c in packet["candidates"]}
             items = {e["id"]: e for e in packet["evidence"]}
             for update in updates:
@@ -294,6 +295,25 @@ def download_reactome(data_dir: Path) -> tuple[Path, JSON]:
     that release is saved already. Returns the mapping file and its manifest."""
     path, manifest = _pathways.download(str(data_dir))
     return Path(path), cast(JSON, manifest)
+
+
+def share_routes(packet: JSON) -> None:
+    """List each network route under every Candidate whose own Target starts it.
+
+    Stream A attaches a route only to the Candidates it was a representative path for
+    (at most three each). A route from JAK1 to TYK2 is as true for every other JAK1
+    drug, and jurors cite it for them; the checker then rejects the review as citing
+    another Candidate's evidence. No item is added: only who it is listed under.
+    """
+    routes: dict[str, list[str]] = {}
+    for item in cast(list[JSON], packet["evidence"]):
+        if item["kind"] == "network_path":
+            start = cast(str, item["source_id"]).split("@", 1)[0].split(">", 1)[0]
+            routes.setdefault(start, []).append(cast(str, item["id"]))
+    for candidate in cast(list[JSON], packet["candidates"]):
+        ids = cast(list[str], candidate["evidence_ids"])
+        for target in cast(list[JSON], candidate["targets"]):
+            ids.extend(i for i in routes.get(cast(str, target["id"]), []) if i not in ids)
 
 
 class NetworkPaths:

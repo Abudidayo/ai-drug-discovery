@@ -223,3 +223,20 @@ def test_database_url_accepts_the_codespace_name(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("OXHACK_DATABASE_URL", "postgresql://preferred/db")
     assert Settings().database_url == "postgresql://preferred/db"
     assert Settings(database_url="postgresql://kwarg/db").database_url == "postgresql://kwarg/db"
+
+
+def test_routes_are_listed_under_every_candidate_whose_target_starts_them() -> None:
+    from oxhack_api.stream_a import share_routes
+
+    route = {"id": "E9", "kind": "network_path", "source_id": f"{T1}>{T2}@abc"}
+    here = {"id": "E8", "kind": "network_path", "source_id": f"{T2}@abc"}
+    packet = {
+        "evidence": [route, here],
+        "candidates": [
+            {"evidence_ids": ["E9"], "targets": [{"id": T1}]},
+            {"evidence_ids": [], "targets": [{"id": T1}, {"id": T2}]},
+            {"evidence_ids": [], "targets": [{"id": "ENSG00000000003"}]},
+        ],
+    }
+    share_routes(packet)
+    assert [c["evidence_ids"] for c in packet["candidates"]] == [["E9"], ["E9", "E8"], []]
