@@ -413,9 +413,11 @@ def run_jury(
     *,
     on_juror: Callable[[JSON], None] | None = None,
 ) -> JSON:
-    """Ask every juror in turn and combine the valid ballots. `on_juror` receives each
-    juror's result as soon as that juror finishes."""
-    return cast(JSON, _jury.run_jury(packet, config, model_call, on_juror=on_juror))
+    """Ask every juror at once and combine the valid ballots. `on_juror` receives each
+    juror's result as soon as that juror finishes, from the juror's own thread."""
+    return cast(
+        JSON, _jury.run_jury(packet, config, model_call, on_juror=on_juror, concurrent=True)
+    )
 
 
 mock_model = cast(ModelCall, _jury.mock_model)

@@ -10,10 +10,10 @@
 
 Both send the same blinded evidence packet, rebuilt from the saved Experiment
 (`jury_packet`), and map stream A's result onto `Juror`, `JuryVote` and the
-consensus. Stream A runs the jurors one after another. This backend reports each
-juror as `running` when stream A first asks it, and saves its review as soon as
-it finishes (`run_jury`'s `on_juror`), so the UI never shows a finished juror
-still reviewing.
+consensus. Stream A asks the three jurors at once, each on its own thread. This
+backend reports each juror as `running` when stream A first asks it, and saves its
+review as soon as it finishes (`run_jury`'s `on_juror`), so the UI never shows a
+finished juror still reviewing, and a quick juror never waits for a slow one.
 
 Given an audit folder, each run also writes stream A's whole result to
 `<audit>/<experiment id>/jury_result.json`, next to the build's audit trail. It

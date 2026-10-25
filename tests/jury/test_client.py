@@ -1,9 +1,11 @@
+from collections import Counter
 from copy import deepcopy
 import json
 import os
 from pathlib import Path
 import random
 import subprocess
+import threading
 
 import httpx
 import openai
@@ -84,6 +86,40 @@ def test_on_juror_reports_each_juror_as_it_finishes():
     for juror in result["jurors"]:
         expected += [("asked", juror["model"]), ("finished", juror)]
     assert events == expected
+
+def test_concurrent_jurors_are_asked_at_the_same_time():
+    """Each call waits until all three jurors have been asked: a juror-by-juror run
+    would never get past the first call."""
+    everyone_asked = threading.Barrier(len(CONFIG["models"]), timeout=5)
+    finished = []
+
+    def call(model, prompt, temperature):
+        everyone_asked.wait()
+        return mock_model(model, prompt, temperature)
+
+    result = run_jury(PACKET, CONFIG, call, on_juror=finished.append, concurrent=True)
+    assert [j["status"] for j in result["jurors"]] == ["valid"] * 3
+    # Reported as each finished; returned in the configured order.
+    assert sorted(j["model"] for j in finished) == sorted(CONFIG["models"])
+    assert [j["model"] for j in result["jurors"]] == CONFIG["models"]
+    sequential = run_jury(PACKET, CONFIG, mock_model)
+    assert ([j["presented_order"] for j in result["jurors"]]
+            == [j["presented_order"] for j in sequential["jurors"]])
+
+
+def test_concurrent_jurors_share_the_call_budget_before_any_call():
+    calls = []
+    lock = threading.Lock()
+
+    def invalid(model, prompt, temperature):
+        with lock:
+            calls.append(model)
+        return 'incomplete JSON'
+
+    result = run_jury(PACKET, CONFIG, invalid, max_calls=4, concurrent=True)
+    assert Counter(calls) == Counter([CONFIG['models'][0], *CONFIG['models']])
+    assert [j['attempts'] for j in result['jurors']] == [2, 1, 1]
+
 
 def test_fixture_consensus_exactly():
     assert consensus(PACKET, FIXTURE["jurors"]) == FIXTURE["consensus"]

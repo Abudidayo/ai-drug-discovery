@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import shutil
+import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+import pytest
 from conftest import COVID, SteppedRunner, create, ready_experiment
 from fastapi.testclient import TestClient
 
+from oxhack_api.services import live_jury
 from oxhack_api.services.jury import FixtureJury
 from oxhack_api.services.live_jury import StreamAJury
 from oxhack_api.settings import FIXTURES_DIR
@@ -73,11 +77,23 @@ def test_jury_reports_progress_juror_by_juror(client: TestClient, runner: Steppe
     assert summary["jury_status"] == "done"
 
 
-def test_stream_a_jury_saves_each_juror_as_it_finishes(
-    make_client: Callable[..., TestClient], runner: SteppedRunner, tmp_path: Path
+def test_stream_a_jury_asks_every_juror_at_once_and_saves_each_as_it_finishes(
+    make_client: Callable[..., TestClient],
+    runner: SteppedRunner,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Stream A asks its jurors one after another; a finished juror must not still read
-    as reviewing while the next one works. Stream A's whole result is kept for audits."""
+    """Stream A asks the three jurors at once: no juror's reply comes back until all three
+    have been asked, so all three read as reviewing together. Each is saved as soon as it
+    finishes. Stream A's whole result is kept for audits."""
+    everyone_asked = threading.Barrier(3, timeout=5)
+    mock = live_jury.mock_model
+
+    def model(model_id: str, prompt: str, temperature: float) -> object:
+        everyone_asked.wait()
+        return mock(model_id, prompt, temperature)
+
+    monkeypatch.setattr(live_jury, "mock_model", model)
     client = make_client(jury=StreamAJury("mock", audit_dir=tmp_path))
     experiment_id = ready_experiment(client, runner)["id"]
     client.post(f"/api/experiments/{experiment_id}/jury")
@@ -90,17 +106,11 @@ def test_stream_a_jury_saves_each_juror_as_it_finishes(
     while runner.jobs:
         runner.step()
         seen.append(state())
-    assert seen == [
-        ("queued", ["pending", "pending", "pending"]),
-        ("running", ["pending", "pending", "pending"]),
-        ("running", ["running", "pending", "pending"]),
-        ("running", ["valid", "pending", "pending"]),
-        ("running", ["valid", "running", "pending"]),
-        ("running", ["valid", "valid", "pending"]),
-        ("running", ["valid", "valid", "running"]),
-        ("running", ["valid", "valid", "valid"]),
-        ("done", ["valid", "valid", "valid"]),
-    ]
+    assert ("running", ["running"] * 3) in seen
+    for before, after in itertools.pairwise(seen):
+        for was, now in zip(before[1], after[1], strict=True):
+            assert not (was == "valid" and now != "valid"), seen
+    assert seen[-1] == ("done", ["valid"] * 3)
     run = jury_of(client, experiment_id)
     assert len(run["votes"]) == 3 * len(run["consensus"]["ranking"])
     saved = json.loads((tmp_path / experiment_id / "jury_result.json").read_text())
