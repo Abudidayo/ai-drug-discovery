@@ -145,6 +145,7 @@ test("the jury has started on its own; a student compares drugs, then archives a
 async function trackWebGLContexts(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const contexts: WebGLRenderingContext[] = [];
+    const origins = new Map<WebGLRenderingContext, { stack: string; lossRequests: number }>();
     interface HasContext {
       getContext: (this: unknown, ...args: never[]) => unknown;
     }
@@ -154,7 +155,19 @@ async function trackWebGLContexts(page: Page): Promise<void> {
         const context = original.apply(this, args);
         const isGL =
           context instanceof WebGLRenderingContext || context instanceof WebGL2RenderingContext;
-        if (isGL && !contexts.includes(context)) contexts.push(context);
+        if (isGL && !contexts.includes(context)) {
+          contexts.push(context);
+          const origin = { stack: new Error().stack ?? "unknown", lossRequests: 0 };
+          origins.set(context, origin);
+          const extension = context.getExtension("WEBGL_lose_context");
+          if (extension !== null) {
+            const lose = extension.loseContext.bind(extension);
+            extension.loseContext = () => {
+              origin.lossRequests += 1;
+              lose();
+            };
+          }
+        }
         return context;
       };
     };
@@ -162,6 +175,17 @@ async function trackWebGLContexts(page: Page): Promise<void> {
     track(OffscreenCanvas.prototype);
     Object.assign(window, {
       liveWebGLContexts: () => contexts.filter((context) => !context.isContextLost()).length,
+      webGLContextDiagnostics: () =>
+        contexts.map((context) => ({
+          ...origins.get(context),
+          lost: context.isContextLost(),
+          canvas: context.canvas.constructor.name,
+          connected:
+            context.canvas instanceof HTMLCanvasElement ? context.canvas.isConnected : null,
+          className: context.canvas instanceof HTMLCanvasElement ? context.canvas.className : null,
+          width: context.canvas.width,
+          height: context.canvas.height,
+        })),
     });
   });
 }
@@ -174,7 +198,7 @@ function liveContexts(page: Page): Promise<number> {
 
 test("a student shows baricitinib's binding pose and checks it against the crystal", async ({
   page,
-}) => {
+}, testInfo) => {
   await trackWebGLContexts(page);
   const id = await readyExperiment(page);
 
@@ -239,5 +263,16 @@ test("a student shows baricitinib's binding pose and checks it against the cryst
   await page.getByRole("link", { name: "History", exact: true }).click();
   await expectStep(page, "History");
   await expect(view).toHaveCount(0);
-  await expect.poll(() => liveContexts(page)).toBe(1);
+  try {
+    await expect.poll(() => liveContexts(page)).toBe(1);
+  } catch (error) {
+    const diagnostics = await page.evaluate(() =>
+      (window as unknown as { webGLContextDiagnostics: () => unknown }).webGLContextDiagnostics(),
+    );
+    await testInfo.attach("webgl-contexts", {
+      body: JSON.stringify(diagnostics, null, 2),
+      contentType: "application/json",
+    });
+    throw error;
+  }
 });
