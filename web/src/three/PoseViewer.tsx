@@ -200,6 +200,12 @@ export function PoseViewer({ files, label }: PoseViewerProps) {
           <span className={styles.swatch} data-key="drug" aria-hidden="true" />
           {copy.pose.legend.drug}
         </li>
+        {overlay && (
+          <li>
+            <span className={styles.swatch} data-key="overlay" aria-hidden="true" />
+            {copy.pose.controls.overlay}
+          </li>
+        )}
       </ul>
     </div>
   );

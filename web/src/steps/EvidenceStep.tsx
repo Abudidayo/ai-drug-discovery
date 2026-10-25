@@ -4,8 +4,8 @@ import { useConformer } from "../api/queries";
 import type { Candidate, EvidenceItem, Experiment } from "../api/types";
 import { FigureNote, Panel } from "../app/Figure";
 import { useNetworkHover } from "../app/networkHover";
-import { copy } from "../copy/en";
-import { focusCandidate, warningSentence } from "../lib/candidates";
+import { copy, unscorableReasonText } from "../copy/en";
+import { focusCandidate, noModelText, warningSentence } from "../lib/candidates";
 import { drugName } from "../lib/format";
 import styles from "./EvidenceStep.module.css";
 
@@ -28,12 +28,33 @@ function sourceLabel(item: EvidenceItem): string {
   return copy.evidence.sources[item.source];
 }
 
+/** One fact: a summary said once, with one link per source that records it. */
+interface Fact {
+  summary: string;
+  links: { label: string; url: string }[];
+}
+
+/**
+ * Facts merged by summary: several records can say the same thing ("Blocks JAK2."), so each
+ * summary is listed once, linking the first record of each distinct source.
+ */
+function mergeFacts(items: readonly EvidenceItem[]): Fact[] {
+  const facts = new Map<string, Fact>();
+  for (const item of items) {
+    const fact = facts.get(item.summary) ?? { summary: item.summary, links: [] };
+    const label = sourceLabel(item);
+    if (!fact.links.some((link) => link.label === label)) fact.links.push({ label, url: item.url });
+    facts.set(item.summary, fact);
+  }
+  return [...facts.values()];
+}
+
 function MoleculePanel({ candidate }: { candidate: Candidate }) {
   const name = drugName(candidate.name);
   const conformer = useConformer(candidate.pubchem_cid);
   let body;
   if (candidate.pubchem_cid === null || conformer.data === null) {
-    body = <FigureNote>{copy.evidence.noModel}</FigureNote>;
+    body = <FigureNote>{noModelText(candidate)}</FigureNote>;
   } else if (conformer.isError) {
     body = (
       <FigureNote>
@@ -102,15 +123,20 @@ export function EvidenceStep({ experiment }: { experiment: Experiment }) {
   const candidate = focusCandidate(experiment.candidates, params.get(DRUG_PARAM));
   if (candidate === undefined) return null;
 
-  const facts = candidate.evidence.filter((item) => item.kind !== "warning");
+  const facts = mergeFacts(candidate.evidence.filter((item) => item.kind !== "warning"));
+  // Without a network there is no route panel; the drug's reason is said here, once.
+  const noRoute =
+    experiment.network === null && candidate.unscorable_reason !== null
+      ? unscorableReasonText(candidate.unscorable_reason)
+      : null;
   const symbols = experiment.network?.nodes ?? [];
-  const point = (item: EvidenceItem | null) => {
-    if (item === null) {
+  const point = (fact: Fact | null) => {
+    if (fact === null) {
       setHover(null);
       return;
     }
     const named = symbols
-      .filter((node) => new RegExp(`\\b${escapeRegExp(node.symbol)}\\b`).test(item.summary))
+      .filter((node) => new RegExp(`\\b${escapeRegExp(node.symbol)}\\b`).test(fact.summary))
       .map((node) => node.id);
     setHover(named.length > 0 ? { highlight: named, focus: named } : null);
   };
@@ -120,22 +146,27 @@ export function EvidenceStep({ experiment }: { experiment: Experiment }) {
       <MoleculePanel key={candidate.candidate_id} candidate={candidate} />
       <Panel area="evidence" label={copy.evidence.listLabel}>
         <div className={styles.scroll}>
+          {noRoute !== null && <p className={styles.noRoute}>{noRoute}</p>}
           {facts.length > 0 && (
             <ul className={styles.facts} aria-label={copy.evidence.listLabel}>
-              {facts.map((item) => (
+              {facts.map((fact) => (
                 <li
-                  key={item.id}
+                  key={fact.summary}
                   onPointerEnter={() => {
-                    point(item);
+                    point(fact);
                   }}
                   onPointerLeave={() => {
                     point(null);
                   }}
                 >
-                  <span>{item.summary}</span>
-                  <a href={item.url} target="_blank" rel="noreferrer">
-                    {sourceLabel(item)}
-                  </a>
+                  <span>{fact.summary}</span>
+                  <span className={styles.links}>
+                    {fact.links.map((link) => (
+                      <a key={link.label} href={link.url} target="_blank" rel="noreferrer">
+                        {link.label}
+                      </a>
+                    ))}
+                  </span>
                 </li>
               ))}
             </ul>

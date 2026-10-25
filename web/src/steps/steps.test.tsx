@@ -201,7 +201,7 @@ describe("Step 4, Evidence", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("treats a missing conformer like an antibody instead of breaking", async () => {
+  it("says neutrally that a small molecule's missing conformer leaves no 3D model", async () => {
     server.use(
       http.get("/api/molecules/{pubchem_cid}/conformer", ({ response }) =>
         response(404).json({ detail: "No 3D structure." }),
@@ -209,7 +209,8 @@ describe("Step 4, Evidence", () => {
     );
     renderApp(`${E}/evidence`);
     await ready();
-    expect(await screen.findByText(copy.evidence.noModel)).toBeInTheDocument();
+    expect(await screen.findByText(copy.evidence.noModelNeutral)).toBeInTheDocument();
+    expect(screen.queryByText(copy.evidence.noModel)).not.toBeInTheDocument();
   });
 
   it("explains a drug with no place on the network instead of a route", async () => {

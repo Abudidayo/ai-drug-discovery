@@ -70,7 +70,14 @@ export function BiologyTargets({ experiment }: { experiment: Experiment }) {
         </div>
       )}
       <div className={styles.notes}>
-        <p>{copy.biology.rule(experiment.targets.length, used.length)}</p>
+        {experiment.network === null ? (
+          <>
+            <p>{copy.biology.ruleNoNetwork(experiment.targets.length)}</p>
+            <p>{copy.biology.noNetwork}</p>
+          </>
+        ) : (
+          <p>{copy.biology.rule(experiment.targets.length, used.length)}</p>
+        )}
         {excluded.map((target) => (
           <p key={target.target_id}>
             {copy.biology.excluded[target.excluded_reason](target.symbol)}

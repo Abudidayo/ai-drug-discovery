@@ -49,6 +49,19 @@
   line-height: var(--leading-snug);
 }
 
+.facts .links {
+  display: flex;
+  gap: var(--space-12);
+  font-size: var(--text-label);
+}
+
+.noRoute {
+  max-width: 62ch;
+  margin-bottom: var(--space-16);
+  font-size: var(--text-body-sm);
+  color: var(--color-grey-1);
+}
+
 .facts a,
 .warningSources a {
   font-size: var(--text-label);

@@ -94,3 +94,24 @@ export function defaultPicks(candidates: readonly Candidate[]): string[] {
   const picks = [...ids.slice(start), ...ids.slice(0, start)];
   return picks.slice(0, Math.min(COMPARED, ids.length));
 }
+
+/**
+ * Whether the drug is known to be an antibody: its name carries the INN stem for monoclonal
+ * antibodies ("-mab"), or its records say so. A missing PubChem compound alone doesn't tell:
+ * some small molecules have none in the data.
+ */
+export function isAntibody(candidate: Candidate): boolean {
+  if (/mab$/i.test(candidate.name.trim())) return true;
+  return candidate.evidence.some((item) => /\bantibod(y|ies)\b/i.test(item.statement));
+}
+
+/** Candidates in direct-evidence order; drugs without an evidence rank keep shortlist order last. */
+export function byEvidenceRank(candidates: readonly Candidate[]): Candidate[] {
+  const rank = (candidate: Candidate) => candidate.direct_evidence_rank ?? Number.POSITIVE_INFINITY;
+  return [...candidates].sort((a, b) => rank(a) - rank(b) || a.shortlist_rank - b.shortlist_rank);
+}
+
+/** Why no 3D model of the drug is shown: the antibody wording only when it is known to be one. */
+export function noModelText(candidate: Candidate): string {
+  return isAntibody(candidate) ? copy.evidence.noModel : copy.evidence.noModelNeutral;
+}

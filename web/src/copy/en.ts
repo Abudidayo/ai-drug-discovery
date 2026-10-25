@@ -127,6 +127,10 @@ export const copy = {
   biology: {
     rule: (linked: number, inNetwork: number) =>
       `We use the ${String(linked)} proteins most strongly linked to the disease. ${String(inNetwork)} of them appear in the protein network.`,
+    /** When no network ranking ran, every linked protein is used. */
+    ruleNoNetwork: (linked: number) =>
+      `We use the ${String(linked)} proteins most strongly linked to the disease.`,
+    noNetwork: "The protein network isn’t available for this experiment.",
     strength: "Link strength",
     targetsLabel: "Disease proteins by link strength",
     excluded: {
@@ -152,6 +156,13 @@ export const copy = {
     knownAnswer: (drug: string, disease: string) =>
       `${drug} is already used for ${disease}. Finding it shows the method works; it isn’t a new discovery.`,
     selectedBy: { network: "Network", evidence: "Evidence" },
+    /** The shortlist when no network ranking ran (ranking_method evidence_only). */
+    evidenceOnly: {
+      title: "Ranked by evidence (protein network unavailable)",
+      help: "No protein network ranking ran for this experiment, so drugs are ranked only by direct links between their targets and the disease.",
+      listLabel: "Candidate drugs by evidence rank",
+      rank: (rank: number) => `Evidence rank ${String(rank)}`,
+    },
   },
 
   evidence: {
@@ -177,6 +188,8 @@ export const copy = {
     },
     moleculeLabel: (drug: string) => `${drug} in 3D. Drag to rotate.`,
     noModel: "Antibody: no small-molecule 3D model",
+    /** No PubChem compound, and nothing says the drug is an antibody. */
+    noModelNeutral: "No 3D model is available for this drug",
     modelUnavailable: "The 3D model couldn’t be loaded.",
   },
 
@@ -370,6 +383,8 @@ export const unscorableReasons: Record<UnscorableReason, string> = {
     "None of the disease’s proteins are in the protein network, so no drug can be placed near them.",
   no_retained_drug_targets:
     "None of this drug’s targets are human proteins in the network, so it has no place in it.",
+  network_unavailable:
+    "No protein network ranking ran for this experiment, so this drug has no route to the disease to show.",
 };
 
 /** Why a network score is incomplete or less reliable. Same compile-time guarantee. */

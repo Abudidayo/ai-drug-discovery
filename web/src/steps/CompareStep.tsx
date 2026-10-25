@@ -6,7 +6,7 @@ import { DrugPicker } from "../app/DrugPicker";
 import { Panel } from "../app/Figure";
 import { Marker } from "../charts/Marker";
 import { copy, stepCopy } from "../copy/en";
-import { approvals, defaultPicks, warningSentence } from "../lib/candidates";
+import { approvals, defaultPicks, noModelText, warningSentence } from "../lib/candidates";
 import { structureFor } from "../lib/docking";
 import { drugName, listOf } from "../lib/format";
 import { decisionsFor } from "../lib/jury";
@@ -113,13 +113,25 @@ export function CompareStep({ experiment }: { experiment: Experiment }) {
     const query = conformers[index];
     if (query?.data) return { key: candidate.candidate_id, name, conformer: query.data };
     let message: string | null = null;
-    if (candidate.pubchem_cid === null || query?.data === null) message = copy.evidence.noModel;
+    if (candidate.pubchem_cid === null || query?.data === null) message = noModelText(candidate);
     else if (query?.isError) message = copy.evidence.modelUnavailable;
     return { key: candidate.candidate_id, name, message };
   });
 
-  const rows: { label: string; cell: (candidate: Candidate) => ReactNode }[] = [
-    { label: copy.candidates.networkRank, cell: (c) => rank(c.network?.rank) },
+  // With no network ranking, the network-rank row says "not ranked" once, across every drug.
+  const networkRanked = experiment.ranking_method === "network";
+  const rows: {
+    label: string;
+    cell: (candidate: Candidate) => ReactNode;
+    whole?: ReactNode;
+  }[] = [
+    {
+      label: copy.candidates.networkRank,
+      cell: (c) => rank(c.network?.rank),
+      whole: networkRanked ? undefined : (
+        <span className={styles.quiet}>{copy.candidates.notRanked}</span>
+      ),
+    },
     { label: copy.candidates.evidenceRank, cell: (c) => rank(c.direct_evidence_rank) },
     ...(jury?.status === "done"
       ? [
@@ -195,11 +207,17 @@ export function CompareStep({ experiment }: { experiment: Experiment }) {
             <span role="rowheader" className={styles.label}>
               {row.label}
             </span>
-            {chosen.map((candidate) => (
-              <span role="cell" key={candidate.candidate_id} className={styles.cell}>
-                {row.cell(candidate)}
+            {row.whole === undefined ? (
+              chosen.map((candidate) => (
+                <span role="cell" key={candidate.candidate_id} className={styles.cell}>
+                  {row.cell(candidate)}
+                </span>
+              ))
+            ) : (
+              <span role="cell" className={styles.cell} data-whole="true">
+                {row.whole}
               </span>
-            ))}
+            )}
           </div>
         ))}
       </div>

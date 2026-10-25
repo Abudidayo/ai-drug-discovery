@@ -152,3 +152,8 @@
 .swatch[data-key="drug"] {
   background: var(--color-ink);
 }
+
+/* The crystal position, in the redock colour its overlay is drawn in. */
+.swatch[data-key="overlay"] {
+  background: var(--color-redock);
+}

@@ -313,7 +313,7 @@ export interface components {
        * @description Order in which the Candidate joined the shortlist.
        */
       shortlist_rank: number;
-      /** @description scored: has a closeness z-score. distance_only: has a network distance but no z-score. not_scorable: cannot be placed in the network. */
+      /** @description scored: has a closeness z-score. distance_only: has a network distance but no z-score. not_scorable: cannot be placed in the network, including when no network ranking ran (unscorable_reason network_unavailable). */
       status: components["schemas"]["CandidateStatus"];
       /**
        * Targets
@@ -577,7 +577,7 @@ export interface components {
       rank: number;
       /**
        * Retained
-       * @description True when the Target maps into the protein network.
+       * @description True when the Target maps into the protein network. With no network ranking (ranking_method evidence_only) every Target is kept.
        */
       retained: boolean;
       /**
@@ -958,8 +958,10 @@ export interface components {
       jury: components["schemas"]["JuryRun"] | null;
       /** @description The fixed Model jury for this Experiment. */
       jury_config: components["schemas"]["JuryConfig"];
-      /** @description Protein subgraph to draw; null until built. */
+      /** @description Protein subgraph to draw; null until built, and always null for evidence_only. */
       network: components["schemas"]["NetworkGraph"] | null;
+      /** @description network: Candidates ranked by network proximity, with direct evidence alongside. evidence_only: no network was available, so Candidates are ranked by direct Target evidence alone (show 'Evidence ranking - network unavailable'); network is null and every Candidate is not_scorable with unscorable_reason network_unavailable. */
+      ranking_method: components["schemas"]["RankingMethod"];
       ranking_settings: components["schemas"]["RankingSettings"];
       /** @description Current build stage while building; else null. */
       stage: components["schemas"]["BuildStage"] | null;
@@ -1101,6 +1103,8 @@ export interface components {
        * @description Tries per juror before its review counts as invalid.
        */
       max_attempts: number;
+      /** @description fixture: a recorded review with made-up votes. mock: a practice review; no model is called and every vote is a placeholder with no scientific meaning. cortex: real models through Snowflake Cortex. */
+      mode: components["schemas"]["JuryMode"];
       /**
        * Models
        * @description The jurors, each a different model family.
@@ -1129,6 +1133,8 @@ export interface components {
        */
       temperature: number;
     };
+    /** @enum {string} */
+    JuryMode: "fixture" | "mock" | "cortex";
     /** JuryModel */
     JuryModel: {
       /**
@@ -1348,9 +1354,12 @@ export interface components {
        */
       score: number;
     };
+    /** @enum {string} */
+    RankingMethod: "network" | "evidence_only";
     /**
      * RankingSettings
-     * @description Settings for the network-proximity ranking (stream B `RankingSettings`).
+     * @description Settings for the ranking (stream B `RankingSettings`). The network-only settings are
+     *     null when `Experiment.ranking_method` is evidence_only: no network ranking ran.
      */
     RankingSettings: {
       /**
@@ -1360,9 +1369,9 @@ export interface components {
       evidence_slots: number;
       /**
        * Min Bin Size
-       * @description Fewest proteins in each degree group used to draw random sets.
+       * @description Fewest proteins in each degree group used to draw random sets; null when no network ranking ran.
        */
-      min_bin_size: number;
+      min_bin_size: number | null;
       /**
        * Network Slots
        * @description Shortlist places filled first from the network ranking.
@@ -1370,14 +1379,14 @@ export interface components {
       network_slots: number;
       /**
        * Randomisations
-       * @description How many random protein sets the closeness comparison draws.
+       * @description How many random protein sets the closeness comparison draws; null when no network ranking ran.
        */
-      randomisations: number;
+      randomisations: number | null;
       /**
        * Seed
-       * @description Random seed, so the same inputs give the same ranking.
+       * @description Random seed, so the same inputs give the same ranking; null when no network ranking ran.
        */
-      seed: number;
+      seed: number | null;
       /**
        * Top Targets
        * @description How many Disease Targets to use, strongest evidence first.
@@ -1403,7 +1412,8 @@ export interface components {
       | "initial_network_quota"
       | "initial_evidence_quota"
       | "evidence_fill_after_deduplication"
-      | "network_fill_after_deduplication";
+      | "network_fill_after_deduplication"
+      | "evidence_ranking_network_unavailable";
     /**
      * Structure
      * @description A prepared human protein structure that Candidates can be docked into.
@@ -1531,7 +1541,8 @@ export interface components {
       detail: string | components["schemas"]["ValidationIssue"][];
     };
     /** @enum {string} */
-    UnscorableReason: "no_retained_disease_targets" | "no_retained_drug_targets";
+    UnscorableReason:
+      "no_retained_disease_targets" | "no_retained_drug_targets" | "network_unavailable";
     /**
      * ValidationIssue
      * @description One problem with the request, as FastAPI reports it.

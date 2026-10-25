@@ -22,6 +22,7 @@ type ExperimentFixture = Pick<
   Experiment,
   | "disease"
   | "data_releases"
+  | "ranking_method"
   | "ranking_settings"
   | "jury_config"
   | "targets"
@@ -60,6 +61,7 @@ export function covidExperiment(
     error: status === "failed" ? "The ranking could not be computed for this disease." : null,
     disease: data.disease,
     data_releases: data.data_releases,
+    ranking_method: data.ranking_method,
     ranking_settings: data.ranking_settings,
     jury_config: data.jury_config,
     targets: ready ? data.targets : [],
@@ -70,6 +72,48 @@ export function covidExperiment(
     fixture_note: data.fixture_note,
     created_at: "2026-10-25T09:00:00Z",
     archived_at: null,
+  };
+}
+
+/**
+ * The COVID-19 Experiment as the live source serves it without a protein network
+ * (ranking_method evidence_only): no network, every Target kept, and every Candidate
+ * not_scorable with reason network_unavailable, shortlisted in direct-evidence order.
+ */
+export function evidenceOnlyExperiment(id = EXPERIMENT_ID): Experiment {
+  const experiment = covidExperiment("ready", null, id);
+  const candidates = experiment.candidates
+    .map((candidate) => ({
+      ...candidate,
+      status: "not_scorable" as const,
+      network: null,
+      unscorable_reason: "network_unavailable" as const,
+      unscorable_detail: null,
+      selected_by: ["evidence" as const],
+      selection_reasons: ["evidence_ranking_network_unavailable" as const],
+    }))
+    .sort(
+      (a, b) =>
+        (a.direct_evidence_rank ?? Number.MAX_SAFE_INTEGER) -
+        (b.direct_evidence_rank ?? Number.MAX_SAFE_INTEGER),
+    )
+    .map((candidate, index) => ({ ...candidate, shortlist_rank: index + 1 }));
+  return {
+    ...experiment,
+    ranking_method: "evidence_only",
+    ranking_settings: {
+      ...experiment.ranking_settings,
+      randomisations: null,
+      seed: null,
+      min_bin_size: null,
+    },
+    network: null,
+    targets: experiment.targets.map((target) => ({
+      ...target,
+      retained: true,
+      excluded_reason: null,
+    })),
+    candidates,
   };
 }
 

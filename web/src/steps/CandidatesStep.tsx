@@ -5,7 +5,7 @@ import { useNetworkHover } from "../app/networkHover";
 import { candidateHover } from "../app/networkView";
 import { SlopeChart, type SlopeRow } from "../charts/SlopeChart";
 import { copy, unscorableReasonText, type UnscorableReason } from "../copy/en";
-import { byNetworkRank, isPlaced } from "../lib/candidates";
+import { byEvidenceRank, byNetworkRank, isPlaced } from "../lib/candidates";
 import { drugName, listOf } from "../lib/format";
 import styles from "./CandidatesStep.module.css";
 
@@ -37,10 +37,74 @@ function byReason(candidates: readonly Candidate[]): [UnscorableReason, string[]
 }
 
 /**
+ * Step 3 without a network ranking (ranking_method evidence_only): one list in evidence order,
+ * titled with the plan, and one line saying why. No closeness and no network rank: nothing ran.
+ */
+function EvidenceRanking({ experiment }: { experiment: Experiment }) {
+  const [showAll, setShowAll] = useState(false);
+  const toggleId = useId();
+  const ordered = byEvidenceRank(experiment.candidates);
+  const shown = showAll ? ordered : ordered.slice(0, SHOWN_BY_DEFAULT);
+  const knownAnswer = experiment.candidates.find((candidate) => candidate.known_answer);
+
+  const toggle =
+    ordered.length > SHOWN_BY_DEFAULT ? (
+      <label className={styles.toggle} htmlFor={toggleId}>
+        <input
+          id={toggleId}
+          type="checkbox"
+          checked={showAll}
+          onChange={(event) => {
+            setShowAll(event.target.checked);
+          }}
+        />
+        {copy.candidates.showAll(ordered.length)}
+      </label>
+    ) : undefined;
+
+  return (
+    <Panel area="slope" title={copy.candidates.evidenceOnly.title} actions={toggle}>
+      <p className={styles.help}>{copy.candidates.evidenceOnly.help}</p>
+      <ol className={styles.ranked} aria-label={copy.candidates.evidenceOnly.listLabel}>
+        {shown.map((candidate) => (
+          <li key={candidate.candidate_id} data-emphasis={candidate.known_answer || undefined}>
+            <span className={styles.rank}>
+              {candidate.direct_evidence_rank === null ? (
+                <span className={styles.quiet}>{copy.candidates.notRanked}</span>
+              ) : (
+                <>
+                  <span className={styles.hidden}>
+                    {copy.candidates.evidenceOnly.rank(candidate.direct_evidence_rank)}
+                  </span>
+                  <span aria-hidden="true">{candidate.direct_evidence_rank}</span>
+                </>
+              )}
+            </span>
+            <span className={styles.name}>{drugName(candidate.name)}</span>
+          </li>
+        ))}
+      </ol>
+      {knownAnswer && (
+        <p className={styles.note}>
+          {copy.candidates.knownAnswer(drugName(knownAnswer.name), experiment.disease.name)}
+        </p>
+      )}
+    </Panel>
+  );
+}
+
+/**
  * Step 3: the shortlist as one slope chart, top five first. Drugs that can't be placed on the
  * network are listed under the chart with the plain reason, and no score.
  */
 export function CandidatesStep({ experiment }: { experiment: Experiment }) {
+  if (experiment.ranking_method === "evidence_only") {
+    return <EvidenceRanking experiment={experiment} />;
+  }
+  return <NetworkRanking experiment={experiment} />;
+}
+
+function NetworkRanking({ experiment }: { experiment: Experiment }) {
   const [showAll, setShowAll] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
   const setNetworkHover = useNetworkHover();

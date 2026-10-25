@@ -1,4 +1,5 @@
 import type { Candidate, DockJob, Structure } from "../api/types";
+import { isAntibody } from "./candidates";
 
 /**
  * Which drug can be docked into which prepared structure, and why the others can't (plan.md §7:
@@ -27,16 +28,16 @@ export function structureFor(
 }
 
 /**
- * Why a Candidate can't be docked: antibodies have no small-molecule structure (and no PubChem
- * compound), some drugs act only on proteins without a prepared structure, and the rest lack what
- * docking needs. Null when it can be docked.
+ * Why a Candidate can't be docked: antibodies have no small-molecule structure, some drugs act
+ * only on proteins without a prepared structure, and the rest lack what docking needs. A missing
+ * PubChem compound alone doesn't make a drug an antibody. Null when it can be docked.
  */
 export function unsupportedReason(
   candidate: Candidate,
   structures: readonly Structure[],
 ): UnsupportedReason | null {
   if (structureFor(candidate, structures) !== undefined) return null;
-  if (candidate.pubchem_cid === null) return "antibody";
+  if (candidate.pubchem_cid === null && isAntibody(candidate)) return "antibody";
   const targets = new Set(candidate.targets.map((target) => target.id));
   if (!structures.some((structure) => targets.has(structure.target_id))) return "no_structure";
   return "not_dockable";

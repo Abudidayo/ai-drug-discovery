@@ -47,6 +47,22 @@
     "pose unsupported";
 }
 
+/* No protein network for this Experiment: the step's own panels take its cell. */
+.grid[data-network="none"][data-layout="biology"] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "targets";
+}
+
+.grid[data-network="none"][data-layout="candidates"] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "slope";
+}
+
+.grid[data-network="none"][data-layout="evidence"] {
+  grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  grid-template-areas: "molecule evidence";
+}
+
 .grid[data-layout="single"] {
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "main";
@@ -209,6 +225,11 @@
       "molecule evidence"
       "net evidence";
   }
+
+  .grid[data-network="none"][data-layout="evidence"] {
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: "molecule evidence";
+  }
 }
 
 /* Narrow screens: one column, in reading order; 3D plates get a fixed height. */
@@ -238,6 +259,10 @@
 
   .grid[data-layout="evidence"] {
     grid-template-areas: "molecule" "evidence" "net";
+  }
+
+  .grid[data-network="none"][data-layout="evidence"] {
+    grid-template-areas: "molecule" "evidence";
   }
 
   .grid[data-layout="jury"] {

@@ -100,6 +100,7 @@ function ExperimentScreen({ experimentId, step }: { experimentId: string; step: 
     figure = (
       <FigureGrid
         layout={(showsNetwork ? LAYOUTS[step] : undefined) ?? fallbackLayout(step, experiment)}
+        network={experiment?.status !== "ready" || experiment.network !== null}
       >
         <NetworkHoverContext.Provider value={setHover}>
           <Outlet context={{ experiment } satisfies StepContext} />

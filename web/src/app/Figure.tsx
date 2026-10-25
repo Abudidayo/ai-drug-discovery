@@ -8,9 +8,16 @@ import styles from "./Figure.module.css";
 export type FigureLayout =
   "search" | "biology" | "candidates" | "evidence" | "jury" | "pose" | "single";
 
-export function FigureGrid({ layout, children }: { layout: FigureLayout; children: ReactNode }) {
+interface FigureGridProps {
+  layout: FigureLayout;
+  /** False when the Experiment has no protein network: its cell goes to the step's panels. */
+  network?: boolean;
+  children: ReactNode;
+}
+
+export function FigureGrid({ layout, network = true, children }: FigureGridProps) {
   return (
-    <div className={styles.grid} data-layout={layout}>
+    <div className={styles.grid} data-layout={layout} data-network={network ? undefined : "none"}>
       {children}
     </div>
   );

@@ -142,3 +142,8 @@
     scroll-snap-align: start;
   }
 }
+
+/* One cell across every drug, for a fact that holds for all of them. */
+.cell[data-whole] {
+  grid-column: 2 / -1;
+}
