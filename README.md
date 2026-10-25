@@ -81,7 +81,7 @@ Each method picks 15 of 1,956 drugs per disease. We count how many drugs already
 
 Each panel has 15 drugs: 1 already approved for the disease and 14 that aren't. The model ranks them without seeing drug names. Hits@5 counts how often the approved drug lands in the top 5 (chance 33%); MRR rewards ranking it higher (chance 0.22, perfect 1.0).
 
-Higher Hits@5 and MRR are better. The p-value says how likely a score this high would be by luck alone, corrected for testing several methods; below 0.05 counts as beating chance.
+Higher Hits@5 and MRR are better. The p-value is the chance a score this high happens by luck; below 0.05 means it beat chance.
 
 | Method | Hits@5 | MRR | Beats chance? (p) |
 |---|---:|---:|---|
