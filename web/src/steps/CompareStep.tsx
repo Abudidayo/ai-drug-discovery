@@ -1,5 +1,5 @@
 import { useQueries } from "@tanstack/react-query";
-import { lazy, Suspense, useState, type ReactNode } from "react";
+import { type CSSProperties, lazy, Suspense, useState, type ReactNode } from "react";
 import { conformerQuery, useStructures } from "../api/queries";
 import type { Candidate, DockJob, Experiment, JuryRun, Structure } from "../api/types";
 import { Panel } from "../app/Figure";
@@ -163,9 +163,7 @@ export function CompareStep({ experiment }: { experiment: Experiment }) {
         role="table"
         aria-label={copy.compare.tableLabel}
         className={styles.table}
-        style={{
-          gridTemplateColumns: `minmax(9em, 0.8fr) repeat(${String(chosen.length)}, minmax(0, 2fr))`,
-        }}
+        style={{ "--drugs": chosen.length } as CSSProperties}
       >
         <div role="row" className={styles.head}>
           <span role="columnheader" className={styles.corner} />
