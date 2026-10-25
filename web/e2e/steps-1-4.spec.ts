@@ -103,6 +103,18 @@ test("a student walks from choosing COVID-19 to the evidence for baricitinib", a
 
 test("the network persists across steps instead of being rebuilt", async ({ page }) => {
   await page.goto("/");
+  // Wait for the build: until then the later steps show its progress in place of the network.
+  await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}\/disease$/);
+  const id = new URL(page.url()).pathname.split("/")[2] ?? "";
+  await expect
+    .poll(
+      async () => {
+        const response = await page.request.get(`/api/experiments/${id}`);
+        return ((await response.json()) as { status: string }).status;
+      },
+      { timeout: 15_000 },
+    )
+    .toBe("ready");
   const network = page.getByRole("img", { name: "Protein network in 3D. Drag to rotate." });
   await expect(network).toBeVisible({ timeout: 15_000 });
   // Tag the network's element; if a step change rebuilt the network, the tag would be gone.
