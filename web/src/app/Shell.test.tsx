@@ -36,7 +36,7 @@ describe("Shell", () => {
       const title = titleOf(slug);
       const intro = copy.steps[stepSlugs.indexOf(slug)]?.intro ?? "";
       // Let the Experiment load, so the step's own figure is on screen too.
-      await screen.findAllByText(copy.disclaimer);
+      await screen.findByRole("link", { name: copy.evaluation.title });
 
       expect(screen.getAllByRole("heading", { name: title })).toHaveLength(1);
       expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
@@ -44,11 +44,6 @@ describe("Shell", () => {
       expectOnStep(slug);
       // The title appears in the heading and as the plain nav label, nowhere else.
       expect(screen.getAllByText(title)).toHaveLength(2);
-    });
-
-    it("shows the disclaimer exactly once", () => {
-      renderAt(`${E}/${slug}`);
-      expect(screen.getAllByText(copy.disclaimer)).toHaveLength(1);
     });
 
     it("labels the header buttons exactly Back and Next, with no step counter", () => {
@@ -78,8 +73,8 @@ describe("Shell", () => {
     const router = renderAt(`${E}/candidates`);
 
     await user.click(screen.getByRole("button", { name: copy.next }));
-    expectOnStep("evidence");
-    expect(router.state.location.pathname).toBe(`${E}/evidence`);
+    expectOnStep("jury");
+    expect(router.state.location.pathname).toBe(`${E}/jury`);
 
     await user.click(screen.getByRole("button", { name: copy.back }));
     await user.click(screen.getByRole("button", { name: copy.back }));
@@ -140,7 +135,6 @@ describe("Landing page", () => {
 
     await user.keyboard("{ArrowDown}");
     expect(router.state.location.pathname).toBe("/");
-    expect(screen.getAllByText(copy.disclaimer)).toHaveLength(1);
   });
 });
 
@@ -178,6 +172,5 @@ describe("Unknown routes", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: copy.notFound.home })).toHaveAttribute("href", "/");
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
-    expect(screen.getAllByText(copy.disclaimer)).toHaveLength(1);
   });
 });

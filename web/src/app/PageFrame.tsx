@@ -13,11 +13,10 @@ interface PageFrameProps {
 
 /**
  * The frame of every screen: a header that starts with the product name, the main area, and a
- * footer with the disclaimer, which docs/design.md requires once on every screen, and the link to
- * the evaluation. Rendering them here is what keeps each to exactly once.
+ * footer with the link to the evaluation. Rendering them here is what keeps each to exactly once.
  */
 export function PageFrame({ header, flow = "fit", children }: PageFrameProps) {
-  // The evaluation's link sits in every footer but its own page's, where the title says it.
+  // The evaluation's page has no footer: its title already says where you are.
   const onEvaluation = useMatch("/evaluation") !== null;
   return (
     <div className={styles.page} data-flow={flow}>
@@ -28,14 +27,13 @@ export function PageFrame({ header, flow = "fit", children }: PageFrameProps) {
         {header}
       </header>
       <main className={styles.main}>{children}</main>
-      <footer className={styles.footer}>
-        <p className={styles.disclaimer}>{copy.disclaimer}</p>
-        {!onEvaluation && (
+      {!onEvaluation && (
+        <footer className={styles.footer}>
           <Link to="/evaluation" className={styles.evaluation}>
             {copy.evaluation.title}
           </Link>
-        )}
-      </footer>
+        </footer>
+      )}
     </div>
   );
 }

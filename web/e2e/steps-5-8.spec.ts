@@ -7,11 +7,8 @@ import { expect, test } from "./console";
  * Experiment. Wording comes from web/src/copy/en.ts; model names come from the API.
  */
 
-const DISCLAIMER = /^For learning only\./;
-
 async function expectStep(page: Page, title: string) {
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
-  await expect(page.getByText(DISCLAIMER)).toHaveCount(1);
 }
 
 /** Creates a COVID-19 Experiment through the API and waits until it is ready. */
@@ -203,7 +200,7 @@ test("a student shows baricitinib's binding pose and checks it against the cryst
   expect(await liveContexts(page)).toBe(2);
 
   // Leaving the step releases the pose's context, once the step's transition has played.
-  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByRole("link", { name: "Saved experiments", exact: true }).click();
   await expectStep(page, "Saved experiments");
   await expect(view).toHaveCount(0);
   await expect.poll(() => liveContexts(page)).toBe(1);

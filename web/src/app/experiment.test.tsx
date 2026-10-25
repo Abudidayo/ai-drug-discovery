@@ -129,7 +129,6 @@ describe("An Experiment that isn't ready", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: copy.experiment.notFound.title }),
     ).toBeInTheDocument();
-    expect(screen.getAllByText(copy.disclaimer)).toHaveLength(1);
   });
 
   it("says it is waiting while queued", async () => {

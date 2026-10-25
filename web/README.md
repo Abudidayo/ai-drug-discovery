@@ -12,17 +12,17 @@ npm ci
 npm run dev        # http://localhost:5173, with /api proxied to FastAPI on 127.0.0.1:8000
 ```
 
-| Script                    | What it does                                                                 |
-| ------------------------- | ---------------------------------------------------------------------------- |
-| `dev`                     | Vite dev server with the `/api` proxy                                        |
-| `build`                   | Type-checks, then builds to `dist/`                                          |
-| `preview`                 | Serves `dist/` (also proxies `/api`)                                         |
-| `typecheck`               | `tsc -b`                                                                     |
-| `lint`                    | ESLint (typescript-eslint, react-hooks, jsx-a11y), no warnings allowed       |
-| `format` / `format:check` | Prettier                                                                     |
-| `test`                    | Vitest with jsdom, Testing Library and MSW                                   |
-| `e2e`                     | Playwright: starts the fixture API and `vite preview`, walks steps 1-6 and 8 |
-| `gen:api`                 | Regenerates `src/api/schema.d.ts` from `../api/openapi.json`                 |
+| Script                    | What it does                                                            |
+| ------------------------- | ----------------------------------------------------------------------- |
+| `dev`                     | Vite dev server with the `/api` proxy                                   |
+| `build`                   | Type-checks, then builds to `dist/`                                     |
+| `preview`                 | Serves `dist/` (also proxies `/api`)                                    |
+| `typecheck`               | `tsc -b`                                                                |
+| `lint`                    | ESLint (typescript-eslint, react-hooks, jsx-a11y), no warnings allowed  |
+| `format` / `format:check` | Prettier                                                                |
+| `test`                    | Vitest with jsdom, Testing Library and MSW                              |
+| `e2e`                     | Playwright: starts the fixture API and `vite preview`, walks every step |
+| `gen:api`                 | Regenerates `src/api/schema.d.ts` from `../api/openapi.json`            |
 
 `VITE_API_BASE` sets the API's origin (default: the page's own origin, whose `/api` Vite proxies).
 `OXHACK_API_ORIGIN` points the dev and preview proxies at an API other than
@@ -40,7 +40,7 @@ Locally it reuses servers already running on ports 8000 and 4173; `E2E_API_PORT`
 - `src/copy/en.ts`: the copy deck. Every interface sentence lives here. Text that depends on the
   Disease (evidence, objections, model names) comes from the API instead.
 - `src/app/Shell.tsx`: header (product, Disease, step navigation, Back and Next), step title and
-  intro, then the figure. `PageFrame.tsx` renders the disclaimer once on every screen.
+  intro, then the figure. `PageFrame.tsx` renders the footer link to the evaluation once on every screen.
 - `src/app/routes.tsx`: `/` is step 1 before any Experiment; `/e/:experimentId/:step` uses the
   step slugs from the copy deck; anything else is not found.
 - `src/api/client.ts`: the `openapi-fetch` client, typed by the generated `schema.d.ts`. Don't

@@ -34,7 +34,7 @@ describe("Step 5, Model jury", () => {
     const user = userEvent.setup();
     renderApp(`${E}/jury`);
     const ask = await screen.findByRole("button", { name: copy.jury.ask });
-    expectOnce(copy.jury.panel("Claude Sonnet 5, GPT-5.4 and GLM-5.3"), copy.disclaimer);
+    expectOnce(copy.jury.panel("Claude Sonnet 5, GPT-5.4 and GLM-5.3"));
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
 
     await user.click(ask);
@@ -62,7 +62,6 @@ describe("Step 5, Model jury", () => {
       "Blocking JAK1 may also weaken the body's early antiviral defence, so early in infection it could do harm.",
       copy.jury.retried(1),
       copy.jury.rank,
-      copy.disclaimer,
     );
     // Each row's ranks are readable without the picture.
     expect(
@@ -208,7 +207,6 @@ describe("Step 6, Compare", () => {
       copy.compare.approval,
       copy.evidence.warningTitle,
       copy.compare.dockable,
-      copy.disclaimer,
     );
     // No jury yet, so no decision row.
     expect(screen.queryByRole("rowheader", { name: copy.compare.decision })).toBeNull();
@@ -340,7 +338,6 @@ describe("Step 7, Binding pose", () => {
       ANTIBODIES,
       copy.pose.legend.protein,
       copy.pose.legend.drug,
-      copy.disclaimer,
     );
     expect(screen.getByText(/^0\.74/)).toHaveAttribute("data-fixture", "true");
     // Plain words: the program and the statistic are never named.
@@ -494,7 +491,6 @@ describe("Step 8, Saved experiments", () => {
     expectOnce(
       copy.history.current,
       copy.history.data(["Open Targets 26.09", "ChEMBL 37", "STRING 12.5"]),
-      copy.disclaimer,
     );
     expect(within(open).getByRole("link", { name: "COVID-19" })).toHaveAttribute(
       "href",

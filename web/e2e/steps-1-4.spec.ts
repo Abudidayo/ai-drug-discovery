@@ -2,17 +2,11 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./console";
 
 /*
- * Walks steps 1 to 4 against the real API in fixture mode (COVID-19), the plan's first working
- * demonstration: search, create, watch the build, then biology, candidate drugs and evidence,
+ * Walks the network steps against the real API in fixture mode (COVID-19), the plan's first
+ * working demonstration: search, create, watch the build, then biology, candidate drugs and evidence,
  * including the drugs whose closeness can't be measured, the one that can't be placed on the
  * network, and an antibody with no 3D model. Wording comes from web/src/copy/en.ts.
  */
-
-const DISCLAIMER = /^For learning only\./;
-
-async function expectDisclaimerOnce(page: Page) {
-  await expect(page.getByText(DISCLAIMER)).toHaveCount(1);
-}
 
 async function expectStep(page: Page, title: string) {
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
@@ -20,7 +14,6 @@ async function expectStep(page: Page, title: string) {
     "aria-current",
     "step",
   );
-  await expectDisclaimerOnce(page);
 }
 
 test("a student walks from choosing COVID-19 to the evidence for baricitinib", async ({ page }) => {
@@ -72,8 +65,8 @@ test("a student walks from choosing COVID-19 to the evidence for baricitinib", a
   await expect(page.getByText("Remdesivir", { exact: true })).toBeVisible();
   await expect(page.getByText(/^None of this drug’s targets are human proteins/)).toHaveCount(1);
 
-  // Step 4: the known-answer drug's evidence.
-  await page.getByRole("button", { name: "Next", exact: true }).click();
+  // The known-answer drug's evidence, which the steps place just before the saved experiments.
+  await page.getByRole("link", { name: "Evidence", exact: true }).click();
   await expectStep(page, "Evidence");
   await expect(page.getByRole("heading", { level: 2, name: "Baricitinib" })).toBeVisible();
   await expect(page.getByRole("img", { name: "Baricitinib in 3D. Drag to rotate." })).toBeVisible();
@@ -94,7 +87,6 @@ test("a student walks from choosing COVID-19 to the evidence for baricitinib", a
   await expect(page.getByRole("img", { name: "Tocilizumab in 3D. Drag to rotate." })).toHaveCount(
     0,
   );
-  await expectDisclaimerOnce(page);
 });
 
 test("the network persists across steps instead of being rebuilt", async ({ page }) => {
@@ -110,7 +102,7 @@ test("the network persists across steps instead of being rebuilt", async ({ page
 
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Candidate drugs");
-  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByRole("link", { name: "Evidence", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Evidence");
   await expect(network).toHaveAttribute("data-marker", "first");
 });
@@ -122,6 +114,5 @@ test.describe("an unknown Experiment", () => {
   test("says so plainly", async ({ page }) => {
     await page.goto("/e/00000000-0000-4000-8000-000000000000/biology");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Experiment not found");
-    await expectDisclaimerOnce(page);
   });
 });

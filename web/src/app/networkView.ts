@@ -19,7 +19,7 @@ const NEUTRAL: NetworkView = {
 /**
  * What the network shows on each step (docs/design.md: each step highlights only what it is
  * about): disease proteins on steps 1 and 2, the candidates' targets on step 3, and the route
- * from the focus drug to a disease protein on step 4. A hovered row narrows that emphasis.
+ * from the focus drug to a disease protein on the evidence step. A hovered row narrows that emphasis.
  */
 export function networkView(
   step: StepSlug,

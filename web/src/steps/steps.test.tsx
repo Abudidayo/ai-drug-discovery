@@ -35,7 +35,7 @@ describe("Step 1, Choose a disease, with an Experiment", () => {
     renderApp(`${E}/disease`);
     await ready();
     expect(screen.getByRole("searchbox")).toHaveValue("COVID-19");
-    expectOnce(copy.legend.disease, copy.disclaimer);
+    expectOnce(copy.legend.disease);
     // The search lists the Disease, so the header doesn't name it again.
     expect(within(screen.getByRole("banner")).queryByText("COVID-19")).not.toBeInTheDocument();
   });
@@ -85,7 +85,6 @@ describe("Step 2, Its biology", () => {
       copy.legend.disease,
       copy.legend.link,
       "COVID-19",
-      copy.disclaimer,
     );
   });
 
@@ -136,7 +135,6 @@ describe("Step 3, Candidate drugs", () => {
       copy.legend.drug,
       copy.legend.both,
       "COVID-19",
-      copy.disclaimer,
     );
     // Closeness sits on the drug's own row.
     const row = screen.getByTestId("slope-row-CHEMBL2105759");
@@ -240,7 +238,6 @@ describe("Step 4, Evidence", () => {
       copy.legend.drug,
       copy.legend.path,
       "COVID-19",
-      copy.disclaimer,
     );
     const facts = screen.getByRole("list", { name: copy.evidence.listLabel });
     expect(within(facts).getAllByRole("listitem")).toHaveLength(6);
@@ -380,10 +377,11 @@ describe("Step 4, Evidence", () => {
     expectOnce(copy.evidence.route.via("Dexamethasone", "NR3C1", "IFNAR2", "STAT1"));
   });
 
-  it("keeps the evidence list when there are no recorded warnings, without calling it safe", async () => {
+  it("keeps the evidence list and shows no warning box when there are no recorded warnings", async () => {
     renderApp(`${E}/evidence?drug=CHEMBL2103830`);
     await ready();
-    expectOnce(copy.evidence.noWarnings);
+    expect(screen.getByRole("list", { name: copy.evidence.listLabel })).toBeInTheDocument();
     expect(screen.queryByText(copy.evidence.warningTitle)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\bsafe\b/)).not.toBeInTheDocument();
   });
 });

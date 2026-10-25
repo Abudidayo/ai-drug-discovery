@@ -31,15 +31,15 @@ function angstrom(value: number): string {
 
 export const copy = {
   product: "Drug repurposing explorer",
-  disclaimer:
-    "For learning only. Rankings, AI reviews and binding poses are hypotheses from public data and computer models, and may be wrong. Not medical advice.",
   back: "Back",
   next: "Next",
   stepsLabel: "Steps",
   retry: "Try again",
 
   /**
-   * The eight steps of plan.md §2, in order. `slug` is the URL segment in `/e/:experimentId/:step`.
+   * The eight steps of plan.md §2, in order, except that Evidence sits just before Saved
+   * experiments, so the main path runs from the candidates straight to the jury. `slug` is the URL
+   * segment in `/e/:experimentId/:step`.
    * Intros never name the Disease: the header already shows it once.
    */
   steps: [
@@ -59,11 +59,6 @@ export const copy = {
       intro: "Approved drugs whose targets are closely tied to the disease’s proteins.",
     },
     {
-      slug: "evidence",
-      title: "Evidence",
-      intro: "What we know about each drug, and where each claim comes from.",
-    },
-    {
       slug: "jury",
       title: "Model jury",
       intro: "AI models judged the same evidence without seeing our ranking.",
@@ -77,6 +72,11 @@ export const copy = {
       slug: "pose",
       title: "Binding pose",
       intro: "How a drug might fit into its target protein, from a real crystal structure.",
+    },
+    {
+      slug: "evidence",
+      title: "Evidence",
+      intro: "What we know about each drug, and where each claim comes from.",
     },
     {
       slug: "history",
@@ -185,7 +185,6 @@ export const copy = {
       reactome: "Reactome",
     } satisfies Record<EvidenceSource, string>,
     warningTitle: "Label warning",
-    noWarnings: "No label warnings are recorded. That doesn’t mean the drug is safe.",
     missingTitle: "Not yet known",
     pathTitle: "Why it ranks high",
     /** For a drug that has a route but wasn't shortlisted for its closeness. */

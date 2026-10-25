@@ -16,7 +16,7 @@ Jessica's concern that Figure was not professional enough is addressed by the re
 
 ## Principles
 
-1. **One step, one figure.** A step is a single composition of at most three panels on white paper. There is no chrome beyond the header and the disclaimer.
+1. **One step, one figure.** A step is a single composition of at most three panels on white paper. There is no chrome beyond the header and the footer link to the evaluation.
 2. **Say everything once.** A fact, label, warning or explanation appears in one place per screen. The step name appears only as the page title, and the navigation shows the current step by its state alone. Buttons read "Back" and "Next" and never repeat the next step's name. There are no eyebrows, no "step N of 8" counters and no captions that restate the panels.
 3. **Plain words.** Students should never meet a term without its meaning. All interface copy comes from one copy deck (`web/src/copy/en.ts`). Text that depends on the Disease, such as evidence statements and juror objections, comes from the API. Statistics get plain names and a one-line explanation, shown once:
 
@@ -29,7 +29,7 @@ Jessica's concern that Figure was not professional enough is addressed by the re
 
    Model names come from the Experiment's jury configuration (the API's `display_name`) and are never hard-coded. Database identifiers are not shown, except the disease ID as quiet secondary text in search results.
 4. **3D where it explains.** The protein network, the molecule and the binding pose are real WebGL. They are drawn in the same flat, outlined, print-like style as the charts, so they read as part of the figure rather than as decoration.
-5. **Honest limits.** Rankings, the jury and poses are hypotheses. The disclaimer appears once on every screen. A missing value is shown as missing; it is never scored as zero and never labelled safe.
+5. **Honest limits.** Rankings, the jury and poses are hypotheses, and each step says so where it matters (the pose caveat, the jury's agreement note). There is no blanket disclaimer. A missing value is shown as missing; it is never scored as zero and never labelled safe. When a drug has no recorded label warnings, the warning box is left out rather than replaced with a note.
 
 ## Tokens
 

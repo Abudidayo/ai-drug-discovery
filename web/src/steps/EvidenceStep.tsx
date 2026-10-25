@@ -81,13 +81,7 @@ function MoleculePanel({ candidate }: { candidate: Candidate }) {
 }
 
 function WarningBox({ candidate }: { candidate: Candidate }) {
-  if (candidate.warnings.length === 0) {
-    return (
-      <div className={styles.noWarning} role="note">
-        <p>{copy.evidence.noWarnings}</p>
-      </div>
-    );
-  }
+  if (candidate.warnings.length === 0) return null;
   const cited = new Set(candidate.warnings.map((warning) => warning.evidence_id));
   const sources = new Map<string, EvidenceItem>();
   for (const item of candidate.evidence) {
@@ -114,7 +108,7 @@ function WarningBox({ candidate }: { candidate: Candidate }) {
 }
 
 /**
- * Step 4: one drug's evidence. The molecule in 3D (or a plain line for antibodies), the sourced
+ * The evidence step: one drug's evidence. The molecule in 3D (or a plain line for antibodies), the sourced
  * facts with links, and its label warnings, said once in the warning box and never repeated as
  * a fact. Hovering a fact points at the proteins it names in the network.
  */
