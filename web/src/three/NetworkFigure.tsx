@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import type { NetworkGraph } from "../api/types";
 import { copy } from "../copy/en";
 import { NetworkScene, type NetworkView } from "./networkScene";
@@ -24,13 +24,16 @@ export function NetworkFigure({ graph, view }: NetworkFigureProps) {
   const viewRef = useRef(view);
   const webgl = canUseWebGL();
 
-  useEffect(() => {
+  // Laid out and drawn as the graph is committed, not after: when another Disease's network
+  // replaces this one, the new one is on screen in the same frame as the rest of the page.
+  useLayoutEffect(() => {
     const host = hostRef.current;
     const labels = labelsRef.current;
     if (!webgl || !host || !labels) return;
     const scene = NetworkScene.create(host, styles.canvas ?? "", labels, graph);
     if (scene === null) return;
     scene.setView(viewRef.current);
+    scene.draw();
     sceneRef.current = scene;
     return () => {
       scene.dispose();

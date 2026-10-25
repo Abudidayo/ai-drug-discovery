@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { delay, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { copy } from "../copy/en";
 import { covidExperiment, EXPERIMENT_ID } from "../test/fixtures";
@@ -31,10 +32,13 @@ describe("Choosing a disease", () => {
     });
     expect(fakeApi.created).toBe(created + 1);
     expect(screen.getByText(copy.search.common)).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: /COVID-19/ })).toHaveAttribute(
-      "aria-current",
-      "true",
-    );
+    // The router has moved on before its screen is drawn, so wait for the mark.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /COVID-19/ })).toHaveAttribute(
+        "aria-current",
+        "true",
+      );
+    });
     expect(
       await screen.findByRole("img", { name: copy.network.label }, { timeout: 3000 }),
     ).toBeInTheDocument();
@@ -142,6 +146,56 @@ describe("Choosing a disease", () => {
     expect(await screen.findByText(copy.search.createFailed)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: copy.retry })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/");
+  });
+
+  it("swaps in a saved disease in place, with no loading and no new list", async () => {
+    const psoriasisId = "5c3e9a10-7d2b-4f6e-8a41-0b9c2d7e6f13";
+    const psoriasis = {
+      ...covidExperiment("ready", null, psoriasisId),
+      disease: { id: "MONDO_0005083", name: "psoriasis" },
+      created_at: "2026-10-25T09:00:00Z",
+    };
+    serveExperiment(covidExperiment());
+    serveExperiment(psoriasis);
+    let fetched = 0;
+    server.use(
+      http.get("/api/diseases/common", ({ response }) =>
+        response(200).json({
+          items: [{ id: covidExperiment().disease.id, name: "COVID-19" }, psoriasis.disease],
+        }),
+      ),
+      // Slow enough that a screen shown before its Experiment arrived would be caught empty.
+      http.untyped.get(`*/api/experiments/${psoriasisId}`, async () => {
+        fetched += 1;
+        await delay(150);
+        return HttpResponse.json(psoriasis);
+      }),
+    );
+    const created = fakeApi.created;
+    const user = userEvent.setup();
+    const { router } = renderApp(`${E}/disease`);
+    const box = await loadedSearchbox();
+    const network = await screen.findByRole("img", { name: copy.network.label });
+    const option = screen.getByRole("button", { name: /psoriasis/ });
+
+    await user.click(option);
+    // Busy from the click until its screen is drawn.
+    expect(option).toHaveAttribute("aria-busy", "true");
+    await waitFor(() => {
+      expect(option).toHaveAttribute("aria-current", "true");
+    });
+
+    // Its screen showed the saved Experiment at once, fetched before it opened: the same search
+    // box and list (never remounted, so never emptied), only the mark moved, and its network
+    // redrawn in the same plate (never taken away while loading).
+    expect(router.state.location.pathname).toBe(`/e/${psoriasisId}/disease`);
+    expect(fetched).toBe(1);
+    expect(option).not.toHaveAttribute("aria-busy");
+    expect(screen.getByRole("button", { name: /COVID-19/ })).not.toHaveAttribute("aria-current");
+    expect(box).toBeInTheDocument();
+    expect(box).toHaveValue("psoriasis");
+    expect(network).toBeInTheDocument();
+    expect(fakeApi.created).toBe(created);
   });
 
   it("marks the current Experiment's disease, and choosing it again changes nothing", async () => {

@@ -20,7 +20,7 @@ export function StepFigure() {
   const ready = experiment?.status === "ready" ? experiment : undefined;
   switch (step) {
     case "disease":
-      return <DiseaseSearch key={experiment?.id} current={experiment} />;
+      return <DiseaseSearch current={experiment} />;
     case "biology": {
       // Drawn as soon as the build has saved the Targets, before the drugs are ready.
       const drawn = ready ?? (experiment && hasEarlyResult(experiment) ? experiment : undefined);

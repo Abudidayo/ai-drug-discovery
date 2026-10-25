@@ -1,4 +1,13 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useTransition,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { useNavigate } from "react-router";
 import { isBuilding, useCommonDiseases, useDiseaseSearch, useOpenDisease } from "../api/queries";
 import type { Experiment } from "../api/types";
@@ -42,15 +51,24 @@ interface DiseaseSearchProps {
  * Step 1: choose a Disease. Until something is typed the list holds well-known Diseases (the
  * current one marked); typing searches every Disease instead. Choosing one stays on this step and
  * shows its network: a saved Experiment for it when there is one, else a new one as it builds.
- * Next then carries on with whichever Disease is shown.
+ * Next then carries on with whichever Disease is shown. The search stays mounted while the
+ * Disease on screen changes, so the list, its scroll and focus stay put and only the mark moves.
  */
 export function DiseaseSearch({ current, preload = false }: DiseaseSearchProps) {
-  const [query, setQuery] = useState(current?.disease.name ?? "");
+  const name = current?.disease.name ?? "";
+  const [query, setQuery] = useState(name);
+  // The box holds the Disease on screen: when another one comes on screen, the box follows it.
+  const [shown, setShown] = useState(name);
+  if (shown !== name) {
+    setShown(name);
+    setQuery(name);
+  }
   const searching = query.trim() !== "" && query !== current?.disease.name;
   const search = useDiseaseSearch(searching ? query : "");
   const common = useCommonDiseases();
   const open = useOpenDisease();
   const navigate = useNavigate();
+  const [navigating, startNavigation] = useTransition();
   const listId = useId();
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -60,13 +78,23 @@ export function DiseaseSearch({ current, preload = false }: DiseaseSearchProps) 
   const marking = searching ? query.trim() : "";
 
   const { mutate } = open;
-  const choose = (diseaseId: string, replace = false) => {
+  // The chosen Disease stays busy until its screen is drawn, not just until it is opened.
+  const opening = open.isPending || navigating ? open.variables : undefined;
+  const show = useCallback(
+    (experimentId: string, replace: boolean) => {
+      startNavigation(async () => {
+        await navigate(stepPath(experimentId, "disease") ?? HOME_PATH, { replace });
+      });
+    },
+    [navigate],
+  );
+  const choose = (diseaseId: string) => {
     if (current?.disease.id === diseaseId) return;
     // A mutation's own callbacks never run once this page has gone, so a choice made while
     // the first common Disease is still opening wins.
     mutate(diseaseId, {
       onSuccess: (experimentId) => {
-        void navigate(stepPath(experimentId, "disease") ?? HOME_PATH, { replace });
+        show(experimentId, false);
       },
     });
   };
@@ -78,10 +106,10 @@ export function DiseaseSearch({ current, preload = false }: DiseaseSearchProps) 
     preloaded.current = true;
     mutate(first, {
       onSuccess: (experimentId) => {
-        void navigate(stepPath(experimentId, "disease") ?? HOME_PATH, { replace: true });
+        show(experimentId, true);
       },
     });
-  }, [preload, first, mutate, navigate]);
+  }, [preload, first, mutate, show]);
 
   const options = () => [...(listRef.current?.querySelectorAll("button") ?? [])];
 
@@ -162,7 +190,7 @@ export function DiseaseSearch({ current, preload = false }: DiseaseSearchProps) 
         <ul id={listId} ref={listRef} className={styles.results} onKeyDown={onListKey}>
           {results.map((result) => {
             const isCurrent = current?.disease.id === result.id;
-            const busy = open.isPending && open.variables === result.id;
+            const busy = opening === result.id;
             return (
               <li key={result.id}>
                 <button
@@ -170,7 +198,7 @@ export function DiseaseSearch({ current, preload = false }: DiseaseSearchProps) 
                   className={styles.option}
                   aria-current={isCurrent ? "true" : undefined}
                   aria-busy={busy || undefined}
-                  disabled={open.isPending}
+                  disabled={opening !== undefined}
                   onClick={() => {
                     choose(result.id);
                   }}

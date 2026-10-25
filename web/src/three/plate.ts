@@ -125,6 +125,11 @@ export interface Plate {
   reducedMotion(): boolean;
   /** Called before each rendered frame with the seconds since the last one. */
   onFrame(callback: (seconds: number) => void): void;
+  /**
+   * Draws a frame now rather than on the next animation frame, so a new plate is never blank
+   * on screen: a view transition, say, captures the page before that frame.
+   */
+  draw(): void;
   /** CSS pixels per world unit at the origin's depth. */
   pixelsPerUnit(): number;
   /** Projects a world point to canvas pixels. */
@@ -215,14 +220,17 @@ export function createPlate(host: HTMLElement, canvasClass: string): Plate | nul
   });
   intersectionObserver.observe(canvas);
 
+  const render = (seconds: number) => {
+    if (width === 0 || height === 0) return;
+    for (const callback of callbacks) callback(seconds);
+    renderer.render(scene, camera);
+  };
   const loop = (now: number) => {
     frame = requestAnimationFrame(loop);
     const seconds = Math.min(0.05, (now - last) / 1000);
     last = now;
     if (!visible || document.hidden) return;
-    if (width === 0 || height === 0) return;
-    for (const callback of callbacks) callback(seconds);
-    renderer.render(scene, camera);
+    render(seconds);
   };
   frame = requestAnimationFrame(loop);
 
@@ -235,6 +243,10 @@ export function createPlate(host: HTMLElement, canvasClass: string): Plate | nul
     reducedMotion: motion.reduced,
     onFrame: (callback) => {
       callbacks.push(callback);
+    },
+    draw: () => {
+      resize();
+      render(0);
     },
     pixelsPerUnit: () => height / 2 / (camera.position.z * TAN_HALF_FOV),
     project: (point) => {

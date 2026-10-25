@@ -239,6 +239,11 @@ export class NetworkScene {
     this.setDrug(view.mode === "path" ? view.drug : null);
   }
 
+  /** Draws the current view now; see `Plate.draw`. */
+  draw(): void {
+    this.plate.draw();
+  }
+
   dispose(): void {
     this.drag.dispose();
     this.plate.dispose();

@@ -69,7 +69,8 @@ export function useCommonDiseases() {
 /**
  * Opens a Disease and resolves to the Experiment to show for it: the newest active one that is
  * ready or still building, so its network can show at once, or else a new one, which starts
- * building. Choosing a Disease twice never builds it twice.
+ * building. Choosing a Disease twice never builds it twice. Either way the Experiment is in the
+ * cache before this resolves, so its screen draws it straight away instead of loading it again.
  */
 export function useOpenDisease() {
   const queryClient = useQueryClient();
@@ -81,7 +82,12 @@ export function useOpenDisease() {
       const reuse = saved.items.find(
         (item) => item.disease.id === diseaseId && item.status !== "failed",
       );
-      if (reuse !== undefined) return reuse.id;
+      if (reuse !== undefined) {
+        // A copy already cached will do: its screen refreshes it once shown.
+        const { queryKey, queryFn } = experimentQuery(reuse.id);
+        await queryClient.query({ queryKey, queryFn, staleTime: "static" });
+        return reuse.id;
+      }
       const experiment = await unwrap(
         api.POST("/api/experiments", { body: { disease_id: diseaseId } }),
       );
@@ -125,8 +131,8 @@ function isWorking(experiment: Experiment): boolean {
  * One Experiment, polled every second while it is queued or building, and every two seconds
  * while its jury or a docking job works.
  */
-export function useExperiment(id: string) {
-  return useQuery({
+function experimentQuery(id: string) {
+  return queryOptions({
     queryKey: queryKeys.experiment(id),
     queryFn: ({ signal }) =>
       unwrap(
@@ -142,6 +148,10 @@ export function useExperiment(id: string) {
       return isWorking(experiment) ? WORK_POLL_MS : false;
     },
   });
+}
+
+export function useExperiment(id: string) {
+  return useQuery(experimentQuery(id));
 }
 
 /**
