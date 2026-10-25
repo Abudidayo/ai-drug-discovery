@@ -2,6 +2,10 @@
 /graft/
 # Local secrets (see .env.example).
 .env
+
+# Downloaded source data (Open Targets, ChEMBL, STRING): cached locally, never committed.
+/data/
+
 # Python caches and local virtual environments.
 __pycache__/
 *.py[cod]
