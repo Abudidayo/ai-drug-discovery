@@ -111,7 +111,7 @@ def test_fixture_shapes_and_real_measurements(inputs, sources):
     # only the fictional measurements. Approval can select another real regulator.
     actual = {(e['kind'], e['source_id']): e for e in packet['evidence']}
     for sample in fixture_packet['evidence']:
-        if sample['kind'] in {'approval', 'network_path'}:
+        if sample['kind'] in {'approval', 'network_path', 'pathway'}:
             continue
         item = actual[sample['kind'], sample['source_id']]
         assert item['values'].keys() == sample['values'].keys()
@@ -442,3 +442,16 @@ def test_obsolete_uniprot_ids_use_a2_index(sources):
     sources.table = lambda _: relation.project(
         "id, list_transform(proteinIds, lambda p: {'id': p.id, 'source': 'uniprot_obsolete'}) as proteinIds")
     assert sources.map_target('CHEMBL2835', single=True) == {'ENSG00000162434'}
+
+
+def test_optional_pathways_update_candidates_and_count_unmapped(inputs, sources):
+    from pipeline.pathways import load_pathways
+    pathways, _ = load_pathways(Path(__file__).parent/'data/pathways/Ensembl2Reactome.tsv')
+    coverage = {}
+    updates, packet = build(inputs, sources, pathways=pathways, pathway_release='reactome-97', coverage=coverage)
+    items = {e['id']:e for e in packet['evidence']}
+    assert sum(e['kind']=='pathway' for e in items.values()) == 1
+    assert coverage['pathways']['unmapped_items'] > 0
+    for update in updates:
+        candidate = next(c for c in packet['candidates'] if c['candidate_id']==update['candidate_id'])
+        assert update['evidence']==[items[e] for e in candidate['evidence_ids']]

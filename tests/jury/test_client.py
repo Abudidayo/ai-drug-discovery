@@ -55,7 +55,7 @@ def test_seeded_orders_and_output_shape():
     assert set(result) == set(FIXTURE)
     assert result["jury"] == {**CONFIG, 'prompt_version': PROMPT_VERSION,
                               'reasoning_effort': {model: None for model in CONFIG['models']}}
-    assert PROMPT_VERSION == 'jury-v5'
+    assert PROMPT_VERSION == 'jury-v6'
     assert len(result["jurors"]) == 3
     for i, j in enumerate(result["jurors"]):
         order = [c["label"] for c in PACKET["candidates"]]

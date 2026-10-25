@@ -128,7 +128,7 @@ NUMERIC_TARGET_ALIASES = {'ENSG00000001626': ['ABC35', 'ABCC7', 'MRP7', 'dJ760C5
                      'FAME2', 'alpha-2BAR']}
 
 DECISIONS = {"investigate", "watch", "deprioritise"}
-PROMPT_VERSION = "jury-v5"
+PROMPT_VERSION = "jury-v6"
 DIRECTIONS = {"supported", "contradicted", "unknown"}
 SAFETY = {"warnings_recorded", "unknown"}
 RESPONSE_FORMAT = {
@@ -243,6 +243,7 @@ treatment evidence. The graph is undirected: path order says nothing about signa
 direction or whether the drug's action would help or harm. A zero-hop path means
 the drug Target is itself a Disease Target. The STRING page is a protein-network
 view, not an edge-level citation or a reproduction of the direct-experiment filter.
+Each pathway item means that a drug Target and one of the fifty highest-associated Disease Targets share a lowest-level Reactome pathway; shared membership does not establish effect, causality, direction, benefit or treatment evidence.
 Every quoted measurement in rationale or objection must equal a numeric value in the
 values of evidence cited by that review. Do not derive, round, convert to percentages,
 or invent numbers. Include E IDs for measurements in objections too, using

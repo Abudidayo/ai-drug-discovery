@@ -326,7 +326,8 @@ class EvidenceSources:
 
 def build_evidence_packet(disease, candidate_ids, disease_targets, drug_targets, *,
                           experiment_id, shuffle_seed=7, data_dir="data", offline=False,
-                          sources=None, releases=None, coverage=None):
+                          sources=None, releases=None, coverage=None,
+                          pathways=None, pathway_release=None):
     """Return fixture-shaped Candidate enrichments and the stored jury packet.
 
     disease is {id, name}; inputs use fixtures/disease_targets.json and
@@ -485,6 +486,66 @@ def build_evidence_packet(disease, candidate_ids, disease_targets, drug_targets,
     packet = {"experiment_id": str(experiment_id), "disease": {"id": disease["id"], "name": disease["name"]},
               "releases": list(dict.fromkeys(releases or drug_targets["releases"])),
               "candidates": packet_candidates, "evidence": list(evidence.values())}
+    pathway_coverage = {}
+    if pathways is not None:
+        packet = add_pathways(packet, disease_targets, pathways, release=pathway_release, coverage=pathway_coverage)
+        by_id = {c["candidate_id"]: c for c in packet["candidates"]}
+        items = {e["id"]: e for e in packet["evidence"]}
+        for update in updates:
+            update["evidence"] = [deepcopy(items[e]) for e in by_id[update["candidate_id"]]["evidence_ids"]]
     if coverage is not None:
         coverage.update(sources.coverage)
+        if pathways is not None:
+            coverage["pathways"] = pathway_coverage
     return updates, packet
+
+
+def add_pathways(packet, disease_targets, pathways, *, release, coverage=None):
+    """Append at most three smallest shared lowest-level pathways per Candidate."""
+    from pipeline.pathways import memberships
+    if not re.fullmatch(r'reactome-[0-9]+', release):
+        raise ValueError('Expected a numbered Reactome release')
+    if disease_targets['release'] != OT_RELEASE:
+        raise ValueError('Expected Open Targets 26.09 Disease Targets')
+    if disease_targets['disease_id'] != packet['disease']['id']:
+        raise ValueError('Pathway Disease mismatch')
+    if any(e['kind'] == 'pathway' for e in packet['evidence']):
+        raise ValueError('Packet already has pathway evidence')
+    top = {t['target_id'] for t in disease_targets['targets'][:50]}
+    result = deepcopy(packet)
+    evidence = {}
+    next_id = max((int(e['id'][1:]) for e in result['evidence']), default=0) + 1
+    mapped_genes = set().union(*(p['genes'] for p in pathways.values())) if pathways else set()
+    rejected = [{'disease_id': packet['disease']['id'], 'target_id': gene,
+                 'status': 'unmapped', 'reason': 'no_Reactome_gene_membership'}
+                for gene in sorted(top - mapped_genes)]
+    for candidate in sorted(result['candidates'], key=lambda c: c['candidate_id']):
+        genes = {t['id'] for t in candidate['targets']}
+        for gene in sorted(genes - mapped_genes):
+            rejected.append({'candidate_id': candidate['candidate_id'], 'target_id': gene,
+                             'status': 'unmapped', 'reason': 'no_Reactome_gene_membership'})
+        for pid, row in memberships(pathways, genes, top):
+            if pid not in evidence:
+                n = len(row['genes'])
+                # The same pathway record can serve several Candidates without implying
+                # that any one representative pair describes all of their Targets.
+                evidence[pid] = {
+                    'id': f'E{next_id}', 'kind': 'pathway', 'source': 'reactome',
+                    'source_id': pid, 'url': f'https://reactome.org/content/detail/{pid}',
+                    'release': release,
+                    'statement': ("In Reactome, at least one of this Candidate's Targets and at least "
+                                  "one of the selected Disease Targets belong to "
+                                  f"'{row['name']}' ({pid}, {n} genes). "
+                                  'Shared membership is not proof of effect.'),
+                    'values': {'pathway_gene_count': n},
+                }
+                next_id += 1
+                result['evidence'].append(evidence[pid])
+            candidate['evidence_ids'].append(evidence[pid]['id'])
+    if release not in result['releases']:
+        result['releases'].append(release)
+    if coverage is not None:
+        coverage.update(unmapped_items=len(rejected), unmapped=rejected,
+                        unmapped_disease_target_ids=sorted(top - mapped_genes),
+                        pathway_items=len(evidence))
+    return result
