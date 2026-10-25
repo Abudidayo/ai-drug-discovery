@@ -691,17 +691,19 @@ B_MAX_CALLS = 45
 B_SUFFIX = 'Keep each rationale and objection concise (one short sentence each). Avoid quoting numeric measurements. Obey decision order across ranks.'
 
 
-def b_jobs(output):
+def b_jobs(output, *, replication=False):
     from copy import deepcopy
     from pipeline.panels import B_DISEASES, B_SEED, blind_prompt_leaks
     output = Path(output)
     panels = json.loads((output / 'panels.json').read_text())['panels']
-    if len(panels) != 11:
-        raise ValueError('Experiment B requires exactly eleven panels')
-    if [p['disease']['id'] for p in panels] != [d[0] for d in B_DISEASES]:
+    expected_diseases = (json.loads((output / 'selection.json').read_text())['selected']
+                         if replication else B_DISEASES)
+    if len(panels) != (14 if replication else 11):
+        raise ValueError('Replication requires fourteen panels' if replication else 'Experiment B requires exactly eleven panels')
+    if [p['disease']['id'] for p in panels] != [d[0] for d in expected_diseases]:
         raise ValueError('Experiment B panels differ from the eleven declared Diseases')
     identities = json.loads((output / 'identities.json').read_text())
-    ablation_ids = {panels[i]['disease']['id'] for i in random.Random(B_SEED).sample(range(11), 3)}
+    ablation_ids = set() if replication else {panels[i]['disease']['id'] for i in random.Random(B_SEED).sample(range(11), 3)}
     jobs = []
     for index, panel in enumerate(panels):
         did = panel['disease']['id']
@@ -733,22 +735,46 @@ def b_jobs(output):
     return sorted(jobs, key=lambda j: j['condition'] != 'pathways')
 
 
-def freeze_b(output='data/experiment_b', report_dir='results/experiment_b'):
+def replication_input_paths(output, report_dir):
+    """Evidence and original-study bytes that must stay fixed during replication."""
+    inputs = []
+    inputs += [report_dir / n for n in ['candidates.json', 'protocol_frozen.json']]
+    inputs += [Path('results/experiment_b/results.json'), Path('results/experiment_b/preregistered.json')]
+    # Raw source responses and graph artifacts are part of the reproducible seal.
+    inputs += sorted((output / 'packets').rglob('*.json'))
+    inputs += sorted(Path('data/a6/stage1').glob('*'))
+    inputs += [Path('data/drug_targets.json'), Path('data/string_id_map.json')]
+    inputs += sorted(Path('data/ot').rglob('*.parquet'))
+    inputs += [Path('data/reactome/97/Ensembl2Reactome.human.tsv')]
+    inputs += [Path('results/experiment_b/protocol.md')]
+    for name, expected in json.loads((Path('results/experiment_b/preregistered.json')).read_text())['declaration']['inputs_sha256'].items():
+        if sha256(Path(name).read_bytes()).hexdigest() != expected:
+            raise ValueError('Original Experiment B inputs changed')
+    return inputs
+
+
+def freeze_b(output='data/experiment_b', report_dir='results/experiment_b', *, replication=False):
     """Seal protocol, inputs, prompts and code before the first model request."""
     from pipeline.panels import B_SEED
     output, report_dir = Path(output), Path(report_dir)
     protocol = report_dir / 'protocol.md'
     if not protocol.exists():
         raise ValueError('Write protocol.md before freezing')
-    jobs = b_jobs(output)
+    if replication:
+        from pipeline.panels import replication_protocol
+        replication_protocol(report_dir)
+    jobs = b_jobs(output, replication=True) if replication else b_jobs(output)
     if len(jobs) != 42:
         raise ValueError('Expected 33 primary and nine ablation jobs')
     source_paths = [Path(p) for p in ['jury/client.py', 'jury/pilot.py', 'pipeline/panels.py',
                                      'pipeline/packets.py', 'pipeline/pathways.py']]
     source_paths += sorted(Path('/Users/jessicamak/oxhack-workers/zaid-ro/ranking').glob('*.py'))
     inputs = [p for p in output.glob('*.json') if p.name != 'preregistered.json']
+    if replication:
+        source_paths += [Path(p) for p in ['pipeline/disease_targets.py', 'pipeline/opentargets.py']]
+        inputs += replication_input_paths(output, report_dir)
     declaration = {'protocol_sha256': sha256(protocol.read_bytes()).hexdigest(),
-        'models': B_MODELS, 'reasoning_effort': B_EFFORT, 'max_live_calls': B_MAX_CALLS,
+        'models': B_MODELS, 'reasoning_effort': B_EFFORT, 'max_live_calls': 60 if replication else B_MAX_CALLS,
         'seed': B_SEED, 'prompt_version': 'jury-v6',
         'inputs_sha256': {str(p): sha256(p.read_bytes()).hexdigest() for p in sorted(inputs)},
         'source_sha256': {str(p): sha256(p.read_bytes()).hexdigest() for p in source_paths},
@@ -766,7 +792,7 @@ def freeze_b(output='data/experiment_b', report_dir='results/experiment_b'):
         write_json(report_dir / 'results.json', {'status': 'frozen_before_live_calls',
             'protocol_sha256': declaration['protocol_sha256'],
             'frozen_at': json.loads(path.read_text())['frozen_at'],
-            'live_calls_including_retries': 0, 'budget': B_MAX_CALLS})
+            'live_calls_including_retries': 0, 'budget': 60 if replication else B_MAX_CALLS})
         (report_dir / 'results.md').write_text('Protocol frozen before live calls. SHA256: `' + declaration['protocol_sha256'] + '`.\nNo live results yet.\n')
     prompts = output / 'prompts'
     prompts.mkdir(exist_ok=True)
@@ -807,14 +833,19 @@ def b_live_attempt(job, model_call=None):
             'condition': job['condition'], 'status': attempt['status']}
 
 
-def run_b(output='data/experiment_b', report_dir='results/experiment_b'):
+def run_b(output='data/experiment_b', report_dir='results/experiment_b', *, replication=False):
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from copy import deepcopy
     output = Path(output)
     if os.environ.get('SNOWFLAKE_REASONING_EFFORT') and json.loads(os.environ['SNOWFLAKE_REASONING_EFFORT']) != B_EFFORT:
         raise ValueError('Remove conflicting SNOWFLAKE_REASONING_EFFORT before the frozen run')
-    freeze_b(output, report_dir)
-    jobs = b_jobs(output)
+    if replication:
+        freeze_b(output, report_dir, replication=True)
+        jobs = b_jobs(output, replication=True)
+    else:
+        freeze_b(output, report_dir)
+        jobs = b_jobs(output)
+    max_calls = 60 if replication else B_MAX_CALLS
     (output / 'runs').mkdir(exist_ok=True)
     # A single writer/process owns the journal; prevent simultaneous runners.
     lock = output / 'live.lock'
@@ -829,7 +860,7 @@ def run_b(output='data/experiment_b', report_dir='results/experiment_b'):
                 run = json.loads(path.read_text()) if path.exists() else {
                     **{k: job[k] for k in ('disease_id', 'model', 'condition', 'presented_order')}, 'attempts': []}
                 if (len(run['attempts']) != pass_number - 1 or final_attempt(run)
-                        or used >= B_MAX_CALLS):
+                        or used >= max_calls):
                     continue
                 dispatched_job = deepcopy(job)
                 if pass_number == 2:
@@ -868,7 +899,7 @@ def b_borda(packet, finals):
     return [{**r, 'rank': i} for i, r in enumerate(ranked, 1)], result['kendalls_w']
 
 
-def score_b(output='data/experiment_b', report_dir='results/experiment_b'):
+def score_b(output='data/experiment_b', report_dir='results/experiment_b', *, replication=False):
     """Offline only; retain all failures and use the frozen scoring rules."""
     import math
     from bisect import bisect_left
@@ -926,12 +957,13 @@ def score_b(output='data/experiment_b', report_dir='results/experiment_b'):
                 'jurors': {m: {'with_pathways': recovery(f['reviews'] if f else None, true),
                               'without_pathways': recovery(n['reviews'] if n else None, true)}
                            for m, f, n in zip(B_MODELS, finals, no_finals)}})
+    n = len(panels)
     summary = {m: b_metrics(rows) for m, rows in methods.items()}
     rng = random.Random(B_SEED)
-    null_mrr = sorted(sum(1/rng.randint(1, 15) for _ in range(11))/11 for _ in range(100000))
+    null_mrr = sorted(sum(1/rng.randint(1, 15) for _ in range(n))/n for _ in range(100000))
     for value in summary.values():
         k = value['hits']
-        value['hits_p_one_sided'] = sum(math.comb(11, j)*(1/3)**j*(2/3)**(11-j) for j in range(k, 12))
+        value['hits_p_one_sided'] = sum(math.comb(n, j)*(1/3)**j*(2/3)**(n-j) for j in range(k, n+1))
         value['mrr_p_monte_carlo'] = (1 + len(null_mrr) - bisect_left(null_mrr, value['mrr']))/(1 + len(null_mrr))
     # Holm over all six methods and both metrics: one predeclared family of 12 tests.
     tests = sorted((v[key], m, key) for m, v in summary.items()
@@ -943,19 +975,19 @@ def score_b(output='data/experiment_b', report_dir='results/experiment_b'):
     deltas = [p['rr_delta'] for p in paired]
     observed = sum(deltas)
     ablation = {'panels': paired, 'n': len(paired),
-        'hits_at_5_delta': sum(p['hits_delta'] for p in paired)/len(paired),
-        'mrr_delta': observed/len(paired),
+        'hits_at_5_delta': sum(p['hits_delta'] for p in paired)/len(paired) if paired else None,
+        'mrr_delta': observed/len(paired) if paired else None,
         'sign_flip_p_one_sided': sum(sum(s*d for s,d in zip(signs, deltas)) >= observed-1e-12
             for signs in product([-1, 1], repeat=len(deltas)))/(2**len(deltas))}
     attempts = [a for r in runs for a in r['attempts']]
     first = min((a['dispatched_at'] for a in attempts if a.get('dispatched_at')), default=None)
     if first and first < declaration['frozen_at']:
         raise ValueError('Model call precedes protocol freeze')
-    if len(attempts) > B_MAX_CALLS:
+    if len(attempts) > (60 if replication else B_MAX_CALLS):
         raise ValueError('Experiment B live call budget exceeded')
     result = {'status': 'completed', 'protocol_sha256': protocol_hash, 'frozen_at': declaration['frozen_at'],
         'panels': panels, 'eligibility_unmapped': panel_document.get('eligibility_unmapped', []),
-        'first_live_call_at': first, 'live_calls_including_retries': len(attempts), 'budget': B_MAX_CALLS,
+        'first_live_call_at': first, 'live_calls_including_retries': len(attempts), 'budget': 60 if replication else B_MAX_CALLS,
         'chance': {'hits_at_5': 5/15, 'mrr': sum(1/i for i in range(1, 16))/15},
         'methods': summary, 'pathway_ablation': ablation,
         'validity': {m: {c: sum(bool(final_attempt(r)) for r in runs if r['model']==m and r['condition']==c)
@@ -985,6 +1017,8 @@ def score_b(output='data/experiment_b', report_dir='results/experiment_b'):
     write_json(report_dir / 'audit_sample.json', audit)
     result['manual_citation_audit'] = {'selected_pairs': len(audit), 'status': 'not_reviewed',
                                        'path': 'audit_sample.json'}
+    if replication:
+        return report_replication(result, report_dir, output)
     write_json(report_dir / 'results.json', result)
     significant = [m for m,v in summary.items() if min(v['hits_p_one_sided_holm'], v['mrr_p_monte_carlo_holm']) < .05]
     lines = ['# Experiment B: blind retrospective recovery', '',
@@ -1054,13 +1088,94 @@ def score_b(output='data/experiment_b', report_dir='results/experiment_b'):
     return result
 
 
+def replication_statistics(methods):
+    """Same B chance null and joint Holm family, with the declared denominator."""
+    import math
+    from bisect import bisect_left
+    from pipeline.panels import B_SEED
+    summary = {m: b_metrics(rows) for m, rows in methods.items()}
+    n = next(iter(summary.values()))['panels']
+    rng = random.Random(B_SEED)
+    null = sorted(sum(1/rng.randint(1, 15) for _ in range(n))/n for _ in range(100000))
+    for v in summary.values():
+        v['hits_p_one_sided'] = sum(math.comb(n,j)*(1/3)**j*(2/3)**(n-j) for j in range(v['hits'],n+1))
+        v['mrr_p_monte_carlo'] = (1+len(null)-bisect_left(null,v['mrr']))/(len(null)+1)
+    tests = sorted((v[k],m,k) for m,v in summary.items() for k in ['hits_p_one_sided','mrr_p_monte_carlo'])
+    adjusted = 0
+    for i,(p,m,k) in enumerate(tests):
+        adjusted = max(adjusted,min(1,p*(len(tests)-i)))
+        summary[m][k+'_holm'] = adjusted
+    return summary
+
+
+def report_replication(result, report_dir, output):
+    """Keep the unseen-panel primary and already-seen-panel secondary separate."""
+    from pipeline.panels import replication_protocol
+    seal = replication_protocol(report_dir)
+    if not result['first_live_call_at'] or seal['frozen_at'] >= result['first_live_call_at']:
+        raise ValueError('Protocol must be recorded before first live model dispatch')
+    old = json.loads(Path('results/experiment_b/results.json').read_text())
+    primary = result['methods']
+    old_ids = {p['disease']['id'] for p in old['panels']}
+    if old_ids & {p['disease']['id'] for p in result['panels']}:
+        raise ValueError('Replication overlaps original Diseases')
+    pooled = {m: old['methods'][m]['per_panel'] + v['per_panel'] for m,v in primary.items()}
+    result.update(primary={'label':'Independent replication: new fourteen panels only','methods':primary},
+        secondary={'label':'Secondary: pooled 25 panels; original eleven already seen',
+                   'methods':replication_statistics(pooled)},
+        protocol_written_before_source_calls=seal,
+        selection=json.loads((output/'selection.json').read_text()),
+        original_results_sha256=sha256(Path('results/experiment_b/results.json').read_bytes()).hexdigest())
+    result.pop('pathway_ablation')
+    def conclusion(summary, label):
+        v=summary['jury']
+        sig=min(v['hits_p_one_sided_holm'],v['mrr_p_monte_carlo_holm']) < .05
+        return (f"{label}: the jury {'beats the stated chance null after correction' if sig else 'does not show evidence above chance after correction'}. "
+                f"Hits@5 {v['hits']}/{v['panels']} ({v['hits_at_5']:.1%}), MRR {v['mrr']:.3f}; "
+                f"Holm p: Hits {v['hits_p_one_sided_holm']:.4f}, MRR {v['mrr_p_monte_carlo_holm']:.4f}.")
+    lines=['# Independent replication of Experiment B','',
+        conclusion(primary,'Primary, new Diseases only'),'',
+        conclusion(result['secondary']['methods'],'Secondary, pooled 25 panels'),
+        'The pooled result includes the eleven panels already seen before replication; it is secondary and cannot replace the primary result.','',
+        f"Protocol SHA256: `{result['protocol_sha256']}`. Written/frozen before source calls: {seal['frozen_at']}; final input seal: {result['frozen_at']}; first live dispatch: {result['first_live_call_at']}.",
+        f"Live calls including retries and reservations: {result['live_calls_including_retries']}/60. Same jury-v6, three low-effort jurors, evidence, strict validator and Amendment 1 as Experiment B.", '',
+        'Chance: Hits@5 1/3; MRR 0.221215. One-sided exact binomial Hits tests and 100,000-draw uniform-rank MRR tests (seed 20261025, plus-one p). Holm over twelve method/metric tests separately within primary and secondary. Failed or invalid ballots miss; an incomplete jury misses.','']
+    for label,summary in [('Primary: fourteen new panels',primary),('Secondary: all 25 panels',result['secondary']['methods'])]:
+        lines += [label,'','| Method | Hits@5 | MRR | Hits p / Holm p | MRR p / Holm p |','|---|---:|---:|---:|---:|']
+        for m,v in summary.items():
+            lines.append(f"| {m} | {v['hits']}/{v['panels']} ({v['hits_at_5']:.1%}) | {v['mrr']:.4f} | {v['hits_p_one_sided']:.6f} / {v['hits_p_one_sided_holm']:.6f} | {v['mrr_p_monte_carlo']:.6f} / {v['mrr_p_monte_carlo_holm']:.6f} |")
+        lines += ['']
+    lines += ['New-panel true-drug ranks (— means failure/miss).','','| Disease (area) | True drug | Jury | Opus | GPT | Kimi | Direct | Network | Plausible / eligible |','|---|---|---:|---:|---:|---:|---:|---:|---:|']
+    for i,p in enumerate(result['panels']):
+        ranks=[str(primary[m]['per_panel'][i]['rank'] or '—') for m in primary]
+        lines.append(f"| {p['disease']['name']} [{p['disease']['id']}] ({p['disease']['area']}) | {p['true_drug']['name']} ({p['true_drug']['drug_id']}) | " + ' | '.join(ranks)+f" | {p['matching']['plausible_decoy_count']}/14; {p['matching']['eligible_plausible']} |")
+    mappings = [(c['name'],c['resolved_name'],c['disease_id']) for c in result['selection'].get('cases',[])
+                if c.get('included') and c['name'] != c['resolved_name']]
+    lines += ['', f'Exact catalogue resolutions with changed display labels: {mappings}. The pinned catalogue labels the multiple-sclerosis record as a symptom measurement; this limits its interpretation as a Disease. The frozen exact-name/synonym rule was retained.',
+        f"Valid final ballots by juror: {result['validity']}. Rejection counts: {result['rejections']}.",
+        f"Complete juries: {sum(bool(r['complete']) for r in primary['jury']['per_panel'])}/14. Selection recall is 14/14 by construction, not retrieval performance.",
+        'All candidates, exact IDs, selected/excluded names, label provenance, Amendment 1 exclusions and coverage are retained in results.json and the sealed data directory.', '',
+        'Limits: purposive retrospective source-record recovery; no prospective or clinical claim. Regulator-linked source records may misstate indications and were not independently clinically adjudicated. Decoys are unlabelled rather than confirmed ineffective. Literature co-mentions, Target/mechanism fingerprints and model knowledge may retain leakage. Target-count matching does not match network degree. Missing warnings remain unknown. The deterministic citation sample is saved in audit_sample.json; independent scientific entailment and credit costs were not verified. No pathway-benefit claim is tested in this replication.', '']
+    write_json(report_dir/'results.json',result)
+    (report_dir/'results.md').write_text('\n'.join(lines)+'\n')
+    return result
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--experiment-b", action="store_true")
+    parser.add_argument("--replication", action="store_true")
     parser.add_argument("--v2", action="store_true")
     parser.add_argument("--output", type=Path, default=Path("data/pilot"))
     args = parser.parse_args()
+    if args.replication:
+        output = Path('data/experiment_b_replication') if args.output == Path('data/pilot') else args.output
+        report = Path('results/experiment_b_replication')
+        if args.live:
+            run_b(output, report, replication=True)
+        score_b(output, report, replication=True)
+        raise SystemExit(0)
     if args.experiment_b:
         output = Path('data/experiment_b') if args.output == Path('data/pilot') else args.output
         if args.live:

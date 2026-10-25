@@ -55,7 +55,7 @@ def test_seeded_orders_and_output_shape():
     assert set(result) == set(FIXTURE)
     assert result["jury"] == {**CONFIG, 'prompt_version': PROMPT_VERSION,
                               'reasoning_effort': {model: None for model in CONFIG['models']}}
-    assert PROMPT_VERSION == 'jury-v6'
+    assert PROMPT_VERSION == 'jury-v7'
     assert len(result["jurors"]) == 3
     for i, j in enumerate(result["jurors"]):
         order = [c["label"] for c in PACKET["candidates"]]
@@ -205,7 +205,7 @@ def test_invalid_review_text_is_rejected_and_retried(field, text, flag):
     assert reviews is None and validation[flag] is False and validation["errors"]
 
     exhausted = run_jury(PACKET, CONFIG, lambda *args: raw)
-    assert exhausted["consensus"]["jurors_counted"] == 0
+    assert exhausted["consensus_status"]["jurors_counted"] == 0
     for juror in exhausted["jurors"]:
         assert juror["status"] == "invalid" and juror["reviews"] is None
         assert juror["attempts"] == CONFIG["max_attempts"]
@@ -227,8 +227,10 @@ def test_retry_recovery_and_exhaustion():
     assert all(j["status"] == "valid" and j["attempts"] == 2 for j in result["jurors"])
     assert all(j["validation"]["errors"] == ["Attempt 1: JSON decoding failed"] for j in result["jurors"])
     invalid = run_jury(PACKET, CONFIG, lambda *args: "last raw reply")
-    assert invalid["consensus"] == {"method": "borda", "jurors_counted": 0,
-                                    "ranking": [], "kendalls_w": None, "contested": []}
+    assert invalid["consensus"] is None
+    assert invalid["consensus_status"] == {"jurors_counted": 0,
+                                           "failed_jurors": CONFIG["models"],
+                                           "reason": "fewer_than_two_valid_jurors"}
     for j in invalid["jurors"]:
         assert j["status"] == "invalid" and j["reviews"] is None
         assert j["raw_output"] == "last raw reply" and j["attempts"] == 2
@@ -249,7 +251,7 @@ def test_failures_do_not_leak_secrets_or_fabricate_votes():
         raise RuntimeError("secret PAT should never be recorded")
     result = run_jury(PACKET, CONFIG, fail)
     assert "secret PAT" not in json.dumps(result)
-    assert result["consensus"]["jurors_counted"] == 0
+    assert result["consensus_status"]["jurors_counted"] == 0
     for j in result["jurors"]:
         assert j["status"] == "failed" and j["attempts"] == 2
         assert j["reviews"] is None and j["raw_output"] is None
@@ -557,9 +559,9 @@ def test_total_call_budget_reserves_one_attempt_per_juror():
 
 def test_v4_research_scope_and_explicit_citation_fields():
     prompt = build_prompt(PACKET, [c['label'] for c in PACKET['candidates']])
-    assert 'research ranking of existing regulator-approved drugs' in prompt
-    assert 'not treatment advice for a patient' in prompt
-    assert 'approvals may be for other Diseases' in prompt
+    assert 'retrospective evidence-review exercise using supplied public data' in prompt
+    assert 'no advice for any patient' in prompt
+    assert 'approvals may concern other Diseases' in prompt
     assert 'Inline citations do not populate these arrays' in prompt
     assert 'All fields are required' in prompt
     assert 'including non-numeric claims' in prompt
@@ -656,3 +658,160 @@ def test_legacy_config_saves_provider_defaults():
     result = run_jury(PACKET, config, mock_model)
     assert result['jury']['reasoning_effort'] == {model: None for model in config['models']}
     assert 'reasoning_effort' not in config
+
+
+@pytest.mark.parametrize('raw', ['', '{"reviews":[', json.dumps(reply())])
+def test_provider_refusal_is_never_a_json_error_or_a_vote(raw):
+    result = run_jury(PACKET, CONFIG, lambda *args: ModelReply(
+        raw, input_tokens=10, output_tokens=2, stop_reason='refusal'))
+    for juror in result['jurors']:
+        assert juror['status'] == 'invalid' and juror['reviews'] is None
+        assert juror['raw_output'] == raw
+        assert juror['validation'] == {
+            'schema': None, 'unique_ranks': None, 'evidence_ids_exist': None,
+            'numbers_match': None,
+            'errors': [f'Attempt {i}: refused (provider stop_reason=refusal)'
+                       for i in range(1, CONFIG['max_attempts'] + 1)],
+        }
+        assert all(u['stop_reason'] == 'refusal' and u['input_tokens'] == 10
+                   for u in juror['token_usage'])
+
+
+def test_refusal_retry_preserves_order_and_runs_all_validation():
+    prompts = {}
+    def call(model, prompt, temperature):
+        prompts.setdefault(model, []).append(prompt)
+        if len(prompts[model]) == 1:
+            return ModelReply('{"reviews":[', stop_reason='refusal')
+        value = reply()
+        value['reviews'][0]['rationale'] = 'Invented measurement 999999.'
+        return ModelReply(json.dumps(value), stop_reason='end_turn')
+    result = run_jury(PACKET, CONFIG, call)
+    for juror in result['jurors']:
+        assert prompts[juror['model']][0] == prompts[juror['model']][1]
+        assert juror['status'] == 'invalid' and juror['reviews'] is None
+        assert juror['validation']['numbers_match'] is False
+        assert juror['validation']['errors'][0].endswith('stop_reason=refusal)')
+        assert 'unsupported or unparseable number' in juror['validation']['errors'][1]
+
+
+def test_refusal_can_recover_with_a_complete_validated_reply():
+    calls = {}
+    def call(model, prompt, temperature):
+        calls[model] = calls.get(model, 0) + 1
+        return (ModelReply('', stop_reason='refusal') if calls[model] == 1
+                else ModelReply(json.dumps(reply()), stop_reason='end_turn'))
+    result = run_jury(PACKET, CONFIG, call)
+    assert all(j['status'] == 'valid' and j['attempts'] == 2 for j in result['jurors'])
+    assert all(j['validation']['errors'] == [
+        'Attempt 1: refused (provider stop_reason=refusal)'] for j in result['jurors'])
+
+
+def test_v7_changes_only_the_research_framing():
+    prompt = build_prompt(PACKET, ['C1', 'C2', 'C3', 'C4'])
+    assert 'retrospective evidence-review exercise' in prompt
+    assert 'no advice for any patient' in prompt
+    assert 'priorities for further investigation' in prompt
+    assert 'not as\nrecommendations' in prompt
+    assert 'Missing warnings\nmean unknown, never safe' in prompt
+
+
+@pytest.mark.parametrize('valid_count', [0, 1, 2, 3])
+def test_consensus_requires_two_and_counts_every_valid_juror(valid_count):
+    jurors = []
+    for index in range(3):
+        juror = deepcopy(FIXTURE['jurors'][index % 2])
+        juror['model'] = f'juror-{index}'
+        if index >= valid_count:
+            juror.update(status='failed' if index % 2 else 'invalid', reviews=None)
+        jurors.append(juror)
+    result = consensus(PACKET, jurors)
+    assert result['jurors_counted'] == valid_count
+    assert result['failed_jurors'] == [j['model'] for j in jurors[valid_count:]]
+    if valid_count < 2:
+        assert result['ranking'] == [] and result['kendalls_w'] is None
+        assert result['reason'] == 'fewer_than_two_valid_jurors'
+    else:
+        assert result['reason'] is None
+        ranks = {c['label']: [] for c in PACKET['candidates']}
+        for juror in jurors[:valid_count]:
+            for review in juror['reviews']:
+                ranks[review['label']].append(review['rank'])
+        points = {label: sum(4 - rank for rank in values) for label, values in ranks.items()}
+        assert {r['label']: r['borda_points'] for r in result['ranking']} == points
+        s = sum((sum(values) - valid_count * 2.5) ** 2 for values in ranks.values())
+        assert result['kendalls_w'] == round(12 * s / (valid_count ** 2 * (4 ** 3 - 4)), 4)
+
+
+@pytest.mark.parametrize('valid_count', [0, 1, 2, 3])
+def test_jury_serializes_null_consensus_and_preserves_failure_metadata(valid_count):
+    config = {**CONFIG, 'max_attempts': 1}
+    def call(model, prompt, temperature):
+        if config['models'].index(model) >= valid_count:
+            return ModelReply('', stop_reason='refusal')
+        return mock_model(model, prompt, temperature)
+    result = run_jury(PACKET, config, call)
+    assert result['consensus_status'] == {
+        'jurors_counted': valid_count,
+        'failed_jurors': config['models'][valid_count:],
+        'reason': 'fewer_than_two_valid_jurors' if valid_count < 2 else None,
+    }
+    if valid_count < 2:
+        assert result['consensus'] is None
+        assert json.loads(json.dumps(result))['consensus'] is None
+    else:
+        assert result['consensus'] == consensus(PACKET, result['jurors'])
+
+
+@pytest.mark.parametrize('valid_count', [0, 1])
+def test_a6_receipts_and_comparison_handle_refusal_and_null_consensus(tmp_path, monkeypatch, valid_count):
+    from pipeline import a6
+
+    monkeypatch.setenv('SNOWFLAKE_MODELS', json.dumps(CONFIG['models']))
+    monkeypatch.delenv('SNOWFLAKE_REASONING_EFFORT', raising=False)
+    calls = []
+    class RefusingClient:
+        reasoning_effort = {}
+        def __call__(self, model, prompt, temperature):
+            calls.append(model)
+            if CONFIG['models'].index(model) < valid_count:
+                return mock_model(model, prompt, temperature)
+            return ModelReply('{"reviews":[', stop_reason='refusal')
+        def close(self):
+            pass
+    monkeypatch.setattr(a6, 'CortexModel', RefusingClient)
+    manifest = {'diseases': {}}
+    for disease_id in a6.DISEASES:
+        folder = tmp_path / disease_id
+        folder.mkdir()
+        a6.write(folder / 'evidence_packet.json', PACKET)
+        manifest['diseases'][disease_id] = {
+            'packet_sha256': a6.digest(folder / 'evidence_packet.json')}
+    a6.write(tmp_path / 'manifest.json', manifest)
+    a6.live(tmp_path)
+    assert len(calls) == a6.CALL_BUDGET
+    for receipt in a6.read(tmp_path / 'live_calls.json'):
+        if CONFIG['models'].index(receipt['model']) < valid_count:
+            assert receipt['status'] == 'valid'
+            continue
+        assert receipt['status'] == 'invalid'
+        assert receipt['validation']['schema'] is None
+        assert receipt['validation']['errors'] == ['refused (provider stop_reason=refusal)']
+    result = a6.read(tmp_path / a6.DISEASES[0] / 'jury_result.json')
+    assert result['consensus'] is None
+    candidates = a6.read(ROOT / 'fixtures/candidates.json')['candidates']
+    network = {'disease': PACKET['disease'], 'candidates': candidates,
+               'shortlist': [c['candidate_id'] for c in candidates]}
+    before = deepcopy(result)
+    comparison = a6.compare(network, PACKET, result,
+                            a6.read(ROOT / 'fixtures/drug_targets.json'))
+    assert result == before
+    assert comparison['jurors_counted'] == valid_count
+    assert comparison['failed_jurors'] == CONFIG['models'][valid_count:]
+    assert comparison['consensus_reason'] == 'fewer_than_two_valid_jurors'
+    assert comparison['kendalls_w'] is None
+    assert all(r['borda_rank'] is None and r['borda_points'] is None
+               for r in comparison['rows'])
+    result['consensus_status']['jurors_counted'] = 2
+    with pytest.raises(ValueError, match='metadata'):
+        a6.compare(network, PACKET, result, a6.read(ROOT / 'fixtures/drug_targets.json'))

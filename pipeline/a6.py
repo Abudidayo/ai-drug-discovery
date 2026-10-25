@@ -115,8 +115,14 @@ def compare(network, packet, result, drugs):
             or not set(shortlist) <= by_id.keys() or packet["disease"]["id"] != network["disease"]["id"]):
         raise ValueError("Network shortlist and packet must contain exactly the same unique IDs")
     summary = consensus(packet, result["jurors"])
-    if summary != result["consensus"]:
+    expected = summary if summary["reason"] is None else None
+    # Older in-memory callers pass the summary helper's empty-ranking metadata.
+    if result["consensus"] != expected and result["consensus"] != summary:
         raise ValueError("Stored consensus differs from validated ballots")
+    if "consensus_status" in result and result["consensus"] == expected:
+        metadata = {key: summary[key] for key in ("jurors_counted", "failed_jurors", "reason")}
+        if result["consensus_status"] != metadata:
+            raise ValueError("Stored consensus metadata differs from validated ballots")
     combined = {r["candidate_id"]: r for r in summary["ranking"]}
     references = {d["drug_id"]: d for d in drugs["drugs"]
                   if packet["disease"]["id"] in d["approval"]["disease_ids"]
@@ -175,6 +181,7 @@ def compare(network, packet, result, drugs):
             "jurors": [{k: j[k] for k in ("model", "status", "attempts", "validation")}
                        for j in result["jurors"]],
             "kendalls_w": summary["kendalls_w"], "jurors_counted": summary["jurors_counted"],
+            "failed_jurors": summary["failed_jurors"], "consensus_reason": summary["reason"],
             "rows": rows, "approved_references": reference_rows,
             "limitations": [
                 "Two worked examples, not the matched-decoy evaluation panels in plan §6.2.",
@@ -355,7 +362,13 @@ def live(output):
                 try:
                     reply = client(model, prompt, temperature)
                     write(folder / f"call_{number}_reply.json", asdict(reply) if isinstance(reply, ModelReply) else {"text": reply})
-                    reviews, flags = validate_reply(reply.text if isinstance(reply, ModelReply) else reply, packet)
+                    if isinstance(reply, ModelReply) and reply.stop_reason == "refusal":
+                        reviews = None
+                        flags = dict(schema=None, unique_ranks=None, evidence_ids_exist=None,
+                                     numbers_match=None,
+                                     errors=["refused (provider stop_reason=refusal)"])
+                    else:
+                        reviews, flags = validate_reply(reply.text if isinstance(reply, ModelReply) else reply, packet)
                     record.update(status="valid" if reviews is not None else "invalid", validation=flags)
                     print(f"Call {number}: {record['status']} {flags['errors']}", flush=True)
                     return reply
