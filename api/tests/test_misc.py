@@ -77,6 +77,7 @@ def test_openapi_covers_every_route() -> None:
         "/api/experiments",
         "/api/experiments/{experiment_id}",
         "/api/experiments/{experiment_id}/jury",
+        "/api/experiments/{experiment_id}/follow-ups",
         "/api/experiments/{experiment_id}/archive",
         "/api/experiments/{experiment_id}/restore",
         "/api/structures",

@@ -148,6 +148,27 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/experiments/{experiment_id}/follow-ups": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Start the jury and every binding pose the reader will look at next
+     * @description The web app asks once the reader moves past choosing the Disease. Asking again starts
+     *     nothing new. Poll the Experiment to follow the jury and the poses.
+     */
+    post: operations["start_follow_ups"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/experiments/{experiment_id}/jury": {
     parameters: {
       query?: never;
@@ -2010,6 +2031,55 @@ export interface operations {
     };
   };
   archive_experiment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        experiment_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Experiment"];
+        };
+      };
+      /** @description Not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Not allowed in the current state. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description The request cannot be carried out. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["UnprocessableResponse"];
+        };
+      };
+    };
+  };
+  start_follow_ups: {
     parameters: {
       query?: never;
       header?: never;

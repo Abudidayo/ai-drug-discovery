@@ -2,10 +2,10 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./console";
 
 /*
- * Steps 5 to 8 against the real API in fixture mode (COVID-19). Once an Experiment is built, the
- * API starts its follow-ups itself: the Model jury, and a binding pose for every drug that can be
- * docked. So the jury is already at work or done when a student reaches it, and the pose is there
- * on arrival. Then compare three drugs and archive and restore the Experiment. Wording comes from
+ * Steps 5 to 8 against the real API in fixture mode (COVID-19). Once a student moves past choosing
+ * the disease, the app starts the Experiment's follow-ups: the Model jury, and a binding pose for
+ * every drug that can be docked. So the jury is at work or done when a student reaches it, and the
+ * pose is there on arrival. Then compare three drugs and archive and restore the Experiment. Wording comes from
  * web/src/copy/en.ts; model names come from the API.
  */
 
@@ -15,7 +15,6 @@ async function expectStep(page: Page, title: string) {
 
 interface ExperimentState {
   status: string;
-  jury: { status: string } | null;
   dock_jobs: { status: string }[];
 }
 
@@ -24,10 +23,7 @@ async function state(page: Page, id: string): Promise<ExperimentState> {
   return (await response.json()) as ExperimentState;
 }
 
-/**
- * Creates a COVID-19 Experiment through the API and waits until it is ready and its follow-ups
- * (the jury and the poses) have been started.
- */
+/** Creates a COVID-19 Experiment through the API and waits until it is ready. */
 async function readyExperiment(page: Page): Promise<string> {
   const created = await page.request.post("/api/experiments", {
     data: { disease_id: "MONDO_0100096" },
@@ -37,8 +33,7 @@ async function readyExperiment(page: Page): Promise<string> {
   await expect
     .poll(
       async () => {
-        const { status, jury } = await state(page, id);
-        return status === "ready" && jury !== null;
+        return (await state(page, id)).status === "ready";
       },
       { timeout: 15_000 },
     )
@@ -51,7 +46,7 @@ test("the jury has started on its own; a student compares drugs, then archives a
 }) => {
   const id = await readyExperiment(page);
 
-  // Step 5: the jury started when the Experiment was built; nothing to ask, just the result.
+  // Step 5: opening a step past the first started the jury; nothing to ask, just the result.
   await page.goto(`/e/${id}/jury`);
   await expectStep(page, "Model jury");
   await expect(page.getByRole("button", { name: "Ask the Model jury" })).toHaveCount(0);
@@ -191,7 +186,7 @@ test("a student shows baricitinib's binding pose and checks it against the cryst
     page.getByRole("img", { name: "Protein network in 3D. Drag to rotate." }),
   ).toBeHidden();
 
-  // The pose was computed as a follow-up of the build (here a saved demo pair): no button.
+  // The pose was started when the student moved past step 1 (a saved demo pair): no button.
   await expect(page.getByRole("button", { name: "Show binding pose" })).toHaveCount(0);
   const view = page.getByRole("img", {
     name: "Baricitinib in JAK2, in 3D. Drag to rotate, scroll to zoom.",

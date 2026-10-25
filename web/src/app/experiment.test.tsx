@@ -157,6 +157,31 @@ describe("Choosing a disease", () => {
   });
 });
 
+describe("Follow-ups", () => {
+  it("start once the reader moves past step 1, not while they choose a disease", async () => {
+    serveExperiment(covidExperiment());
+    const user = userEvent.setup();
+    renderApp(`${E}/disease`);
+    await loadedSearchbox();
+    expect(fakeApi.followedUp).toEqual([]);
+
+    await user.click(screen.getByRole("button", { name: copy.next }));
+    await waitFor(() => {
+      expect(fakeApi.followedUp).toEqual([EXPERIMENT_ID]);
+    });
+    await user.click(screen.getByRole("button", { name: copy.next }));
+    await screen.findByRole("heading", { level: 1, name: copy.steps[2].title });
+    expect(fakeApi.followedUp).toEqual([EXPERIMENT_ID]);
+  });
+
+  it("wait for the build to be ready", async () => {
+    serveExperiment(covidExperiment("building", "evidence"));
+    renderApp(`${E}/biology`);
+    expect(await screen.findByText(copy.experiment.stages.evidence)).toBeInTheDocument();
+    expect(fakeApi.followedUp).toEqual([]);
+  });
+});
+
 describe("An Experiment that isn't ready", () => {
   it("shows the plain error and the way back when the build failed", async () => {
     serveExperiment(covidExperiment("failed"));

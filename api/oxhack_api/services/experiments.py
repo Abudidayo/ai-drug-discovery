@@ -7,9 +7,9 @@
 - An identical docking computation is reused instead of run twice, and an
   Experiment has at most `MAX_LIVE_DOCK_JOBS` computations waiting or running
   that a reader asked for.
-- Once an Experiment is built, its follow-ups start on their own
-  (`start_follow_ups`): the jury's review and a binding pose for every drug that
-  can be docked, so the later steps are ready sooner.
+- Once a reader moves past choosing the Disease, the Experiment's follow-ups
+  start (`start_follow_ups`): the jury's review and a binding pose for every
+  drug that can be docked, so the later steps are ready sooner.
 
 Each change and the job it needs are made in one `repo.locked()` block, so the
 Postgres repo checks the rule, writes the change and queues the job in one
@@ -188,20 +188,30 @@ class ExperimentService:
 
     # Follow-ups ---------------------------------------------------------------
 
-    def start_follow_ups(self, experiment_id: UUID) -> None:
-        """Start what a reader asks for next as soon as the Experiment is built, so the later
-        steps wait less: the Model jury's review, and a binding pose for each drug that can be
-        docked (the known-answer drug first, then shortlist order), each into the structure
-        the binding-pose step opens on. Anything already asked for is left alone, and one
-        follow-up that can't start never stops the others."""
+    def start_follow_ups(self, experiment_id: UUID) -> Experiment:
+        """Start what a reader will ask for next, once they move past choosing the Disease,
+        so the later steps wait less: the Model jury's review, and a binding pose for each drug
+        that can be docked (the known-answer drug first, then shortlist order), each into the
+        structure the binding-pose step opens on. Not on choosing alone: a reader trying
+        Diseases on step 1 shouldn't set the slow work going for each. Anything already asked
+        for is left alone, so asking again is harmless, and one follow-up that can't start
+        never stops the others. Returns the Experiment with what was started."""
         experiment = self.get(experiment_id)
-        if experiment.status != "ready" or experiment.archived_at is not None:
-            return
+        self._require_active_and_ready(experiment, "prepare its next steps")
         if experiment.jury is None:
             try:
                 self.ask_jury(experiment_id)
             except (Conflict, Unavailable) as exc:
                 log.warning("Experiment %s: the jury did not start: %s", experiment_id, exc)
+        try:
+            self._start_poses(experiment)
+        except Exception:
+            # The poses are a head start: the reader can still ask for each one.
+            log.exception("Experiment %s: its binding poses did not start", experiment_id)
+        return self.get(experiment_id)
+
+    def _start_poses(self, experiment: Experiment) -> None:
+        experiment_id = experiment.id
         structures = self.docking.structures()
         asked = {(job.candidate_id, job.structure_id) for job in experiment.dock_jobs}
         for candidate in sorted(experiment.candidates, key=lambda c: not c.known_answer):

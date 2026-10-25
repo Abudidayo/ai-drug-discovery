@@ -300,3 +300,22 @@ export function dockFileQuery(file: DockFile) {
     staleTime: Infinity,
   });
 }
+
+/**
+ * Starts an Experiment's follow-ups: the Model jury and a binding pose for every drug that can be
+ * docked. Asking again starts nothing new. The answer is the whole Experiment, with what started.
+ */
+export function useStartFollowUps() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (experimentId: string) =>
+      unwrap(
+        api.POST("/api/experiments/{experiment_id}/follow-ups", {
+          params: { path: { experiment_id: experimentId } },
+        }),
+      ),
+    onSuccess: (experiment) => {
+      queryClient.setQueryData(queryKeys.experiment(experiment.id), experiment);
+    },
+  });
+}

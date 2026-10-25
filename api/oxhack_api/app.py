@@ -6,7 +6,6 @@ import logging
 import threading
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
-from uuid import UUID
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
@@ -14,14 +13,13 @@ from fastapi.routing import APIRoute
 from . import __version__, stream_b
 from .deps import Components
 from .errors import install_error_handlers
-from .jobs import JobFactory, Runner, ThreadRunner, skip_follow_ups
+from .jobs import JobFactory, Runner, ThreadRunner
 from .jobs_pg import PostgresQueue, PostgresWorker
 from .repo import AlreadyExists, MemoryRepo, Repo
 from .repo.postgres import PostgresRepo
 from .routes.api import router
 from .services.docking import DockingBackend, FixtureDocking, VinaDocking
 from .services.evaluation import EvaluationSource, FixtureEvaluation
-from .services.experiments import ExperimentService
 from .services.jury import FixtureJury, JuryBackend
 from .services.ligands import ChemblLigands
 from .services.live import LiveSource
@@ -68,25 +66,12 @@ def build_components(
         if opened:
             repo.close()
         raise
-    queue: list[Runner] = []
-
-    def start_follow_ups(experiment_id: UUID) -> None:
-        # Builds run only once the components exist, so the runner below is set by then.
-        ExperimentService(repo, source, jury, docking, queue[0]).start_follow_ups(experiment_id)
-
-    jobs = JobFactory(
-        repo=repo,
-        source=source,
-        jury=jury,
-        docking=docking,
-        after_build=start_follow_ups if settings.follow_ups else skip_follow_ups,
-    )
+    jobs = JobFactory(repo=repo, source=source, jury=jury, docking=docking)
     if runner is None:
         if isinstance(repo, PostgresRepo):
             runner = PostgresQueue(repo)
         else:
             runner = ThreadRunner(jobs, settings.fixture_delay_ms, settings.worker_threads)
-    queue.append(runner)
     return Components(
         settings=settings,
         repo=repo,

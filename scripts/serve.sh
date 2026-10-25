@@ -66,7 +66,8 @@ pids+=($!)
 "${run[@]}" python -m oxhack_api.worker &
 pids+=($!)
 if [[ "$docking" == vina ]]; then
-  "${run[@]}" python -m oxhack_worker.queue &
+  # Vina uses every CPU; at a lower priority it never slows the API's answers to the reader.
+  nice -n 10 "${run[@]}" python -m oxhack_worker.queue &
   pids+=($!)
 fi
 echo "serve.sh: API on port ${PORT:-8000}, docking $docking; Ctrl-C stops everything"

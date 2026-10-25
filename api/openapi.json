@@ -3359,6 +3359,70 @@
         ]
       }
     },
+    "/api/experiments/{experiment_id}/follow-ups": {
+      "post": {
+        "description": "The web app asks once the reader moves past choosing the Disease. Asking again starts\nnothing new. Poll the Experiment to follow the jury and the poses.",
+        "operationId": "start_follow_ups",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "experiment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Experiment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Experiment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed in the current state."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnprocessableResponse"
+                }
+              }
+            },
+            "description": "The request cannot be carried out."
+          }
+        },
+        "summary": "Start the jury and every binding pose the reader will look at next",
+        "tags": [
+          "experiments"
+        ]
+      }
+    },
     "/api/experiments/{experiment_id}/jury": {
       "post": {
         "description": "Once per Experiment. Poll the Experiment to follow each juror's progress.",

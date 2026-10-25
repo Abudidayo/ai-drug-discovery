@@ -103,8 +103,6 @@ def postgres_settings(database_url: str, **overrides: Any) -> Settings:
         "inprocess_worker": False,
         "worker_poll_ms": 20,
         "worker_threads": 2,
-        # Tests ask for the jury and poses themselves; test_follow_ups.py turns this on.
-        "follow_ups": False,
         **overrides,
     }
     return Settings(**values)
@@ -123,11 +121,7 @@ def settings(repo_kind: str, request: pytest.FixtureRequest) -> Settings:
     if repo_kind == "postgres":
         return postgres_settings(request.getfixturevalue("pg_database"))
     return Settings(
-        fixture_delay_ms=0,
-        fixtures_dir=FIXTURES_DIR,
-        repo="memory",
-        inprocess_worker=False,
-        follow_ups=False,
+        fixture_delay_ms=0, fixtures_dir=FIXTURES_DIR, repo="memory", inprocess_worker=False
     )
 
 

@@ -70,14 +70,6 @@ class Settings(BaseSettings):
     worker_threads: int = Field(
         default=4, ge=1, description="Threads that run background jobs, in or out of process."
     )
-    follow_ups: bool = Field(
-        default=True,
-        description=(
-            "Once an Experiment is built, ask the Model jury and dock every drug that can be "
-            "docked straight away, so the later steps are ready sooner. 0 leaves both to the "
-            "reader (tests do)."
-        ),
-    )
 
     # Docking ------------------------------------------------------------------
 

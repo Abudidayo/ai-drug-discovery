@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useParams, useSearchParams } from "react-router";
 import { ApiError } from "../../api/errors";
-import { hasEarlyResult, isBuilding, useExperiment } from "../../api/queries";
+import { hasEarlyResult, isBuilding, useExperiment, useStartFollowUps } from "../../api/queries";
 import type { Experiment } from "../../api/types";
 import { copy, isStepSlug, type StepSlug } from "../../copy/en";
 import { followUpStates } from "../../lib/followUps";
@@ -65,6 +65,20 @@ function ExperimentScreen({ experimentId, step }: { experimentId: string; step: 
   const activeHover = hover?.step === step ? hover.hover : null;
 
   const experiment = query.data;
+
+  // Once the reader moves past choosing the Disease, start the slow work the later steps show
+  // (the jury, the binding poses), so it is under way while they read. Not on step 1, where they
+  // may try several Diseases. Once per Experiment; asking again would start nothing new anyway.
+  const { mutate: startFollowUps } = useStartFollowUps();
+  const followedUp = useRef<string | null>(null);
+  const followable =
+    step !== "disease" && experiment?.status === "ready" && experiment.archived_at === null;
+  useEffect(() => {
+    if (!followable || followedUp.current === experimentId) return;
+    followedUp.current = experimentId;
+    startFollowUps(experimentId);
+  }, [followable, experimentId, startFollowUps]);
+
   const view = useMemo(
     () => (experiment ? networkView(step, experiment, focusId, activeHover) : null),
     [step, experiment, focusId, activeHover],

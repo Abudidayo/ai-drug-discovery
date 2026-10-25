@@ -68,10 +68,6 @@ class Runner(Protocol):
         ...
 
 
-def skip_follow_ups(_experiment_id: UUID) -> None:
-    """The `after_build` that starts nothing: the reader asks for each follow-up."""
-
-
 @dataclass(frozen=True)
 class JobFactory:
     """Turns a `JobRef` into a runnable job, with the pieces jobs need."""
@@ -80,12 +76,10 @@ class JobFactory:
     source: ExperimentSource
     jury: JuryBackend
     docking: DockingBackend
-    after_build: Callable[[UUID], None] = skip_follow_ups
-    """Runs once an Experiment is built and ready, e.g. to start its follow-ups."""
 
     def start(self, ref: JobRef) -> Job:
         if ref.kind == "experiment_build":
-            return build_experiment(self.repo, self.source, ref.subject_id, self.after_build)
+            return build_experiment(self.repo, self.source, ref.subject_id)
         if ref.kind == "jury_run":
             return run_jury(self.repo, self.jury, ref.subject_id)
         return run_dock(self.repo, self.docking, ref.subject_id)
@@ -149,12 +143,7 @@ def _each(
 # ---------------------------------------------------------------------------
 
 
-def build_experiment(
-    repo: Repo,
-    source: ExperimentSource,
-    experiment_id: UUID,
-    after_build: Callable[[UUID], None] = skip_follow_ups,
-) -> Job:
+def build_experiment(repo: Repo, source: ExperimentSource, experiment_id: UUID) -> Job:
     experiment = repo.get_experiment(experiment_id)
     if experiment is None or experiment.status in ("ready", "failed"):
         return None
@@ -180,18 +169,12 @@ def build_experiment(
         with repo.locked(experiment_id):
             repo.save_build_result(experiment_id, result.targets, result.network, result.candidates)
             repo.set_build_state(experiment_id, "ready", None, None)
+        return None
     except SourceError as exc:
         error = str(exc)
     except Exception as exc:
         log.exception("Experiment %s failed to build", experiment_id)
         error = f"The Experiment could not be built ({type(exc).__name__})."
-    else:
-        try:
-            after_build(experiment_id)
-        except Exception:
-            # The Experiment is built; what follows can still be asked for by hand.
-            log.exception("Experiment %s: its follow-ups did not start", experiment_id)
-        return None
     repo.set_build_state(experiment_id, "failed", None, error)
     return error
 

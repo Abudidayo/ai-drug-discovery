@@ -121,6 +121,18 @@ def ask_jury(experiment_id: UUID, service: ServiceDep) -> JuryRun:
 
 
 @router.post(
+    "/experiments/{experiment_id}/follow-ups",
+    tags=["experiments"],
+    summary="Start the jury and every binding pose the reader will look at next",
+    responses=responses(404, 409, 422),
+)
+def start_follow_ups(experiment_id: UUID, service: ServiceDep) -> Experiment:
+    """The web app asks once the reader moves past choosing the Disease. Asking again starts
+    nothing new. Poll the Experiment to follow the jury and the poses."""
+    return service.start_follow_ups(experiment_id)
+
+
+@router.post(
     "/experiments/{experiment_id}/archive",
     tags=["experiments"],
     summary="Archive an Experiment: hide it from history, keeping it recoverable",

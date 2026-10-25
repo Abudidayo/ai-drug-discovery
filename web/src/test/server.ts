@@ -34,6 +34,8 @@ export const fakeApi = {
     { ...experiment, jury: covidJury("done") },
   ],
   created: 0,
+  /** The Experiment IDs the app asked to start follow-ups for, in order. */
+  followedUp: [] as string[],
 };
 
 /** The Experiment's current state: the last answer its GETs will give. */
@@ -125,6 +127,16 @@ export const handlers = [
     }
     fakeApi.experiments.set(experiment.id, fakeApi.jurySequence(experiment));
     return response(202).json(covidJury("queued"));
+  }),
+
+  // Starts nothing here: the jury and pose tests drive those states themselves.
+  http.post("/api/experiments/{experiment_id}/follow-ups", ({ params, response }) => {
+    const experiment = latest(params.experiment_id);
+    if (!experiment) {
+      return response(404).json({ detail: "There is no saved Experiment with this ID." });
+    }
+    fakeApi.followedUp.push(experiment.id);
+    return response(200).json(contract(experiment));
   }),
 
   http.post("/api/experiments/{experiment_id}/archive", ({ params, response }) => {

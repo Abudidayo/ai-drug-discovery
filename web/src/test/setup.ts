@@ -139,6 +139,7 @@ afterEach(() => {
   cleanup();
   server.resetHandlers();
   fakeApi.experiments.clear();
+  fakeApi.followedUp.length = 0;
 });
 
 afterAll(() => {
