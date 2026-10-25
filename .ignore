@@ -3,3 +3,5 @@
 !graft/
 graft/.cache/
 graft/.graph/
+data/stream_a/
+data/string/

@@ -1,8 +1,22 @@
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
 
-# Downloaded source data (Open Targets, ChEMBL, STRING): cached locally, never committed.
+# Downloaded releases, graph/distance matrices and generated evaluation outputs.
 /data/
+/ranking/artifacts/
+/workstream_b/.tools/
+
+# Local Python environments, build products and caches.
 .venv/
+/.venv-ranking/
 __pycache__/
 .pytest_cache/
+*.py[cod]
+*.egg-info/
+
+# Local credentials; keep the example environment template available to Git.
+/.env
+/.env.*
+!/.env.example
+/.aws/
+/secrets/
