@@ -228,9 +228,11 @@ its bytes, so the web app can load them straight into the viewer.
 
 ### The evaluation file
 
-`GET /evaluation` serves `fixtures/evaluation.json` in every mode. Until the
-frozen evaluation has run it holds example numbers and says so (`fixture_note`).
-To replace it with stream B's frozen Stage 3 results:
+`GET /evaluation` serves `fixtures/evaluation.json` in every mode. It holds
+stream B's frozen Stage 3 results for myeloma and COVID-19 (manifest
+`e38c121b...`), made on 2026-10-25 from `data/ranking/stage2/` with
+`python -m ranking evaluate --indications data/drug_targets.json --seed 0`;
+its `fixture_note` is null because nothing in it is made up. To refresh it:
 
 ```sh
 uv run python scripts/import_evaluation.py <stage3 folder> <stage2 ranking files...>
@@ -277,7 +279,7 @@ one, and copying a crystal ligand as a pose only stands in for that same drug.
 `fixtures/MONDO_0100096/` holds the COVID-19 Experiment (`experiment.json`)
 and its recorded jury run (`jury.json`); `structures.json`, `docking.json`,
 `docking_files/` and `evaluation.json` are shared. Each JSON file has a
-`fixture_note` saying which values are made up; each docking file says so
+`fixture_note` saying which values are made up (null in `evaluation.json`); each docking file says so
 itself (`fixture: true`, or the first line of `log.txt`).
 
 **Real and checked on 2026-10-24/25:** Ensembl gene IDs (Ensembl REST

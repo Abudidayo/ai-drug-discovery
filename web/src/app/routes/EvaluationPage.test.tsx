@@ -48,6 +48,20 @@ describe("Evaluation page", () => {
   });
 
   it("switches to drugs every ranking can place, where a disease can be left out", async () => {
+    // COVID-19 loses its known treatments once only placeable drugs count; one Disease is left.
+    serve({
+      ...evaluation,
+      results: evaluation.results.map((result) =>
+        result.scope === "common_scorable"
+          ? { ...result, coverage: { ...result.coverage, diseases: 1 }, confidence_intervals: null }
+          : result,
+      ),
+      diseases: evaluation.diseases.map((disease) =>
+        disease.scope === "common_scorable" && disease.disease_id === "MONDO_0100096"
+          ? { ...disease, status: "no_positive_in_scope", known: 0 }
+          : disease,
+      ),
+    });
     const user = userEvent.setup();
     renderApp("/evaluation");
     await rows();
@@ -55,7 +69,7 @@ describe("Evaluation page", () => {
       "aria-pressed",
       "true",
     );
-    expect(screen.getByText(text.found(1, 1956))).toBeInTheDocument();
+    expect(screen.getByText(text.found(32, 1956))).toBeInTheDocument();
     expect(screen.queryByText(text.leftOut.no_positive_in_scope)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: text.scopes.common_scorable }));
@@ -65,12 +79,19 @@ describe("Evaluation page", () => {
     expect(screen.queryByText(text.rangeNote)).not.toBeInTheDocument();
   });
 
-  it("says when the numbers are an example, and gives each value's likely range", async () => {
+  it("gives each value's likely range, and says nothing about examples for frozen results", async () => {
+    renderApp("/evaluation");
+    await rows();
+    expect(screen.getByText(text.rangeNote)).toBeInTheDocument();
+    expect(screen.getAllByText(/likely between/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(text.example)).not.toBeInTheDocument();
+  });
+
+  it("says when the numbers are an example", async () => {
+    serve({ ...evaluation, fixture_note: "Made up." });
     renderApp("/evaluation");
     await rows();
     expect(screen.getByText(text.example)).toBeInTheDocument();
-    expect(screen.getByText(text.rangeNote)).toBeInTheDocument();
-    expect(screen.getAllByText(/likely between/).length).toBeGreaterThan(0);
   });
 
   it("shows a missing metric as missing, never as zero", async () => {

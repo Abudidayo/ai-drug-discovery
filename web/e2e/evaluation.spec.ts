@@ -21,9 +21,7 @@ test("a student opens the evaluation from the footer and switches which drugs ar
   await expect(names.last()).toHaveText("Random order");
 
   await page.getByRole("button", { name: "Drugs every ranking can place" }).click();
-  await expect(
-    page.getByText("Left out: none of its known treatments are among these drugs."),
-  ).toBeVisible();
+  await expect(page.getByText("25 known treatments among 1,307 drugs")).toBeVisible();
 });
 
 test.describe("on a phone", () => {
