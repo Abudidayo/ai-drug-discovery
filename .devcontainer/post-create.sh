@@ -6,9 +6,9 @@ cd "$(dirname "$0")/.."
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends postgresql-client
 
-if [[ -f pyproject.toml ]]; then
-  uv sync
-fi
+# One uv workspace (root pyproject.toml): stream A's pipeline/ and jury/ plus
+# api/, in one .venv with one uv.lock.
+uv sync --all-packages
 
 # Docking toolchain (docs/build-reference.md C1-C6), kept apart from the project
 # venv so `uv sync` never removes it. Move it into a `docking` dependency group

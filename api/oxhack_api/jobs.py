@@ -153,7 +153,7 @@ def build_experiment(repo: Repo, source: ExperimentSource, experiment_id: UUID) 
         return {"stage": stage}
 
     try:
-        result = yield from _each(source.build(experiment.disease.id), enter)
+        result = yield from _each(source.build(experiment.disease.id, experiment_id), enter)
         yield enter("saving")
         with repo.locked(experiment_id):
             repo.save_build_result(experiment_id, result.targets, result.network, result.candidates)

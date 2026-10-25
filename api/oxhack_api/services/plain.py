@@ -47,6 +47,7 @@ _TOXICITY: dict[str, str] = {
 _REGULATORS: dict[str, str] = {
     "FDA": "the US regulator (FDA)",
     "EMA": "the European regulator (EMA)",
+    "EMA Human Drugs": "the European regulator (EMA)",
     "PMDA": "Japan's regulator (PMDA)",
     "DailyMed": "the US regulator (FDA)",
 }
@@ -99,3 +100,17 @@ def warning(toxicity_class: str | None) -> str:
     if not toxicity_class:
         return "serious risks listed on the label"
     return _TOXICITY.get(toxicity_class.lower(), toxicity_class.lower())
+
+
+def warning_summary(toxicity_class: str | None) -> str:
+    """A warning evidence item's summary: its one label risk, as a sentence."""
+    risk = warning(toxicity_class)
+    return risk[0].upper() + risk[1:] + "."
+
+
+def network_unavailable(drug: str, disease: str) -> str:
+    """Why a Candidate has no network result when no network ranking ran."""
+    return (
+        f"No protein network was available, so {drug} was ranked only by how strongly its "
+        f"own Targets are linked to {disease}."
+    )

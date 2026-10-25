@@ -57,6 +57,7 @@ def _experiment(conn: psycopg.Connection, **overrides) -> uuid.UUID:
         "data_releases": ["opentargets-26.09", "chembl-37", "string-12.5"],
         "jury_config": "{}",
         "ranking_settings": "{}",
+        "ranking_method": "network",
         "status": "ready",
         **overrides,
     }
@@ -458,3 +459,22 @@ def test_juror_token_usage_defaults_to_an_empty_list_and_must_be_a_list(
         )
         with pytest.raises(errors.CheckViolation):
             conn.execute("""update jurors set token_usage = '{"attempt": 1}'::jsonb""")
+
+
+# ---------------------------------------------------------------------------
+# 0005: how an Experiment was ranked
+# ---------------------------------------------------------------------------
+
+
+def test_experiments_state_a_known_ranking_method(migrated: str) -> None:
+    with psycopg.connect(migrated) as conn:
+        _experiment(conn, ranking_method="evidence_only")
+        with pytest.raises(errors.NotNullViolation):
+            conn.execute(
+                """insert into experiments (disease_id, disease_name, data_releases,
+                     jury_config, ranking_settings, status)
+                   values ('MONDO_0100096', 'COVID-19', '{opentargets-26.09}', '{}', '{}',
+                     'ready')"""
+            )
+    with psycopg.connect(migrated) as conn, pytest.raises(errors.CheckViolation):
+        _experiment(conn, ranking_method="guess")

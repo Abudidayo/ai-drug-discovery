@@ -41,6 +41,7 @@ def experiment(fixture: ExperimentFixture) -> Experiment:
         error=None,
         disease=fixture.disease,
         data_releases=fixture.data_releases,
+        ranking_method=fixture.ranking_method,
         ranking_settings=fixture.ranking_settings,
         jury_config=fixture.jury_config,
         targets=fixture.targets,

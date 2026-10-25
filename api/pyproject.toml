@@ -6,6 +6,9 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115",
+  # Stream A (pipeline/ and jury/ at the repository root): the live evidence
+  # pipeline and the Model jury.
+  "oxhack-drug-repurposing",
   "psycopg-pool>=3.2,<4",
   "psycopg[binary]>=3.2,<4",
   "pydantic>=2.9",
@@ -24,6 +27,9 @@ dev = [
   "ruff>=0.8",
 ]
 
+[tool.uv.sources]
+oxhack-drug-repurposing = { workspace = true }
+
 [build-system]
 requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
@@ -33,7 +39,8 @@ packages = ["oxhack_api"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+addopts = "-ra -m 'not network'"
+markers = ["network: calls Open Targets and needs `python -m oxhack_api.prepare` data; run with -m network"]
 # db/ holds migrate.py and the throwaway-Postgres helpers shared with db/tests.
 pythonpath = ["../db"]
 
@@ -50,6 +57,7 @@ ignore = ["N818"]
 include = ["oxhack_api", "tests"]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
-venvPath = "."
+# The uv workspace keeps one .venv at the repository root.
+venvPath = ".."
 venv = ".venv"
 extraPaths = ["../db"]

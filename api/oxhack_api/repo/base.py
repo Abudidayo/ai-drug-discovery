@@ -94,7 +94,7 @@ class Repo(Protocol):
         self,
         experiment_id: UUID,
         targets: list[DiseaseTarget],
-        network: NetworkGraph,
+        network: NetworkGraph | None,
         candidates: list[Candidate],
     ) -> None:
         """Replace the Experiment's Targets, network and Candidates (a rerun of a build

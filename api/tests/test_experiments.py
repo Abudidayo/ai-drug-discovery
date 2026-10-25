@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from conftest import COVID, SteppedRunner, create, ready_experiment
 from fastapi.testclient import TestClient
@@ -149,7 +149,7 @@ def test_archive_and_restore_unknown_experiment_is_404(client: TestClient) -> No
 
 
 class BrokenSource(FixtureSource):
-    def build(self, disease_id: str) -> BuildSteps:
+    def build(self, disease_id: str, experiment_id: UUID) -> BuildSteps:
         yield "targets"
         raise SourceError("Open Targets did not answer. Try again in a minute.")
 

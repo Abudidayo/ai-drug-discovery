@@ -98,6 +98,8 @@ ExperimentStatus = TypeAliasType(
     "ExperimentStatus", Literal["queued", "building", "ready", "failed"]
 )
 BuildStage = TypeAliasType("BuildStage", Literal["targets", "ranking", "evidence", "saving"])
+RankingMethod = TypeAliasType("RankingMethod", Literal["network", "evidence_only"])
+JuryMode = TypeAliasType("JuryMode", Literal["fixture", "mock", "cortex"])
 CandidateStatus = TypeAliasType(
     "CandidateStatus", Literal["scored", "distance_only", "not_scorable"]
 )
@@ -109,10 +111,12 @@ SelectionReason = TypeAliasType(
         "initial_evidence_quota",
         "evidence_fill_after_deduplication",
         "network_fill_after_deduplication",
+        "evidence_ranking_network_unavailable",
     ],
 )
 UnscorableReason = TypeAliasType(
-    "UnscorableReason", Literal["no_retained_disease_targets", "no_retained_drug_targets"]
+    "UnscorableReason",
+    Literal["no_retained_disease_targets", "no_retained_drug_targets", "network_unavailable"],
 )
 NetworkWarning = TypeAliasType(
     "NetworkWarning", Literal["zero_null_variance", "insufficient_degree_matched_pool"]
@@ -224,17 +228,32 @@ class DiseaseSearchResponse(Model):
 
 
 class RankingSettings(Model):
-    """Settings for the network-proximity ranking (stream B `RankingSettings`)."""
+    """Settings for the ranking (stream B `RankingSettings`). The network-only settings are
+    null when `Experiment.ranking_method` is evidence_only: no network ranking ran."""
 
     top_targets: int = Field(
         ge=1, description="How many Disease Targets to use, strongest evidence first."
     )
-    randomisations: int = Field(
-        ge=2, description="How many random protein sets the closeness comparison draws."
+    randomisations: int | None = Field(
+        ge=2,
+        description=(
+            "How many random protein sets the closeness comparison draws; null when no network "
+            "ranking ran."
+        ),
     )
-    seed: int = Field(ge=0, description="Random seed, so the same inputs give the same ranking.")
-    min_bin_size: int = Field(
-        ge=1, description="Fewest proteins in each degree group used to draw random sets."
+    seed: int | None = Field(
+        ge=0,
+        description=(
+            "Random seed, so the same inputs give the same ranking; null when no network "
+            "ranking ran."
+        ),
+    )
+    min_bin_size: int | None = Field(
+        ge=1,
+        description=(
+            "Fewest proteins in each degree group used to draw random sets; null when no "
+            "network ranking ran."
+        ),
     )
     network_slots: int = Field(
         ge=0, description="Shortlist places filled first from the network ranking."
@@ -253,6 +272,13 @@ class JuryModel(Model):
 class JuryConfig(Model):
     """The fixed Model jury configuration of one Experiment."""
 
+    mode: JuryMode = Field(
+        description=(
+            "fixture: a recorded review with made-up votes. mock: a practice review; no model "
+            "is called and every vote is a placeholder with no scientific meaning. cortex: "
+            "real models through Snowflake Cortex."
+        )
+    )
     models: list[JuryModel] = Field(
         min_length=1, description="The jurors, each a different model family."
     )
@@ -291,7 +317,12 @@ class DiseaseTarget(Model):
             "Strength of the link, not a chance of treatment success."
         ),
     )
-    retained: bool = Field(description="True when the Target maps into the protein network.")
+    retained: bool = Field(
+        description=(
+            "True when the Target maps into the protein network. With no network ranking "
+            "(ranking_method evidence_only) every Target is kept."
+        )
+    )
     excluded_reason: TargetExcludedReason | None = Field(
         description="Why the Target was left out of the network; null when retained."
     )
@@ -446,7 +477,8 @@ class Candidate(Model):
     status: CandidateStatus = Field(
         description=(
             "scored: has a closeness z-score. distance_only: has a network distance but no "
-            "z-score. not_scorable: cannot be placed in the network."
+            "z-score. not_scorable: cannot be placed in the network, including when no network "
+            "ranking ran (unscorable_reason network_unavailable)."
         )
     )
     shortlist_rank: int = Field(
@@ -516,6 +548,16 @@ class Candidate(Model):
                 raise ValueError("a distance_only Candidate has degree_matched_z = null")
         if len(set(self.selected_by)) != len(self.selected_by):
             raise ValueError("selected_by may not repeat a value")
+        fallback = self.unscorable_reason == "network_unavailable"
+        if fallback != ("evidence_ranking_network_unavailable" in self.selection_reasons):
+            raise ValueError(
+                "network_unavailable goes with the evidence_ranking_network_unavailable selection"
+            )
+        if fallback and (
+            self.selected_by != ["evidence"]
+            or self.selection_reasons != ["evidence_ranking_network_unavailable"]
+        ):
+            raise ValueError("with no network ranking a Candidate is selected by evidence only")
         evidence_ids = [item.id for item in self.evidence]
         if len(set(evidence_ids)) != len(evidence_ids):
             raise ValueError("evidence IDs must be unique within a Candidate")
@@ -895,10 +937,20 @@ class Experiment(Model):
     data_releases: list[DataRelease] = Field(
         min_length=1, description="Pinned source releases every result was computed from."
     )
+    ranking_method: RankingMethod = Field(
+        description=(
+            "network: Candidates ranked by network proximity, with direct evidence alongside. "
+            "evidence_only: no network was available, so Candidates are ranked by direct Target "
+            "evidence alone (show 'Evidence ranking - network unavailable'); network is null and "
+            "every Candidate is not_scorable with unscorable_reason network_unavailable."
+        )
+    )
     ranking_settings: RankingSettings
     jury_config: JuryConfig = Field(description="The fixed Model jury for this Experiment.")
     targets: list[DiseaseTarget] = Field(description="Selected Disease Targets, strongest first.")
-    network: NetworkGraph | None = Field(description="Protein subgraph to draw; null until built.")
+    network: NetworkGraph | None = Field(
+        description="Protein subgraph to draw; null until built, and always null for evidence_only."
+    )
     candidates: list[Candidate] = Field(
         max_length=SHORTLIST_MAX,
         description="The shortlist only, in shortlist order. The full ranking is never sent.",
@@ -918,7 +970,34 @@ class Experiment(Model):
         if (self.stage is not None) != (self.status == "building"):
             raise ValueError("stage is set exactly while building")
         check_shortlist(self.candidates)
+        check_ranking_method(
+            self.ranking_method, self.ranking_settings, self.network, self.candidates
+        )
         return self
+
+
+def check_ranking_method(
+    method: RankingMethod,
+    settings: RankingSettings,
+    network: NetworkGraph | None,
+    candidates: list[Candidate],
+) -> None:
+    """Raise ValueError unless the results say what the ranking method says, so an
+    evidence-only Experiment never shows anything that looks like a network result."""
+    network_settings = (settings.randomisations, settings.seed, settings.min_bin_size)
+    fallback = [c.unscorable_reason == "network_unavailable" for c in candidates]
+    if method == "evidence_only":
+        if network is not None:
+            raise ValueError("an evidence_only Experiment has no network")
+        if any(value is not None for value in network_settings) or settings.network_slots:
+            raise ValueError("an evidence_only Experiment has no network ranking settings")
+        if not all(fallback):
+            raise ValueError("every evidence_only Candidate is not_scorable: network_unavailable")
+    else:
+        if any(value is None for value in network_settings):
+            raise ValueError("a network Experiment needs its network ranking settings")
+        if any(fallback):
+            raise ValueError("network_unavailable is only for evidence_only Experiments")
 
 
 def check_shortlist(candidates: list[Candidate]) -> None:

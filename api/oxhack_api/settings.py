@@ -5,18 +5,40 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+"""The repository root. A relative OXHACK_DATA_DIR is read from here, whatever the cwd."""
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="OXHACK_", extra="ignore")
 
-    source: Literal["fixture"] = Field(
+    source: Literal["fixture", "live"] = Field(
         default="fixture",
-        description="Where Experiment data comes from. Only fixture exists until phase 5.",
+        description=(
+            "Where Experiment data comes from. fixture: saved files in fixtures_dir. live: "
+            "stream A's pipeline over the prepared data in data_dir "
+            "(`python -m oxhack_api.prepare`), with the evidence ranking while no network "
+            "ranking is available."
+        ),
+    )
+    data_dir: Path = Field(
+        default=Path("data"),
+        description=(
+            "Prepared source data for the live source (git-ignored). A relative path is "
+            "relative to the repository root."
+        ),
+    )
+    jury: Literal["fixture", "mock", "cortex"] = Field(
+        default="fixture",
+        description=(
+            "The Model jury. fixture: replays fixtures_dir/<disease_id>/jury.json. mock: "
+            "stream A's labelled practice reviewer, no model called. cortex: the models in "
+            "SNOWFLAKE_MODELS through Snowflake Cortex (SNOWFLAKE_ACCOUNT, SNOWFLAKE_PAT)."
+        ),
     )
     fixtures_dir: Path = Field(
         default=FIXTURES_DIR, description="Folder holding the fixture files."
@@ -71,9 +93,63 @@ class Settings(BaseSettings):
     )
 
     @model_validator(mode="after")
+    def _resolve_data_dir(self) -> Settings:
+        if not self.data_dir.is_absolute():
+            self.data_dir = REPO_ROOT / self.data_dir
+        return self
+
+    @model_validator(mode="after")
+    def _live_needs_a_live_jury(self) -> Settings:
+        if self.source == "live" and self.jury == "fixture":
+            raise ValueError(
+                "OXHACK_SOURCE=live needs OXHACK_JURY=mock or cortex: the fixture jury only "
+                "reviews the saved fixture shortlists"
+            )
+        return self
+
+    @model_validator(mode="after")
     def _postgres_needs_a_url(self) -> Settings:
         if self.repo == "postgres" and not self.database_url:
             raise ValueError("OXHACK_REPO=postgres needs OXHACK_DATABASE_URL")
         if self.job_heartbeat_s >= self.job_stale_after_s:
             raise ValueError("OXHACK_JOB_HEARTBEAT_S must be shorter than OXHACK_JOB_STALE_AFTER_S")
         return self
+
+
+class SnowflakeSettings(BaseSettings):
+    """The live Cortex jury's settings, from the `SNOWFLAKE_*` variables stream A reads.
+
+    Only read when OXHACK_JURY=cortex. Stream A's `CortexModel` reads the account and
+    token itself; they are checked here so the API refuses to start without them.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="SNOWFLAKE_", extra="ignore")
+
+    account: str | None = Field(default=None, description="Snowflake account identifier.")
+    pat: SecretStr | None = Field(default=None, description="Programmatic access token.")
+    models: list[str] = Field(
+        default_factory=list[str],
+        description="JSON array of three pinned Cortex model IDs from three model families.",
+    )
+    reasoning_effort: dict[str, str | None] = Field(
+        default_factory=dict[str, str | None],
+        description=(
+            'JSON object of reasoning effort by model ID, e.g. {"openai-gpt-5.4": "low"}; '
+            "null or missing means the provider default."
+        ),
+    )
+
+    def require_complete(self) -> None:
+        """Raise ValueError unless a Cortex jury can run with these settings."""
+        missing = [
+            name
+            for name, value in (("SNOWFLAKE_ACCOUNT", self.account), ("SNOWFLAKE_PAT", self.pat))
+            if not value
+        ]
+        if missing:
+            raise ValueError(f"OXHACK_JURY=cortex needs {' and '.join(missing)}")
+        if len(self.models) != 3 or len(set(self.models)) != 3:
+            raise ValueError(
+                "OXHACK_JURY=cortex needs SNOWFLAKE_MODELS: a JSON array of three distinct "
+                "model IDs, one per model family"
+            )

@@ -1,7 +1,7 @@
 """Where Experiment data comes from: the `ExperimentSource` seam and its fixture mode.
 
-The live source (phase 5) runs stream A's evidence pipeline and stream B's
-ranking; the fixture source reads `fixtures/<disease_id>/experiment.json`.
+The live source (`services/live.py`) runs stream A's evidence pipeline and a
+`RankingBackend`; the fixture source reads `fixtures/<disease_id>/experiment.json`.
 Both build in stages, so the job runner can report progress between them.
 """
 
@@ -11,6 +11,7 @@ import threading
 from collections.abc import Generator
 from pathlib import Path
 from typing import Protocol
+from uuid import UUID
 
 from pydantic import Field, ValidationError, model_validator
 
@@ -24,6 +25,7 @@ from ..schemas import (
     JuryConfig,
     Model,
     NetworkGraph,
+    RankingMethod,
     RankingSettings,
     check_shortlist,
 )
@@ -38,23 +40,31 @@ class ExperimentPlan(Model):
 
     disease: DiseaseRef
     data_releases: list[DataRelease]
+    ranking_method: RankingMethod
     ranking_settings: RankingSettings
-    jury_config: JuryConfig
+    jury_config: JuryConfig | None = Field(
+        description=(
+            "The jury the source's data was reviewed with (the fixture's), or None when the "
+            "jury backend decides. The jury backend has the last word."
+        )
+    )
     fixture_note: str | None
 
 
 class BuildResult(Model):
-    """Everything a build produces."""
+    """Everything a build produces. `network` is None when no network ranking ran."""
 
     targets: list[DiseaseTarget]
-    network: NetworkGraph
+    network: NetworkGraph | None
     candidates: list[Candidate]
 
     @model_validator(mode="after")
     def _consistent(self) -> BuildResult:
         check_shortlist(self.candidates)
-        node_ids = {node.id for node in self.network.nodes}
+        node_ids = {node.id for node in self.network.nodes} if self.network else set[str]()
         for candidate in self.candidates:
+            if candidate.network and self.network is None:
+                raise ValueError(f"{candidate.candidate_id} has a network result but no network")
             if candidate.network and not set(candidate.network.path) <= node_ids:
                 raise ValueError(f"{candidate.candidate_id}'s path leaves the drawn network")
         return self
@@ -71,7 +81,10 @@ class ExperimentSource(Protocol):
         """The fixed settings for a new Experiment, or None if the Disease is unknown."""
         ...
 
-    def build(self, disease_id: str) -> BuildSteps: ...
+    def build(self, disease_id: str, experiment_id: UUID) -> BuildSteps:
+        """Build the Experiment `experiment_id` for the Disease. Runs on the job's thread,
+        never on a request thread, so it may block on files and the network."""
+        ...
 
 
 class ExperimentFixture(Model):
@@ -82,6 +95,7 @@ class ExperimentFixture(Model):
     description: str | None = Field(description="Open Targets definition of the Disease.")
     synonyms: list[str] = Field(description="Other names search should match.")
     data_releases: list[DataRelease]
+    ranking_method: RankingMethod
     ranking_settings: RankingSettings
     jury_config: JuryConfig
     targets: list[DiseaseTarget]
@@ -153,12 +167,13 @@ class FixtureSource:
         return ExperimentPlan(
             disease=fixture.disease,
             data_releases=fixture.data_releases,
+            ranking_method=fixture.ranking_method,
             ranking_settings=fixture.ranking_settings,
             jury_config=fixture.jury_config,
             fixture_note=fixture.fixture_note,
         )
 
-    def build(self, disease_id: str) -> BuildSteps:
+    def build(self, disease_id: str, experiment_id: UUID) -> BuildSteps:
         yield "targets"
         fixture = self.load(disease_id)
         yield "ranking"

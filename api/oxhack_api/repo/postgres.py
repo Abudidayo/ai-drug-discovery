@@ -1,4 +1,4 @@
-"""Postgres storage on the tables in `db/migrations/` (0001 to 0004). psycopg 3, plain SQL.
+"""Postgres storage on the tables in `db/migrations/` (0001 to 0005). psycopg 3, plain SQL.
 
 How the contract maps onto the tables:
 
@@ -51,7 +51,7 @@ from ..schemas import (
 )
 from .base import AlreadyExists, DockInputs, DuplicateComputation
 
-SCHEMA_VERSION = "0004"
+SCHEMA_VERSION = "0005"
 """The newest file in `db/migrations/` this code needs applied."""
 
 Conn = Connection[DictRow]
@@ -194,9 +194,9 @@ class PostgresRepo:
                         """
                         insert into experiments (
                           id, disease_id, disease_name, data_releases, jury_config,
-                          ranking_settings, status, stage, error, network, fixture_note,
-                          created_at, archived_at
-                        ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                          ranking_method, ranking_settings, status, stage, error, network,
+                          fixture_note, created_at, archived_at
+                        ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """,
                         (
                             experiment.id,
@@ -204,6 +204,7 @@ class PostgresRepo:
                             experiment.disease.name,
                             experiment.data_releases,
                             Jsonb(experiment.jury_config.model_dump(mode="json")),
+                            experiment.ranking_method,
                             Jsonb(experiment.ranking_settings.model_dump(mode="json")),
                             experiment.status,
                             experiment.stage,
@@ -225,8 +226,8 @@ class PostgresRepo:
             row = conn.execute(
                 """
                 select id, status, stage, error, disease_id, disease_name, data_releases,
-                       ranking_settings, jury_config, network, fixture_note, created_at,
-                       archived_at
+                       ranking_method, ranking_settings, jury_config, network, fixture_note,
+                       created_at, archived_at
                 from experiments where id = %s
                 """,
                 (experiment_id,),
@@ -264,6 +265,7 @@ class PostgresRepo:
                 "error": row["error"],
                 "disease": {"id": row["disease_id"], "name": row["disease_name"]},
                 "data_releases": row["data_releases"],
+                "ranking_method": row["ranking_method"],
                 "ranking_settings": row["ranking_settings"],
                 "jury_config": row["jury_config"],
                 "targets": targets,
@@ -336,14 +338,14 @@ class PostgresRepo:
         self,
         experiment_id: UUID,
         targets: list[DiseaseTarget],
-        network: NetworkGraph,
+        network: NetworkGraph | None,
         candidates: list[Candidate],
     ) -> None:
         with self.connection() as conn:
             self._update_one(
                 conn,
                 "update experiments set network = %s where id = %s",
-                (Jsonb(network.model_dump(mode="json")), experiment_id),
+                (_json(network and network.model_dump(mode="json")), experiment_id),
             )
             # A rerun after an interrupted build replaces what it left. Votes and
             # docking jobs only exist once the Experiment is ready, so nothing

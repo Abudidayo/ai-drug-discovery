@@ -1,0 +1,506 @@
+"""The live source (`OXHACK_SOURCE=live`): stream A's pipeline over the prepared data.
+
+Prepare the data first with `uv run python -m oxhack_api.prepare`. A build runs
+on the job's thread, in the stages the job runner reports:
+
+- **targets**: stream A's A1 (`pipeline.disease_targets`): every Open Targets
+  26.09 association of the Disease, rescored without clinical-precedence and
+  cancer-biomarker evidence; the top 50 are the Disease Targets. With no network
+  ranking every Target is kept (`retained`).
+- **ranking**: the `RankingBackend` ranks the approved drug universe
+  (`drug_targets.json`, stream A's A2) into a shortlist of at most 15. A
+  shortlisted drug that ChEMBL does not list as its own parent, or whose
+  regulator-backed approval Open Targets cannot confirm, is left out and the next
+  one takes its place; this is stream A's rule from `pipeline.experiment`.
+- **evidence**: stream A's A4 (`build_evidence_packet`): each Candidate's
+  sourced evidence, warnings and PubChem ID. Every item's plain `summary` is
+  built with `plain.py` from structured records (the association score, the
+  ChEMBL mechanism record, the bioactivity pair, the approval report, the
+  warning's toxicity class), never by reading the `statement` text.
+
+Each build also writes its audit trail to `<data_dir>/experiments/<id>/`: the
+Disease Targets, the ranking, the jury evidence packet, mapping coverage and
+stream A's bioactivity cross-check.
+
+**Known answer.** A Candidate is the Experiment's known-answer check when stream
+A's drug universe records a regulator-backed approval of it for this exact
+Disease: an Open Targets 26.09 APPROVAL indication with an FDA, EMA, PMDA or
+DailyMed report, or one of stream A's curated regulator records
+(`pipeline/approval_overrides.json`, e.g. baricitinib for COVID-19). Stage data
+lags regulators, so some real approvals are missing. The flag is computed after
+ranking and never feeds it, but it is not a blind test: the evidence-only
+association scores still include literature and other evidence that may reflect
+the known use, so finding a known answer checks the pipeline, not a discovery
+(plan.md section 6.3).
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import threading
+from collections.abc import Callable, Generator, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass
+from pathlib import Path
+from typing import cast
+from uuid import UUID
+
+import duckdb
+import httpx
+
+from ..schemas import (
+    Candidate,
+    CandidateTarget,
+    DataRelease,
+    DiseaseRef,
+    DiseaseSearchResult,
+    DiseaseTarget,
+    EvidenceItem,
+    Warning,
+)
+from ..stream_a import (
+    CHEMBL_RELEASE,
+    DISEASE_PARQUET,
+    JSON,
+    OT_DATASETS,
+    OT_RELEASE,
+    EvidenceSources,
+    OpenTargetsError,
+    write_json,
+)
+from . import plain
+from .ranking import Ranking, RankingBackend, RankingInput
+from .source import BuildResult, BuildSteps, ExperimentPlan, SourceError
+
+log = logging.getLogger(__name__)
+
+PREPARE_HINT = "Run `uv run python -m oxhack_api.prepare` first."
+
+Dockable = Callable[[str, Sequence[str]], bool]
+"""Whether a binding pose can be computed for a drug (by ChEMBL ID) acting on these Targets."""
+
+
+class DataNotPrepared(RuntimeError):
+    """The data folder is missing what the live source reads."""
+
+
+# ---------------------------------------------------------------------------
+# Disease search and resolution, over the Open Targets disease listing.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DiseaseEntry:
+    id: str
+    name: str
+    description: str | None
+    exact_synonyms: tuple[str, ...]
+    other_synonyms: tuple[str, ...]
+    obsolete_ids: tuple[str, ...]
+
+
+class DiseaseCatalogue:
+    """Every Disease in the Open Targets 26.09 listing, kept in memory (about 46,000)."""
+
+    def __init__(self, path: Path) -> None:
+        with duckdb.connect() as connection:
+            rows = connection.execute(
+                """
+                select id, name, description, exactSynonyms,
+                       list_concat(relatedSynonyms, narrowSynonyms, broadSynonyms),
+                       obsoleteTerms
+                from read_parquet(?)
+                """,
+                [str(path)],
+            ).fetchall()
+        listing = cast(
+            list[tuple[str, str, str | None, list[str] | None, list[str] | None, list[str] | None]],
+            rows,
+        )
+        self._entries = [
+            DiseaseEntry(
+                id=disease_id,
+                name=name,
+                description=description or None,
+                exact_synonyms=_unique(exact or [], name),
+                other_synonyms=_unique(other or [], name, *(exact or [])),
+                obsolete_ids=tuple(obsolete or []),
+            )
+            for disease_id, name, description, exact, other, obsolete in listing
+        ]
+        self._by_id = {entry.id: entry for entry in self._entries}
+        self._by_obsolete: dict[str, list[DiseaseEntry]] = {}
+        for entry in self._entries:
+            for old in entry.obsolete_ids:
+                self._by_obsolete.setdefault(old, []).append(entry)
+
+    def __len__(self) -> int:
+        return len(self._entries)
+
+    def resolve(self, disease_id: str) -> DiseaseEntry | None:
+        """The Disease with this ID, or the one Disease that replaced it (stream A's
+        rule: an exact ID or obsolete-term match, and never an ambiguous one)."""
+        if disease_id in self._by_id:
+            return self._by_id[disease_id]
+        replaced = self._by_obsolete.get(disease_id, [])
+        return replaced[0] if len(replaced) == 1 else None
+
+    def search(self, query: str, limit: int) -> list[DiseaseSearchResult]:
+        """Case-insensitive search of names, synonyms and IDs, best match first.
+
+        Tiers: the ID; the name itself; an exact synonym itself; the name's start; a
+        word in the name; an exact synonym's start; the name containing the query;
+        any synonym containing it. Within a tier, shorter matched text first, then
+        name and ID, so the order is stable.
+        """
+        needle = " ".join(query.split()).casefold()
+        if not needle:
+            return []
+        scored: list[tuple[tuple[int, int, str, str], DiseaseSearchResult]] = []
+        for entry in self._entries:
+            match = _match(entry, needle)
+            if match is None:
+                continue
+            tier, text, synonym = match
+            result = DiseaseSearchResult(
+                id=entry.id,
+                name=entry.name,
+                description=entry.description,
+                matched_synonym=synonym,
+            )
+            scored.append(((tier, len(text), entry.name.casefold(), entry.id), result))
+        scored.sort(key=lambda row: row[0])
+        return [result for _, result in scored[:limit]]
+
+
+def _unique(values: Sequence[str], *skip: str) -> tuple[str, ...]:
+    seen = {value.casefold() for value in skip}
+    kept: list[str] = []
+    for value in values:
+        if value and value.casefold() not in seen:
+            seen.add(value.casefold())
+            kept.append(value)
+    return tuple(kept)
+
+
+def _match(entry: DiseaseEntry, needle: str) -> tuple[int, str, str | None] | None:
+    """(tier, matched text, synonym or None) for the best way the entry matches."""
+    name = entry.name.casefold()
+    if needle == entry.id.casefold():
+        return 0, entry.name, None
+    if needle == name:
+        return 1, entry.name, None
+    exact = [(s, s.casefold()) for s in entry.exact_synonyms]
+    for synonym, folded in exact:
+        if needle == folded:
+            return 2, synonym, synonym
+    if name.startswith(needle):
+        return 3, entry.name, None
+    if any(word.startswith(needle) for word in name.split()[1:]):
+        return 4, entry.name, None
+    starts = [s for s, folded in exact if folded.startswith(needle)]
+    if starts:
+        best = min(starts, key=len)
+        return 5, best, best
+    if needle in name:
+        return 6, entry.name, None
+    contains = [s for s, folded in exact if needle in folded]
+    contains += [s for s in entry.other_synonyms if needle in s.casefold()]
+    if contains:
+        best = min(contains, key=len)
+        return 7, best, best
+    return None
+
+
+# ---------------------------------------------------------------------------
+# The live source.
+# ---------------------------------------------------------------------------
+
+
+class LiveSource:
+    """Implements `ExperimentSource` with stream A's pipeline and a `RankingBackend`."""
+
+    def __init__(
+        self,
+        data_dir: Path,
+        ranking: RankingBackend,
+        *,
+        dockable: Dockable,
+        offline: bool = False,
+    ) -> None:
+        missing = [
+            str(path.relative_to(data_dir))
+            for path in (
+                data_dir / DISEASE_PARQUET,
+                data_dir / "drug_targets.json",
+                *(data_dir / "ot" / dataset for dataset in OT_DATASETS),
+            )
+            if not path.exists()
+        ]
+        if missing:
+            raise DataNotPrepared(
+                f"The live source has no {', '.join(missing)} in {data_dir}. {PREPARE_HINT}"
+            )
+        self._data_dir = data_dir
+        self._ranking = ranking
+        self._dockable = dockable
+        self._offline = offline
+        self._catalogue = DiseaseCatalogue(data_dir / DISEASE_PARQUET)
+        self._drugs = cast(JSON, json.loads((data_dir / "drug_targets.json").read_text()))
+        # Stream A queries Parquet on DuckDB's shared default connection, which is not
+        # thread-safe, so the stages of concurrent builds take turns.
+        self._lock = threading.Lock()
+
+    @property
+    def data_releases(self) -> list[DataRelease]:
+        return [OT_RELEASE, CHEMBL_RELEASE, *self._ranking.releases]
+
+    def search_diseases(self, query: str, limit: int) -> list[DiseaseSearchResult]:
+        return self._catalogue.search(query, limit)
+
+    def plan(self, disease_id: str) -> ExperimentPlan | None:
+        entry = self._catalogue.resolve(disease_id)
+        if entry is None:
+            return None
+        return ExperimentPlan(
+            disease=DiseaseRef(id=entry.id, name=entry.name),
+            data_releases=self.data_releases,
+            ranking_method=self._ranking.method,
+            ranking_settings=self._ranking.settings(),
+            jury_config=None,
+            fixture_note=None,
+        )
+
+    def build(self, disease_id: str, experiment_id: UUID) -> BuildSteps:
+        entry = self._catalogue.resolve(disease_id)
+        if entry is None:
+            raise SourceError(f"Open Targets 26.09 has no Disease {disease_id}.")
+        disease = DiseaseRef(id=entry.id, name=entry.name)
+        sources = EvidenceSources(self._data_dir, offline=self._offline)
+        top_n = self._ranking.settings().top_targets
+
+        yield "targets"
+        with self._lock, _upstream_errors():
+            disease_targets, scores = sources.disease_targets(entry.id, top_n)
+            full_names = sources.target_names(t["target_id"] for t in disease_targets["targets"])
+
+        yield "ranking"
+        with self._lock, _upstream_errors():
+            request = RankingInput(
+                disease_id=entry.id,
+                target_ids=[t["target_id"] for t in disease_targets["targets"]],
+                scores=scores,
+                drugs=self._drugs["drugs"],
+            )
+            ranking = self._shortlist(sources, request)
+        targets = [
+            DiseaseTarget(
+                rank=row["rank"],
+                target_id=row["target_id"],
+                symbol=row["name"],
+                name=full_names.get(row["target_id"]) or row["name"],
+                evidence_only_score=min(1.0, max(0.0, row["evidence_only_score"])),
+                retained=row["target_id"] not in ranking.excluded_targets,
+                excluded_reason=ranking.excluded_targets.get(row["target_id"]),
+            )
+            for row in disease_targets["targets"]
+        ]
+
+        yield "evidence"
+        with self._lock, _upstream_errors():
+            ids = [ranked.candidate_id for ranked in ranking.shortlist]
+            updates, packet = sources.evidence_packet(
+                {"id": entry.id, "name": entry.name},
+                ids,
+                disease_targets,
+                self._drugs,
+                experiment_id=str(experiment_id),
+                releases=list(dict.fromkeys([*self._drugs["releases"], *self._ranking.releases])),
+            )
+            candidates = self._candidates(sources, disease, disease_targets, ranking, updates)
+            self._archive(
+                experiment_id,
+                ranking,
+                disease_targets=disease_targets,
+                evidence_packet=packet,
+                coverage=sources.coverage,
+                consistency=sources.bioactivity_consistency(self._drugs, updates),
+            )
+        return BuildResult(targets=targets, network=ranking.network, candidates=candidates)
+
+    # Ranking ----------------------------------------------------------------
+
+    def _shortlist(self, sources: EvidenceSources, request: RankingInput) -> Ranking:
+        """The backend's shortlist with ineligible drugs replaced, as stream A does it."""
+        by_drug = {drug["drug_id"]: drug for drug in request.drugs}
+        excluded: set[str] = set()
+        while True:
+            ranking = self._ranking.rank(request, frozenset(excluded))
+            ids = [ranked.candidate_id for ranked in ranking.shortlist]
+            conflicts = {i for i in ids if not sources.is_parent(i)}
+            for candidate_id in sorted(conflicts):
+                sources.reject("chembl", candidate_id, "upstream_parent_contract_conflict")
+            unapproved = {
+                i
+                for i in ids
+                if i not in conflicts and not sources.approval(by_drug[i]["source_chembl_ids"])
+            }
+            for candidate_id in sorted(unapproved):
+                sources.reject("open_targets", candidate_id, "regulator_approval_not_confirmed")
+            if not conflicts and not unapproved:
+                break
+            excluded |= conflicts | unapproved
+        if not ranking.shortlist:
+            raise SourceError(
+                "No approved drug acts on a protein with direct evidence for this Disease, so "
+                "there is nothing to shortlist."
+            )
+        return ranking
+
+    # Candidates -------------------------------------------------------------
+
+    def _candidates(
+        self,
+        sources: EvidenceSources,
+        disease: DiseaseRef,
+        disease_targets: JSON,
+        ranking: Ranking,
+        updates: list[JSON],
+    ) -> list[Candidate]:
+        by_update = {update["candidate_id"]: update for update in updates}
+        by_drug = {drug["drug_id"]: drug for drug in self._drugs["drugs"]}
+        symbols = {t["target_id"]: t["name"] for t in disease_targets["targets"]}
+        summaries = _Summaries(sources, disease.name, symbols)
+        candidates: list[Candidate] = []
+        for position, ranked in enumerate(ranking.shortlist, 1):
+            update = by_update[ranked.candidate_id]
+            if not any(item["kind"] == "approval" for item in update["evidence"]):
+                raise SourceError(
+                    f"Open Targets could not confirm a regulator approval for {update['name']}."
+                )
+            targets = [CandidateTarget.model_validate(t) for t in update["targets"]]
+            target_ids = [t.id for t in targets]
+            name = cast(str, update["name"])
+            detail = (
+                plain.network_unavailable(name.capitalize(), disease.name)
+                if ranked.unscorable_reason == "network_unavailable"
+                else None
+            )
+            candidates.append(
+                Candidate(
+                    candidate_id=ranked.candidate_id,
+                    name=name,
+                    status=ranked.status,
+                    shortlist_rank=position,
+                    selected_by=ranked.selected_by,
+                    selection_reasons=ranked.selection_reasons,
+                    network=ranked.network,
+                    unscorable_reason=ranked.unscorable_reason,
+                    unscorable_detail=detail,
+                    direct_evidence_rank=ranked.direct_evidence_rank,
+                    shared_target_count=sum(1 for t in target_ids if t in symbols),
+                    targets=targets,
+                    evidence=[summaries.item(item, update) for item in update["evidence"]],
+                    warnings=[Warning.model_validate(w) for w in update["warnings"]],
+                    safety_status=update["safety_status"],
+                    dockable=self._dockable(ranked.candidate_id, target_ids),
+                    pubchem_cid=update["pubchem_cid"],
+                    known_answer=disease.id
+                    in by_drug[ranked.candidate_id]["approval"]["disease_ids"],
+                )
+            )
+        return candidates
+
+    def _archive(self, experiment_id: UUID, ranking: Ranking, **files: object) -> None:
+        """Keep the build's inputs and checks for audits, as stream A's runs do."""
+        folder = self._data_dir / "experiments" / str(experiment_id)
+        for name, value in files.items():
+            write_json(folder / f"{name}.json", value)
+        write_json(
+            folder / "ranking.json",
+            {
+                "method": self._ranking.method,
+                "settings": self._ranking.settings().model_dump(mode="json"),
+                "eligible": ranking.eligible,
+                "shortlist": [
+                    {
+                        "candidate_id": r.candidate_id,
+                        "direct_evidence_rank": r.direct_evidence_rank,
+                        "selected_by": r.selected_by,
+                        "selection_reasons": r.selection_reasons,
+                        "status": r.status,
+                        "unscorable_reason": r.unscorable_reason,
+                    }
+                    for r in ranking.shortlist
+                ],
+            },
+        )
+
+
+class _Summaries:
+    """Plain summaries of stream A's evidence items, from the structured records."""
+
+    def __init__(self, sources: EvidenceSources, disease: str, symbols: dict[str, str]) -> None:
+        self._sources = sources
+        self._disease = disease
+        self._symbols = symbols
+        self._mechanisms: dict[str, dict[int, JSON]] = {}
+
+    def item(self, item: JSON, update: JSON) -> EvidenceItem:
+        return EvidenceItem.model_validate({**item, "summary": self.summary(item, update)})
+
+    def summary(self, item: JSON, update: JSON) -> str:
+        kind, source_id, values = item["kind"], cast(str, item["source_id"]), item["values"]
+        names = {t["id"]: cast(str, t["name"]) for t in update["targets"]}
+        if kind == "target_association":
+            gene = source_id.split("/")[0]
+            return plain.target_association(
+                self._symbols[gene], self._disease, values["evidence_only_score"]
+            )
+        if kind == "mechanism":
+            record = self._mechanism(update["candidate_id"], int(source_id))
+            target = record.get("target_chembl_id")
+            genes = self._sources.map_target(target) if target else set[str]()
+            acted_on = [name for gene, name in names.items() if gene in genes]
+            if not acted_on:
+                raise ValueError(f"mechanism {source_id} names none of the drug's Targets")
+            return plain.mechanism(plain.join(acted_on), record.get("action_type"))
+        if kind == "bioactivity":
+            _, target = source_id.split("/")
+            genes = self._sources.map_target(target, single=True)
+            if len(genes) != 1 or next(iter(genes)) not in names:
+                raise ValueError(f"bioactivity {source_id} does not map to one of the Targets")
+            return plain.bioactivity(
+                names[next(iter(genes))], values["median_pchembl"], int(values["n_activities"])
+            )
+        if kind == "approval":
+            regulator = self._sources.report_source(source_id)
+            if regulator is None:
+                raise ValueError(f"approval report {source_id} is not in Open Targets")
+            return plain.approval(regulator)
+        if kind == "warning":
+            warning = next(w for w in update["warnings"] if w["evidence_id"] == item["id"])
+            return plain.warning_summary(warning["toxicity_class"])
+        raise ValueError(f"unknown evidence kind {kind}")
+
+    def _mechanism(self, candidate_id: str, mec_id: int) -> JSON:
+        if candidate_id not in self._mechanisms:
+            self._mechanisms[candidate_id] = {
+                record["mec_id"]: record for record in self._sources.mechanisms(candidate_id)
+            }
+        return self._mechanisms[candidate_id][mec_id]
+
+
+@contextmanager
+def _upstream_errors() -> Generator[None]:
+    """Turn a source database failure into a SourceError the user can read."""
+    try:
+        yield
+    except (httpx.HTTPError, OpenTargetsError) as exc:
+        raise SourceError(
+            "A source database (Open Targets, ChEMBL or PubChem) did not give a usable answer "
+            f"({type(exc).__name__}). Try again in a minute."
+        ) from exc
+    except FileNotFoundError as exc:
+        raise SourceError(f"Some source data is missing: {exc}. {PREPARE_HINT}") from exc

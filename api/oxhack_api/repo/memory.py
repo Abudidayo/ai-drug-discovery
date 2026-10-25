@@ -124,7 +124,7 @@ class MemoryRepo:
         self,
         experiment_id: UUID,
         targets: list[DiseaseTarget],
-        network: NetworkGraph,
+        network: NetworkGraph | None,
         candidates: list[Candidate],
     ) -> None:
         self._update(experiment_id, targets=targets, network=network, candidates=candidates)

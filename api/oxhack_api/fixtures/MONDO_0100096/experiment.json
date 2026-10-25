@@ -28,6 +28,7 @@
     "chembl-37",
     "string-12.5"
   ],
+  "ranking_method": "network",
   "ranking_settings": {
     "top_targets": 50,
     "randomisations": 200,
@@ -37,6 +38,7 @@
     "evidence_slots": 5
   },
   "jury_config": {
+    "mode": "fixture",
     "models": [
       {
         "id": "claude-sonnet-5",

@@ -25,7 +25,7 @@ This folder defines the environment that runs the whole stack: Python 3.11, uv, 
    python -c "import vina, rdkit, meeko, gemmi"
    ```
 
-   `python` is the docking venv (`$DOCKING_VENV`). `uv run` uses the project venv once `pyproject.toml` exists. Docking results go to `$RESULTS_DIR` (`/workspaces/results`).
+   `python` is the docking venv (`$DOCKING_VENV`). `uv run` uses the project venv: one uv workspace (stream A's `pipeline/` and `jury/` plus `api/`), synced with `uv sync --all-packages`. Docking results go to `$RESULTS_DIR` (`/workspaces/results`).
 3. Make the API public:
 
    ```bash

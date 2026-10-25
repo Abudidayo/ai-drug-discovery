@@ -120,7 +120,7 @@
           },
           "status": {
             "$ref": "#/components/schemas/CandidateStatus",
-            "description": "scored: has a closeness z-score. distance_only: has a network distance but no z-score. not_scorable: cannot be placed in the network."
+            "description": "scored: has a closeness z-score. distance_only: has a network distance but no z-score. not_scorable: cannot be placed in the network, including when no network ranking ran (unscorable_reason network_unavailable)."
           },
           "targets": {
             "description": "Human proteins the drug acts on; empty when it has none.",
@@ -650,7 +650,7 @@
             "type": "integer"
           },
           "retained": {
-            "description": "True when the Target maps into the protein network.",
+            "description": "True when the Target maps into the protein network. With no network ranking (ranking_method evidence_only) every Target is kept.",
             "title": "Retained",
             "type": "boolean"
           },
@@ -1430,7 +1430,11 @@
                 "type": "null"
               }
             ],
-            "description": "Protein subgraph to draw; null until built."
+            "description": "Protein subgraph to draw; null until built, and always null for evidence_only."
+          },
+          "ranking_method": {
+            "$ref": "#/components/schemas/RankingMethod",
+            "description": "network: Candidates ranked by network proximity, with direct evidence alongside. evidence_only: no network was available, so Candidates are ranked by direct Target evidence alone (show 'Evidence ranking - network unavailable'); network is null and every Candidate is not_scorable with unscorable_reason network_unavailable."
           },
           "ranking_settings": {
             "$ref": "#/components/schemas/RankingSettings"
@@ -1466,6 +1470,7 @@
           "error",
           "disease",
           "data_releases",
+          "ranking_method",
           "ranking_settings",
           "jury_config",
           "targets",
@@ -1732,6 +1737,10 @@
             "title": "Max Attempts",
             "type": "integer"
           },
+          "mode": {
+            "$ref": "#/components/schemas/JuryMode",
+            "description": "fixture: a recorded review with made-up votes. mock: a practice review; no model is called and every vote is a placeholder with no scientific meaning. cortex: real models through Snowflake Cortex."
+          },
           "models": {
             "description": "The jurors, each a different model family.",
             "items": {
@@ -1767,6 +1776,7 @@
           }
         },
         "required": [
+          "mode",
           "models",
           "prompt_version",
           "temperature",
@@ -1775,6 +1785,14 @@
         ],
         "title": "JuryConfig",
         "type": "object"
+      },
+      "JuryMode": {
+        "enum": [
+          "fixture",
+          "mock",
+          "cortex"
+        ],
+        "type": "string"
       },
       "JuryModel": {
         "additionalProperties": false,
@@ -2214,9 +2232,16 @@
         "title": "PoseScore",
         "type": "object"
       },
+      "RankingMethod": {
+        "enum": [
+          "network",
+          "evidence_only"
+        ],
+        "type": "string"
+      },
       "RankingSettings": {
         "additionalProperties": false,
-        "description": "Settings for the network-proximity ranking (stream B `RankingSettings`).",
+        "description": "Settings for the ranking (stream B `RankingSettings`). The network-only settings are\nnull when `Experiment.ranking_method` is evidence_only: no network ranking ran.",
         "properties": {
           "evidence_slots": {
             "description": "Shortlist places filled first from the direct-evidence ranking.",
@@ -2225,10 +2250,17 @@
             "type": "integer"
           },
           "min_bin_size": {
-            "description": "Fewest proteins in each degree group used to draw random sets.",
-            "minimum": 1.0,
-            "title": "Min Bin Size",
-            "type": "integer"
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fewest proteins in each degree group used to draw random sets; null when no network ranking ran.",
+            "title": "Min Bin Size"
           },
           "network_slots": {
             "description": "Shortlist places filled first from the network ranking.",
@@ -2237,16 +2269,30 @@
             "type": "integer"
           },
           "randomisations": {
-            "description": "How many random protein sets the closeness comparison draws.",
-            "minimum": 2.0,
-            "title": "Randomisations",
-            "type": "integer"
+            "anyOf": [
+              {
+                "minimum": 2.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How many random protein sets the closeness comparison draws; null when no network ranking ran.",
+            "title": "Randomisations"
           },
           "seed": {
-            "description": "Random seed, so the same inputs give the same ranking.",
-            "minimum": 0.0,
-            "title": "Seed",
-            "type": "integer"
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Random seed, so the same inputs give the same ranking; null when no network ranking ran.",
+            "title": "Seed"
           },
           "top_targets": {
             "description": "How many Disease Targets to use, strongest evidence first.",
@@ -2313,7 +2359,8 @@
           "initial_network_quota",
           "initial_evidence_quota",
           "evidence_fill_after_deduplication",
-          "network_fill_after_deduplication"
+          "network_fill_after_deduplication",
+          "evidence_ranking_network_unavailable"
         ],
         "type": "string"
       },
@@ -2561,7 +2608,8 @@
       "UnscorableReason": {
         "enum": [
           "no_retained_disease_targets",
-          "no_retained_drug_targets"
+          "no_retained_drug_targets",
+          "network_unavailable"
         ],
         "type": "string"
       },

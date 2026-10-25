@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -20,9 +20,12 @@ from .routes.api import router
 from .services.docking import DockingBackend, FixtureDocking
 from .services.evaluation import EvaluationSource, FixtureEvaluation
 from .services.jury import FixtureJury, JuryBackend
+from .services.live import LiveSource
+from .services.live_jury import StreamAJury
 from .services.molecules import FixtureMolecules, MoleculeSource
+from .services.ranking import EvidenceRanking
 from .services.source import ExperimentSource, FixtureSource
-from .settings import Settings
+from .settings import Settings, SnowflakeSettings
 
 log = logging.getLogger(__name__)
 
@@ -50,8 +53,8 @@ def build_components(
     when the settings say postgres and no repo is given."""
     fixtures = settings.fixtures_dir
     docking = docking or FixtureDocking(fixtures)
-    source = source or FixtureSource(fixtures)
-    jury = jury or FixtureJury(fixtures)
+    source = source or open_source(settings, docking)
+    jury = jury or open_jury(settings)
     repo = repo or open_repo(settings)
     seed_dock_jobs(repo, docking)
     jobs = JobFactory(repo=repo, source=source, jury=jury, docking=docking)
@@ -70,6 +73,35 @@ def build_components(
         molecules=molecules or FixtureMolecules(fixtures),
         runner=runner,
         jobs=jobs,
+    )
+
+
+def open_source(settings: Settings, docking: DockingBackend) -> ExperimentSource:
+    """The Experiment source the settings name. The live source needs prepared data
+    (`python -m oxhack_api.prepare`) and refuses to start without it."""
+    if settings.source == "fixture":
+        return FixtureSource(settings.fixtures_dir)
+    structures = docking.structures()
+
+    def dockable(candidate_id: str, target_ids: Sequence[str]) -> bool:
+        return docking.ligand_smiles(candidate_id) is not None and any(
+            structure.target_id in target_ids for structure in structures
+        )
+
+    # Stream B's network ranking is not merged: plan.md section 4.4's evidence ranking.
+    return LiveSource(settings.data_dir, EvidenceRanking(), dockable=dockable)
+
+
+def open_jury(settings: Settings) -> JuryBackend:
+    """The Model jury the settings name. Cortex refuses to start without its settings."""
+    if settings.jury == "fixture":
+        return FixtureJury(settings.fixtures_dir)
+    if settings.jury == "mock":
+        return StreamAJury("mock")
+    snowflake = SnowflakeSettings()
+    snowflake.require_complete()
+    return StreamAJury(
+        "cortex", models=snowflake.models, reasoning_effort=snowflake.reasoning_effort
     )
 
 

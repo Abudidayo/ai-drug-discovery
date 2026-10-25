@@ -1,9 +1,9 @@
 """The Model jury seam and its fixture mode.
 
-The live jury (phase 6) calls stream A's `jury.client.run_jury` through
-Snowflake Cortex. The fixture jury replays `fixtures/<disease_id>/jury.json`
-one juror at a time. Neither ever invents a vote: an unavailable jury fails the
-run with a reason.
+The live jury (`services/live_jury.py`) calls stream A's `jury.client.run_jury`,
+with Snowflake Cortex models or stream A's labelled mock reviewer. The fixture
+jury replays `fixtures/<disease_id>/jury.json` one juror at a time. None ever
+invents a vote: an unavailable jury fails the run with a reason.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from ..schemas import (
     Consensus,
     Experiment,
     Juror,
+    JuryConfig,
     JuryVote,
     Model,
 )
@@ -53,6 +54,11 @@ JurySteps = Generator[JuryEvent, None, JuryOutcome]
 
 
 class JuryBackend(Protocol):
+    def configure(self, proposed: JuryConfig | None) -> JuryConfig:
+        """The jury a new Experiment is fixed to. `proposed` is the source's (a fixture's
+        recorded jury), or None. Raises JuryUnavailable when there is none to use."""
+        ...
+
     def review(self, experiment: Experiment) -> JurySteps: ...
 
 
@@ -80,6 +86,13 @@ class FixtureJury:
 
     def __init__(self, fixtures_dir: Path) -> None:
         self._dir = fixtures_dir
+
+    def configure(self, proposed: JuryConfig | None) -> JuryConfig:
+        if proposed is None:
+            raise JuryUnavailable(
+                "There is no recorded jury for this data, so the fixture jury cannot review it."
+            )
+        return proposed
 
     def load(self, experiment: Experiment) -> JuryFixture:
         path = self._dir / experiment.disease.id / "jury.json"

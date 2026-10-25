@@ -30,7 +30,7 @@ from ..schemas import (
     JuryRun,
 )
 from .docking import DockingBackend, cache_key, unsupported_reason
-from .jury import JuryBackend
+from .jury import JuryBackend, JuryUnavailable
 from .source import ExperimentSource, SourceError
 
 LIVE_DOCK_STATUSES = ("queued", "running")
@@ -64,6 +64,10 @@ class ExperimentService:
                 f"There is no data for the Disease {disease_id}. Search for a Disease and "
                 "use one of the results."
             )
+        try:
+            jury_config = self.jury.configure(plan.jury_config)
+        except JuryUnavailable as exc:
+            raise Unavailable(str(exc)) from exc
         experiment = Experiment(
             id=uuid4(),
             status="queued",
@@ -71,8 +75,9 @@ class ExperimentService:
             error=None,
             disease=plan.disease,
             data_releases=plan.data_releases,
+            ranking_method=plan.ranking_method,
             ranking_settings=plan.ranking_settings,
-            jury_config=plan.jury_config,
+            jury_config=jury_config,
             targets=[],
             network=None,
             candidates=[],
