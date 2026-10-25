@@ -42,7 +42,9 @@ const CONTESTED_ROW = "minmax(72px, 2.4fr)";
  */
 export function DotPlot({ models, rows, maxRank, hovered, onHover }: DotPlotProps) {
   const style: CSSProperties = {
-    gridTemplateColumns: `max-content minmax(140px, 2.2fr) repeat(${String(models.length)}, minmax(max-content, 1fr))`,
+    // Model names wrap rather than widen their column, so long names ("Practice reviewer A",
+    // "Claude Opus 5.5") never push the table past its panel.
+    gridTemplateColumns: `max-content minmax(120px, 2.2fr) repeat(${String(models.length)}, minmax(6.5em, 1fr))`,
     gridTemplateRows: `auto ${rows.map((row) => (row.contested ? CONTESTED_ROW : ROW)).join(" ")} auto`,
   };
   const anyContested = rows.some((row) => row.contested);

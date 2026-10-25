@@ -37,7 +37,6 @@
 
 .head > * {
   display: flex;
-  white-space: nowrap;
   gap: var(--space-8);
   align-items: center;
   align-self: end;
