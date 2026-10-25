@@ -10,7 +10,7 @@ import pytest
 
 from pipeline.drugs import (
     APPROVAL_SOURCES, Cache, CHEMBL_URL, OT_RELEASE, approval_rows,
-    build_universe, load_approval_overrides, parent_groups, run,
+    build_universe, is_disease_id, load_approval_overrides, parent_groups, run,
 )
 
 
@@ -54,7 +54,7 @@ def test_regulator_universe_and_contract(recorded):
         assert drug["approval"]["sources"]
         assert set(drug["approval"]["sources"]) <= set(APPROVAL_SOURCES)
         assert re.fullmatch(r"CHEMBL[0-9]+", drug["drug_id"])
-        assert all(re.fullmatch(r"[A-Za-z]+_[0-9]+", value)
+        assert all(is_disease_id(value)
                    for value in drug["approval"]["disease_ids"])
         for target in drug["targets"]:
             assert target.keys() == target_keys
@@ -451,3 +451,13 @@ def test_duplicate_override_rejected(tmp_path):
     path.write_text(json.dumps([row, row]))
     with pytest.raises(ValueError, match='Duplicate'):
         load_approval_overrides(path)
+
+
+@pytest.mark.parametrize('disease_id', ['NCIT_C74532', 'EFO_0001378', 'MONDO_0009693'])
+def test_regulator_approval_preserves_alphanumeric_disease_ids(disease_id):
+    row = {'drugId': 'CHEMBL1', 'diseaseId': disease_id, 'maxClinicalStage': 'APPROVAL',
+           'clinicalReportIds': ['r1']}
+    approval = approval_rows([row], [{'id': 'r1', 'source': 'FDA'}])['CHEMBL1']
+    assert approval['disease_ids'] == {disease_id}
+    assert approval['sources'] == {'FDA'}
+    assert approval['unmapped'] == []

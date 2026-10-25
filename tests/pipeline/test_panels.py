@@ -202,3 +202,25 @@ def test_amendment_1_local_ids_skip_aliases_without_changing_evidence():
     assert changes=={'id':{'E2':'E3'},'label':{'C1':'C2'}}
     assert [{k:v for k,v in e.items() if k!='id'} for e in result['evidence']]==[
         {k:v for k,v in e.items() if k!='id'} for e in packet['evidence']]
+
+
+def test_ranking_root_defaults_to_repo_and_accepts_env_and_argument(tmp_path, monkeypatch):
+    from pipeline.panels import resolve_ranking_root
+    monkeypatch.delenv('RANKING_ROOT', raising=False)
+    monkeypatch.chdir(tmp_path)
+    assert resolve_ranking_root() == Path(__file__).resolve().parents[2]
+    monkeypatch.setenv('RANKING_ROOT', str(tmp_path / 'configured'))
+    assert resolve_ranking_root() == tmp_path / 'configured'
+    assert resolve_ranking_root(tmp_path / 'explicit') == tmp_path / 'explicit'
+
+
+@pytest.mark.parametrize('explicit', [False, True])
+def test_replication_uses_configured_protocol_before_preparing_inputs(tmp_path, monkeypatch, explicit):
+    from pipeline.panels import select_replication
+    configured = tmp_path / 'configured'
+    monkeypatch.setenv('RANKING_ROOT', str(tmp_path / 'wrong' if explicit else configured))
+    kwargs = {'ranking_root': configured} if explicit else {}
+    with pytest.raises(FileNotFoundError) as error:
+        select_replication(output=tmp_path / 'output', offline=True, **kwargs)
+    assert Path(error.value.filename) == configured / 'ranking/cohort_protocol.json'
+    assert not (tmp_path / 'output').exists()
