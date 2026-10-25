@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { Link } from "react-router";
 import { useEvaluation } from "../../api/queries";
 import type {
   ConfidenceInterval,
@@ -260,7 +261,14 @@ export function EvaluationPage() {
     figure = <Loading message={text.loading} />;
   }
   return (
-    <PageFrame flow="document">
+    <PageFrame
+      flow="document"
+      header={
+        <Link to="/" className={styles.start}>
+          {text.start}
+        </Link>
+      }
+    >
       <PageBody title={text.title} intro={text.intro}>
         {figure}
       </PageBody>

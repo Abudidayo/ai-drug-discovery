@@ -350,6 +350,8 @@ export const copy = {
   /** `/evaluation`: how well each ranking finds drugs already approved for a disease. */
   evaluation: {
     title: "How well the ranking works",
+    /** The way into the steps, in the header. */
+    start: "Choose a disease",
     intro:
       "A test on past data: for diseases that already have approved treatments, how high does each ranking put them?",
     loading: "Loading the test results",

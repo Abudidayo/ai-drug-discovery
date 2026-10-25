@@ -1,5 +1,25 @@
 /* The evaluation: a results table with dot-and-range marks, then what was tested beside it. */
 
+/* The way into the steps: the header's one button, styled like Next. */
+.start {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-height);
+  margin-left: auto;
+  padding: 0 var(--space-16);
+  border-radius: var(--radius-control);
+  background: var(--color-ink);
+  font-size: var(--text-body-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-paper);
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.start:hover {
+  background: var(--color-ink-hover);
+}
+
 .results,
 .tested {
   display: flex;

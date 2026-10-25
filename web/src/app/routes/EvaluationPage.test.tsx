@@ -31,6 +31,12 @@ describe("Evaluation page", () => {
     // On its own page, the title says it: no link to itself.
     expect(screen.queryByRole("link", { name: text.title })).not.toBeInTheDocument();
     expect(screen.getAllByText(copy.disclaimer)).toHaveLength(1);
+
+    // The header's button leads back into the steps.
+    await user.click(screen.getByRole("link", { name: text.start }));
+    expect(
+      await screen.findByRole("heading", { level: 1, name: copy.steps[0].title }),
+    ).toBeInTheDocument();
   });
 
   it("puts the app's ranking first and the random baseline last", async () => {
