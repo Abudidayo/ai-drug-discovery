@@ -21,7 +21,12 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+
+    "resolveJsonModule": true,
+    "paths": {
+      "@api-fixtures/*": ["../api/oxhack_api/fixtures/*"]
+    }
   },
   "include": ["src"]
 }

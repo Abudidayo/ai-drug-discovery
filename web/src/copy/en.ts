@@ -1,5 +1,9 @@
 import type { components } from "../api/schema";
 
+type BuildStage = components["schemas"]["BuildStage"];
+type EvidenceSource = components["schemas"]["EvidenceSource"];
+type TargetExcludedReason = components["schemas"]["TargetExcludedReason"];
+
 /**
  * The copy deck: every sentence the interface says, in one place (docs/design.md, "Plain words").
  *
@@ -19,6 +23,7 @@ export const copy = {
   back: "Back",
   next: "Next",
   stepsLabel: "Steps",
+  retry: "Try again",
 
   /**
    * The eight steps of plan.md §2, in order. `slug` is the URL segment in `/e/:experimentId/:step`.
@@ -69,6 +74,37 @@ export const copy = {
 
   search: {
     placeholder: "Search diseases",
+    noMatch: (query: string) => `No diseases match “${query}”. Try another name.`,
+    unavailable: "Disease search isn’t answering right now.",
+    createFailed: "The experiment couldn’t be started. The server isn’t answering.",
+  },
+
+  /** An Experiment while it loads, builds or fails. */
+  experiment: {
+    loading: "Loading the experiment",
+    buildLabel: "Building the experiment",
+    queued: "Waiting to start",
+    stages: {
+      targets: "Finding the proteins linked to the disease",
+      ranking: "Placing approved drugs on the protein network",
+      evidence: "Collecting the evidence for each drug",
+      saving: "Saving the results",
+    } satisfies Record<BuildStage, string>,
+    failed: "This experiment couldn’t be built.",
+    chooseAnother: "Choose another disease",
+    unavailable: "The experiment couldn’t be loaded. The server isn’t answering.",
+    notFound: {
+      title: "Experiment not found",
+      body: "There’s no saved experiment at this address.",
+      home: "Choose a disease",
+    },
+  },
+
+  network: {
+    title: "Protein network",
+    label: "Protein network in 3D. Drag to rotate.",
+    unavailable: "The 3D view needs WebGL, which this browser doesn’t offer.",
+    empty: "None of the disease’s proteins are in the protein network, so there’s nothing to draw.",
   },
 
   legend: {
@@ -83,11 +119,18 @@ export const copy = {
     rule: (linked: number, inNetwork: number) =>
       `We use the ${String(linked)} proteins most strongly linked to the disease. ${String(inNetwork)} of them appear in the protein network.`,
     strength: "Link strength",
-    more: (count: number) => `${String(count)} more`,
-    unmapped: (symbol: string) => `${symbol} isn’t in the network, so it can’t be used.`,
+    targetsLabel: "Disease proteins by link strength",
+    excluded: {
+      not_in_graph: (symbol: string) =>
+        `${symbol} isn’t in the protein network, so it can’t be used.`,
+      outside_largest_component: (symbol: string) =>
+        `${symbol} sits apart from the main protein network, so it can’t be used.`,
+    } satisfies Record<TargetExcludedReason, (symbol: string) => string>,
   },
 
   candidates: {
+    ranking: "Ranking",
+    chartLabel: "Candidate drugs: closeness, network rank and evidence rank",
     networkRank: "Network rank",
     evidenceRank: "Evidence rank",
     evidenceRankHelp: "Ranked only by direct links between the drug’s targets and the disease.",
@@ -95,15 +138,37 @@ export const copy = {
     closenessHelp:
       "How near a drug’s targets sit to the disease proteins, compared with random proteins. Lower is closer.",
     showAll: (count: number) => `Show all ${String(count)}`,
+    notMeasured: "Not measured",
+    notRanked: "Not ranked",
     knownAnswer: (drug: string, disease: string) =>
       `${drug} is already used for ${disease}. Finding it shows the method works; it isn’t a new discovery.`,
     selectedBy: { network: "Network", evidence: "Evidence" },
   },
 
   evidence: {
+    listLabel: "Sourced facts",
+    sources: { open_targets: "Open Targets", chembl: "ChEMBL" } satisfies Record<
+      EvidenceSource,
+      string
+    >,
     warningTitle: "Label warning",
+    noWarnings: "No label warnings are recorded. That doesn’t mean the drug is safe.",
     missingTitle: "Not yet known",
     pathTitle: "Why it ranks high",
+    /** For a drug ranked by distance only: it has a route, but closeness didn't rank it high. */
+    routeTitle: "Its route to the disease",
+    noRouteTitle: "Not on the network",
+    route: {
+      self: (drug: string, target: string) =>
+        `${drug} acts on ${target}, which is itself a disease protein.`,
+      direct: (drug: string, target: string, disease: string) =>
+        `${drug} acts on ${target}, which connects directly to ${disease}, a disease protein.`,
+      via: (drug: string, target: string, disease: string, through: string) =>
+        `${drug} acts on ${target}, which reaches ${disease}, a disease protein, through ${through}.`,
+    },
+    moleculeLabel: (drug: string) => `${drug} in 3D. Drag to rotate.`,
+    noModel: "Antibody: no small-molecule 3D model",
+    modelUnavailable: "The 3D model couldn’t be loaded.",
   },
 
   jury: {

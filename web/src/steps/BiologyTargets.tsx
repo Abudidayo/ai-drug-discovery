@@ -1,0 +1,82 @@
+import type { DiseaseTarget, Experiment } from "../api/types";
+import { Panel } from "../app/Figure";
+import { useNetworkHover } from "../app/networkHover";
+import { copy } from "../copy/en";
+import { capitalise } from "../lib/format";
+import styles from "./BiologyTargets.module.css";
+
+const TICKS = [0, 0.25, 0.5, 0.75, 1];
+const percent = (value: number) => `${String(value * 100)}%`;
+const tick = (value: number) => (value === 0 || value === 1 ? String(value) : value.toFixed(2));
+
+/**
+ * Step 2: the Disease's proteins by link strength. Proteins the network can't use are named once,
+ * under the chart, with the reason; the rule sentence says how many were used.
+ */
+export function BiologyTargets({ experiment }: { experiment: Experiment }) {
+  const setHover = useNetworkHover();
+  const used = experiment.targets.filter((target) => target.retained);
+  const excluded = experiment.targets.filter(
+    (
+      target,
+    ): target is DiseaseTarget & {
+      excluded_reason: NonNullable<DiseaseTarget["excluded_reason"]>;
+    } => target.excluded_reason !== null,
+  );
+
+  const point = (target: DiseaseTarget | null) => {
+    setHover(target ? { highlight: [target.target_id], focus: [target.target_id] } : null);
+  };
+
+  return (
+    <Panel area="targets" label={copy.biology.targetsLabel}>
+      {used.length > 0 && (
+        <div className={styles.chart}>
+          <ol className={styles.bars} aria-label={copy.biology.targetsLabel}>
+            {used.map((target) => (
+              <li
+                key={target.target_id}
+                className={styles.row}
+                onPointerEnter={() => {
+                  point(target);
+                }}
+                onPointerLeave={() => {
+                  point(null);
+                }}
+              >
+                <span className={styles.label}>
+                  <b>{target.symbol}</b>
+                  <span>{capitalise(target.name)}</span>
+                </span>
+                <span className={styles.track}>
+                  <i style={{ width: percent(target.evidence_only_score) }} />
+                  <em style={{ left: `calc(${percent(target.evidence_only_score)} + 8px)` }}>
+                    {target.evidence_only_score.toFixed(2)}
+                  </em>
+                </span>
+              </li>
+            ))}
+          </ol>
+          <div className={styles.axis}>
+            <div className={styles.ticks} aria-hidden="true">
+              {TICKS.map((value) => (
+                <span key={value} style={{ left: percent(value) }}>
+                  {tick(value)}
+                </span>
+              ))}
+            </div>
+            <p className={styles.axisTitle}>{copy.biology.strength}</p>
+          </div>
+        </div>
+      )}
+      <div className={styles.notes}>
+        <p>{copy.biology.rule(experiment.targets.length, used.length)}</p>
+        {excluded.map((target) => (
+          <p key={target.target_id}>
+            {copy.biology.excluded[target.excluded_reason](target.symbol)}
+          </p>
+        ))}
+      </div>
+    </Panel>
+  );
+}

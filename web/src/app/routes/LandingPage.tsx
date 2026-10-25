@@ -1,11 +1,14 @@
+import { DiseaseSearch } from "../../steps/DiseaseSearch";
+import { FigureGrid } from "../Figure";
 import { Shell } from "../Shell";
-import { StepPlaceholder } from "../StepPlaceholder";
 
 /** `/`: step 1, choosing a Disease, before any Experiment exists. */
 export function LandingPage() {
   return (
     <Shell step="disease">
-      <StepPlaceholder step="disease" />
+      <FigureGrid layout="search">
+        <DiseaseSearch />
+      </FigureGrid>
     </Shell>
   );
 }

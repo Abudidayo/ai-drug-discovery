@@ -10,11 +10,15 @@
   --color-grey-1: #4d535a;
   --color-grey-2: #6f757c;
   --color-rule: #e1e4e8;
+  --color-placeholder: #a9aeb4;
   --color-disease: #d55e00;
   --color-drug: #0072b2;
   --color-route: #009e73;
   --color-contested: #e69f00;
   --color-redock: #cc79a7;
+  /* 3D plates: neutral proteins and their links, drawn like the charts' greys. */
+  --color-node: #c7cbd0;
+  --color-edge: #a7acb2;
   /* Interaction states derived from ink and paper. */
   --color-hover: #f1f2f4;
   --color-ink-hover: #2a2d31;
@@ -181,6 +185,12 @@ a:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+
   *,
   *::before,
   *::after {

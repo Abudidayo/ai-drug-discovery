@@ -1,0 +1,30 @@
+import type { components } from "./schema";
+
+/**
+ * Short names for the contract's shapes, as the client returns them. openapi-fetch reads every
+ * response through a `Readable` transform that turns fixed-length tuples into plain arrays; this
+ * mirrors it so these types and the client's data are one and the same.
+ */
+type Readable<T> = T extends (infer E)[]
+  ? Readable<E>[]
+  : T extends object
+    ? { [K in keyof T]: Readable<T[K]> }
+    : T;
+
+type Schema<K extends keyof components["schemas"]> = Readable<components["schemas"][K]>;
+
+export type Experiment = Schema<"Experiment">;
+export type ExperimentStatus = Schema<"ExperimentStatus">;
+export type BuildStage = Schema<"BuildStage">;
+export type Candidate = Schema<"Candidate">;
+export type CandidateNetwork = Schema<"CandidateNetwork">;
+export type DiseaseSearchResult = Schema<"DiseaseSearchResult">;
+export type DiseaseTarget = Schema<"DiseaseTarget">;
+export type TargetExcludedReason = Schema<"TargetExcludedReason">;
+export type NetworkGraph = Schema<"NetworkGraph">;
+export type NetworkNode = Schema<"NetworkNode">;
+export type NetworkRole = Schema<"NetworkRole">;
+export type EvidenceItem = Schema<"EvidenceItem">;
+export type EvidenceSource = Schema<"EvidenceSource">;
+export type Warning = Schema<"Warning">;
+export type Conformer = Schema<"Conformer">;

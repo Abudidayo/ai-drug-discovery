@@ -1,16 +1,22 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { copy, stepSlugs, type StepSlug } from "../copy/en";
-import { routes } from "./routes";
+import { covidExperiment, EXPERIMENT_ID } from "../test/fixtures";
+import { renderApp } from "../test/render";
+import { serveExperiment } from "../test/server";
 import { Shell } from "./Shell";
 
+const E = `/e/${EXPERIMENT_ID}`;
+
 function renderAt(path: string) {
-  const router = createMemoryRouter(routes, { initialEntries: [path] });
-  render(<RouterProvider router={router} />);
-  return router;
+  return renderApp(path).router;
 }
+
+beforeEach(() => {
+  serveExperiment(covidExperiment());
+});
 
 const titleOf = (slug: StepSlug) => copy.steps[stepSlugs.indexOf(slug)]?.title ?? "";
 
@@ -23,15 +29,20 @@ function expectOnStep(slug: StepSlug) {
   expect(current[0]).toHaveAccessibleName(title);
 }
 
+/** Steps whose figures later phases build. */
+const PLACEHOLDER_STEPS: StepSlug[] = ["jury", "compare", "pose", "history"];
+
 describe("Shell", () => {
   describe.each(stepSlugs)("step %s", (slug) => {
-    it("says the title once as a heading and marks the nav by state only", () => {
-      renderAt(`/e/exp-1/${slug}`);
+    it("says the title once as a heading and marks the nav by state only", async () => {
+      renderAt(`${E}/${slug}`);
       const title = titleOf(slug);
       const intro = copy.steps[stepSlugs.indexOf(slug)]?.intro ?? "";
+      // Let the Experiment load, so the step's own figure is on screen too.
+      await screen.findAllByText(copy.disclaimer);
 
       expect(screen.getAllByRole("heading", { name: title })).toHaveLength(1);
-      expect(screen.getAllByRole("heading")).toHaveLength(1);
+      expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
       expect(screen.getAllByText(intro)).toHaveLength(1);
       expectOnStep(slug);
       // The title appears in the heading and as the plain nav label, nowhere else.
@@ -39,41 +50,44 @@ describe("Shell", () => {
     });
 
     it("shows the disclaimer exactly once", () => {
-      renderAt(`/e/exp-1/${slug}`);
+      renderAt(`${E}/${slug}`);
       expect(screen.getAllByText(copy.disclaimer)).toHaveLength(1);
     });
 
-    it("labels the buttons exactly Back and Next, with no step counter", () => {
-      renderAt(`/e/exp-1/${slug}`);
-      const buttons = screen.getAllByRole("button").map((button) => button.textContent);
+    it("labels the header buttons exactly Back and Next, with no step counter", () => {
+      renderAt(`${E}/${slug}`);
+      const header = screen.getByRole("banner");
+      const buttons = within(header)
+        .getAllByRole("button")
+        .map((button) => button.textContent);
       expect(buttons).toEqual([copy.back, copy.next]);
       expect(document.body).not.toHaveTextContent(/step \d|\d (of|\/) 8/i);
     });
+  });
 
-    it("renders a placeholder figure naming the phase that fills it", () => {
-      renderAt(`/e/exp-1/${slug}`);
-      expect(screen.getByText(/arrives in phase \w+\./)).toBeInTheDocument();
-    });
+  it.each(PLACEHOLDER_STEPS)("renders a placeholder figure on %s naming its phase", (slug) => {
+    renderAt(`${E}/${slug}`);
+    expect(screen.getByText(/arrives in phase \w+\./)).toBeInTheDocument();
   });
 
   it("disables Back on the first step and Next on the last", () => {
-    renderAt("/e/exp-1/disease");
+    renderAt(`${E}/disease`);
     expect(screen.getByRole("button", { name: copy.back })).toBeDisabled();
     expect(screen.getByRole("button", { name: copy.next })).toBeEnabled();
     cleanup();
 
-    renderAt("/e/exp-1/history");
+    renderAt(`${E}/history`);
     expect(screen.getByRole("button", { name: copy.back })).toBeEnabled();
     expect(screen.getByRole("button", { name: copy.next })).toBeDisabled();
   });
 
   it("moves through the steps with Back and Next", async () => {
     const user = userEvent.setup();
-    const router = renderAt("/e/exp-1/candidates");
+    const router = renderAt(`${E}/candidates`);
 
     await user.click(screen.getByRole("button", { name: copy.next }));
     expectOnStep("evidence");
-    expect(router.state.location.pathname).toBe("/e/exp-1/evidence");
+    expect(router.state.location.pathname).toBe(`${E}/evidence`);
 
     await user.click(screen.getByRole("button", { name: copy.back }));
     await user.click(screen.getByRole("button", { name: copy.back }));
@@ -82,7 +96,7 @@ describe("Shell", () => {
 
   it("moves between steps with ArrowDown and ArrowUp and stops at either end", async () => {
     const user = userEvent.setup();
-    const router = renderAt("/e/exp-1/biology");
+    const router = renderAt(`${E}/biology`);
 
     await user.keyboard("{ArrowDown}");
     expectOnStep("candidates");
@@ -90,7 +104,7 @@ describe("Shell", () => {
     expectOnStep("disease");
     await user.keyboard("{ArrowUp}");
     expectOnStep("disease");
-    expect(router.state.location.pathname).toBe("/e/exp-1/disease");
+    expect(router.state.location.pathname).toBe(`${E}/disease`);
 
     for (let i = 0; i < stepSlugs.length + 2; i++) await user.keyboard("{ArrowDown}");
     expectOnStep("history");
@@ -98,7 +112,7 @@ describe("Shell", () => {
 
   it("ignores arrow keys while an input is focused or a modifier is held", async () => {
     const user = userEvent.setup();
-    renderAt("/e/exp-1/biology");
+    renderAt(`${E}/biology`);
     const input = document.createElement("input");
     document.body.append(input);
 
@@ -113,7 +127,7 @@ describe("Shell", () => {
 
   it("navigates from the step nav", async () => {
     const user = userEvent.setup();
-    renderAt("/e/exp-1/disease");
+    renderAt(`${E}/disease`);
     const nav = screen.getByRole("navigation", { name: copy.stepsLabel });
     await user.click(within(nav).getByRole("link", { name: titleOf("pose") }));
     expectOnStep("pose");
@@ -145,13 +159,13 @@ describe("Disease in the header", () => {
         {
           path: "*",
           element: (
-            <Shell step="biology" experimentId="exp-1" disease="COVID-19">
+            <Shell step="biology" experimentId={EXPERIMENT_ID} disease="COVID-19">
               <p>Figure</p>
             </Shell>
           ),
         },
       ],
-      { initialEntries: ["/e/exp-1/biology"] },
+      { initialEntries: [`${E}/biology`] },
     );
     render(<RouterProvider router={router} />);
     expect(screen.getAllByText("COVID-19")).toHaveLength(1);
@@ -165,16 +179,13 @@ describe("Disease in the header", () => {
 });
 
 describe("Unknown routes", () => {
-  it.each(["/nowhere", "/e/exp-1/not-a-step", "/e/exp-1"])(
-    "%s shows a plain not-found page",
-    (path) => {
-      renderAt(path);
-      expect(
-        screen.getByRole("heading", { level: 1, name: copy.notFound.title }),
-      ).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: copy.notFound.home })).toHaveAttribute("href", "/");
-      expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
-      expect(screen.getAllByText(copy.disclaimer)).toHaveLength(1);
-    },
-  );
+  it.each(["/nowhere", `${E}/not-a-step`, E])("%s shows a plain not-found page", (path) => {
+    renderAt(path);
+    expect(
+      screen.getByRole("heading", { level: 1, name: copy.notFound.title }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: copy.notFound.home })).toHaveAttribute("href", "/");
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    expect(screen.getAllByText(copy.disclaimer)).toHaveLength(1);
+  });
 });
