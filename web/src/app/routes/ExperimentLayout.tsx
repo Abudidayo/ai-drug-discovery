@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Outlet, useParams, useSearchParams } from "react-router";
 import { ApiError } from "../../api/errors";
-import { isBuilding, useExperiment } from "../../api/queries";
+import { hasEarlyResult, isBuilding, useExperiment } from "../../api/queries";
 import type { Experiment } from "../../api/types";
 import { copy, isStepSlug, type StepSlug } from "../../copy/en";
 import { DRUG_PARAM } from "../../steps/EvidenceStep";
@@ -80,10 +80,13 @@ function ExperimentScreen({ experimentId, step }: { experimentId: string; step: 
       ? experiment.disease.name
       : undefined;
   const ready = experiment?.status === "ready";
+  // What is already drawable: the whole Experiment, or its Targets and network mid-build.
+  const drawable = ready || (experiment !== undefined && hasEarlyResult(experiment));
+  const early = drawable && !ready && step === "biology";
   const retry = () => void query.refetch();
 
   let figure;
-  if (RESULT_STEPS.includes(step) && !ready) {
+  if (RESULT_STEPS.includes(step) && !ready && !early) {
     if (experiment === undefined) {
       figure = error ? (
         <Unavailable message={copy.experiment.unavailable} onRetry={retry} />
@@ -96,16 +99,16 @@ function ExperimentScreen({ experimentId, step }: { experimentId: string; step: 
       figure = <BuildFailed experiment={experiment} />;
     }
   } else {
-    const showsNetwork = ready && NETWORK_STEPS.includes(step);
+    const showsNetwork = drawable && NETWORK_STEPS.includes(step);
     figure = (
       <FigureGrid
         layout={(showsNetwork ? LAYOUTS[step] : undefined) ?? fallbackLayout(step, experiment)}
-        network={experiment?.status !== "ready" || experiment.network !== null}
+        network={!drawable || experiment.network !== null}
       >
         <NetworkHoverContext.Provider value={setHover}>
           <Outlet context={{ experiment } satisfies StepContext} />
         </NetworkHoverContext.Provider>
-        {ready && view !== null && (
+        {drawable && view !== null && (
           <NetworkPanel
             experiment={experiment}
             step={step}

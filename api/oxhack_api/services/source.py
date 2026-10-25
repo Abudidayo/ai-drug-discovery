@@ -70,8 +70,17 @@ class BuildResult(Model):
         return self
 
 
-BuildSteps = Generator[BuildStage, None, BuildResult]
-"""Yields each stage as it starts and returns the result. The caller adds `saving`."""
+class EarlyResult(Model):
+    """What a build knows before its Candidates: the Disease Targets and the network.
+    Saved at once, so the app can draw them while the slow evidence step runs."""
+
+    targets: list[DiseaseTarget]
+    network: NetworkGraph | None
+
+
+BuildSteps = Generator[BuildStage | EarlyResult, None, BuildResult]
+"""Yields each stage as it starts, and at most one `EarlyResult` as soon as it is known;
+returns the result. The caller adds `saving`."""
 
 
 class ExperimentSource(Protocol):
@@ -177,6 +186,7 @@ class FixtureSource:
         yield "targets"
         fixture = self.load(disease_id)
         yield "ranking"
+        yield EarlyResult(targets=fixture.targets, network=fixture.network)
         yield "evidence"
         return BuildResult(
             targets=fixture.targets, network=fixture.network, candidates=fixture.candidates

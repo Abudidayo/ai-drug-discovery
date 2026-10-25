@@ -42,6 +42,33 @@ describe("Step 1, Choose a disease, with an Experiment", () => {
 });
 
 describe("Step 2, Its biology", () => {
+  it("draws the proteins and network while the drugs are still being ranked", async () => {
+    const done = covidExperiment();
+    serveExperiment({
+      ...covidExperiment("building", "evidence"),
+      targets: done.targets,
+      network: done.network,
+    });
+    renderApp(`${E}/biology`);
+    await screen.findByRole("img", { name: copy.network.label });
+    const bars = screen.getByRole("list", { name: copy.biology.targetsLabel });
+    expect(within(bars).getAllByRole("listitem")).toHaveLength(8);
+    // One line says what is still happening; the full stage list is gone.
+    expect(screen.getByRole("status")).toHaveTextContent(copy.experiment.stages.evidence);
+    expect(
+      screen.queryByRole("list", { name: copy.experiment.buildLabel }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the full progress list until the proteins are known", async () => {
+    serveExperiment(covidExperiment("building", "targets"));
+    renderApp(`${E}/biology`);
+    expect(
+      await screen.findByRole("list", { name: copy.experiment.buildLabel }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: copy.network.label })).not.toBeInTheDocument();
+  });
+
   it("lists the network's proteins by link strength and names the excluded one once", async () => {
     renderApp(`${E}/biology`);
     await ready();

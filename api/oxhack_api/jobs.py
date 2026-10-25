@@ -31,7 +31,7 @@ from .repo import Repo
 from .schemas import BuildStage, DockJob, Juror, JuryModel, JuryRun
 from .services.docking import DockingBackend, DockingFailed, DockResult
 from .services.jury import JurorStarted, JuryBackend, JuryEvent, JuryUnavailable
-from .services.source import ExperimentSource, SourceError
+from .services.source import EarlyResult, ExperimentSource, SourceError
 
 log = logging.getLogger(__name__)
 
@@ -148,12 +148,23 @@ def build_experiment(repo: Repo, source: ExperimentSource, experiment_id: UUID) 
     if experiment is None or experiment.status in ("ready", "failed"):
         return None
 
+    current: list[BuildStage] = []
+
     def enter(stage: BuildStage) -> Progress:
+        current[:] = [stage]
         repo.set_build_state(experiment_id, "building", stage, None)
         return {"stage": stage}
 
+    def step(item: BuildStage | EarlyResult) -> Progress:
+        if not isinstance(item, EarlyResult):
+            return enter(item)
+        # The Targets and network are drawn while the evidence is still being collected.
+        with repo.locked(experiment_id):
+            repo.save_build_result(experiment_id, item.targets, item.network, [])
+        return {"stage": current[0]} if current else {}
+
     try:
-        result = yield from _each(source.build(experiment.disease.id, experiment_id), enter)
+        result = yield from _each(source.build(experiment.disease.id, experiment_id), step)
         yield enter("saving")
         with repo.locked(experiment_id):
             repo.save_build_result(experiment_id, result.targets, result.network, result.candidates)

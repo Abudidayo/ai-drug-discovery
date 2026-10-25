@@ -31,23 +31,32 @@ def test_create_returns_202_and_a_queued_experiment(client: TestClient) -> None:
 
 
 def test_build_walks_through_every_stage(client: TestClient, runner: SteppedRunner) -> None:
+    """The Disease Targets and network are saved once ranked, before the evidence step, so
+    the app can draw them while the rest builds; the Candidates arrive when it is ready."""
     experiment_id = create(client)["id"]
 
-    def state() -> tuple[str, str | None]:
+    def state() -> tuple[str, str | None, bool, bool, int]:
         body = client.get(f"/api/experiments/{experiment_id}").json()
-        return body["status"], body["stage"]
+        return (
+            body["status"],
+            body["stage"],
+            bool(body["targets"]),
+            body["network"] is not None,
+            len(body["candidates"]),
+        )
 
     seen = [state()]
     while runner.jobs:
         runner.step()
         seen.append(state())
     assert seen == [
-        ("queued", None),
-        ("building", "targets"),
-        ("building", "ranking"),
-        ("building", "evidence"),
-        ("building", "saving"),
-        ("ready", None),
+        ("queued", None, False, False, 0),
+        ("building", "targets", False, False, 0),
+        ("building", "ranking", False, False, 0),
+        ("building", "ranking", True, True, 0),
+        ("building", "evidence", True, True, 0),
+        ("building", "saving", True, True, 0),
+        ("ready", None, True, True, 15),
     ]
 
 

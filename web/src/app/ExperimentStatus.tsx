@@ -36,6 +36,20 @@ export function BuildProgress({ experiment }: { experiment: Experiment }) {
   );
 }
 
+/**
+ * One line while the rest of an Experiment builds beside what is already drawn: the stage in
+ * progress, with the same slowly turning ring as the full list.
+ */
+export function BuildLine({ experiment }: { experiment: Experiment }) {
+  const stage = experiment.stage ?? "targets";
+  return (
+    <p className={styles.line} role="status">
+      <span className={styles.marker} data-state="current" aria-hidden="true" />
+      {copy.experiment.stages[stage]}
+    </p>
+  );
+}
+
 /** A build that failed: the API's plain reason, and the way back to choosing a Disease. */
 export function BuildFailed({ experiment }: { experiment: Experiment }) {
   return (

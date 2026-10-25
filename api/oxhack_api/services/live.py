@@ -80,7 +80,7 @@ from ..stream_a import (
 )
 from . import plain
 from .ranking import Ranking, RankingBackend, RankingInput, archive_full
-from .source import BuildResult, BuildSteps, ExperimentPlan, SourceError
+from .source import BuildResult, BuildSteps, EarlyResult, ExperimentPlan, SourceError
 
 log = logging.getLogger(__name__)
 
@@ -332,6 +332,7 @@ class LiveSource:
             )
             for row in disease_targets["targets"]
         ]
+        yield EarlyResult(targets=targets, network=ranking.network)
 
         yield "evidence"
         with self._lock, _upstream_errors():
