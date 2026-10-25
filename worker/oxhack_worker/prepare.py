@@ -259,6 +259,19 @@ def crystal_ligand(
     return [xyz for _, xyz in heavy], str(residues[0].seqid.num)
 
 
+def complete_molfile(sdf_text: str, title: str, properties: dict[str, str]) -> str:
+    """The ModelServer record's connection table with a title, a 3D dimension code,
+    the counts line's V2000 tag (which the ModelServer leaves out, so readers would
+    take the pose for 2D) and our own properties instead of its per-request ones."""
+    lines = sdf_text.split("$$$$")[0].splitlines()
+    end = next(i for i, line in enumerate(lines) if line.startswith("M  END"))
+    counts = lines[3].ljust(30)[:30] + "999 V2000"
+    block = [title, "  oxhack            3D", "", counts, *lines[4 : end + 1]]
+    for key, value in properties.items():
+        block += [f"> <{key}>", value, ""]
+    return "\n".join([*block, "$$$$"]) + "\n"
+
+
 def control_smiles(comp_id: str, sdf_text: str) -> tuple[str, str]:
     """The ligand's stereo SMILES from the chemical component dictionary, checked to
     fit the crystal pose."""
@@ -313,9 +326,19 @@ def prepare(listing: dict[str, Any], prepared_on: str) -> dict[str, Any]:
 
     clean, changes = clean_receptor(entry_text, chain, center)
     meeko_args = meeko_receptor(clean, out, center)
-    (out / "crystal_ligand.sdf").write_text(
-        sdf_text if sdf_text.endswith("\n") else sdf_text + "\n"
+    title = (
+        f"{listing['ligand']['name']}, crystal pose from PDB {pdb_id} chain {chain}, "
+        f"residue {comp_id} {residue_number}"
     )
+    properties = {
+        "comp_id": comp_id,
+        "name": listing["ligand"]["name"],
+        "pdb_id": pdb_id,
+        "chain": chain,
+        "residue_number": residue_number,
+        "source": ligand_url,
+    }
+    (out / "crystal_ligand.sdf").write_text(complete_molfile(sdf_text, title, properties))
 
     meta = {
         "id": listing["id"],
@@ -358,7 +381,7 @@ def prepare(listing: dict[str, Any], prepared_on: str) -> dict[str, Any]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
     parser.add_argument("pdb_ids", nargs="*", help="Default: every listed structure.")
     args = parser.parse_args(argv)
     listings = json.loads(LISTING.read_text())["structures"]

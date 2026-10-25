@@ -1,7 +1,7 @@
-RXT
-  ModelServer 0.9.13
+ruxolitinib, crystal pose from PDB 6WTN chain A, residue RXT 1204
+  oxhack            3D
 
- 23 26  0  0  1  0  0  0  0  0  0
+ 23 26  0  0  1  0  0  0  0  0999 V2000
    22.1360   11.3500    4.6960 C   0  0  0  0  0  0  0  0  0  0  0  0
    20.9320   10.4190    4.2410 C   0  0  0  0  0  0  0  0  0  0  0  0
    19.6430   11.0420    4.9320 C   0  0  0  0  0  0  0  0  0  0  0  0
@@ -52,46 +52,22 @@ RXT
  21 22  2  0  0  0  0
  22 23  1  0  0  0  0
 M  END
-> <model_server_result.job_id>
-NblkdbQYlraptif6XvUTwg
+> <comp_id>
+RXT
 
-> <model_server_result.datetime_utc>
-2026-10-25 02:33:48
+> <name>
+ruxolitinib
 
-> <model_server_result.server_version>
-0.9.13
-
-> <model_server_result.query_name>
-ligand
-
-> <model_server_result.source_id>
-pdb-bcif
-
-> <model_server_result.entry_id>
+> <pdb_id>
 6WTN
 
-> <model_server_params.name>
-atom_site
+> <chain>
+A
 
-> <model_server_params.value>
-{"auth_asym_id":"A","label_comp_id":"RXT"}
+> <residue_number>
+1204
 
-> <model_server_stats.io_time_ms>
-20
-
-> <model_server_stats.parse_time_ms>
-7
-
-> <model_server_stats.create_model_time_ms>
-2
-
-> <model_server_stats.query_time_ms>
-180
-
-> <model_server_stats.encode_time_ms>
-0
-
-> <model_server_stats.element_count>
-23
+> <source>
+https://models.rcsb.org/v1/6WTN/ligand?auth_asym_id=A&label_comp_id=RXT&encoding=sdf
 
 $$$$

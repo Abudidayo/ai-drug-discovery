@@ -1,7 +1,7 @@
-3JW
-  ModelServer 0.9.13
+baricitinib, crystal pose from PDB 6WTO chain A, residue 3JW 1203
+  oxhack            3D
 
- 26 29  0  0  0  0  0  0  0  0  0
+ 26 29  0  0  0  0  0  0  0  0999 V2000
   -20.2630  -15.6120   10.5180 C   0  0  0  0  0  0  0  0  0  0  0  0
   -19.8010  -14.5440   11.3180 C   0  0  0  0  0  0  0  0  0  0  0  0
   -19.3700  -14.8610   12.5860 C   0  0  0  0  0  0  0  0  0  0  0  0
@@ -58,46 +58,22 @@
  24 25  2  0  0  0  0
  25 26  1  0  0  0  0
 M  END
-> <model_server_result.job_id>
-NI-NXTnFNP6tn5MqtEbFQg
+> <comp_id>
+3JW
 
-> <model_server_result.datetime_utc>
-2026-10-25 02:33:44
+> <name>
+baricitinib
 
-> <model_server_result.server_version>
-0.9.13
-
-> <model_server_result.query_name>
-ligand
-
-> <model_server_result.source_id>
-pdb-bcif
-
-> <model_server_result.entry_id>
+> <pdb_id>
 6WTO
 
-> <model_server_params.name>
-atom_site
+> <chain>
+A
 
-> <model_server_params.value>
-{"auth_asym_id":"A","label_comp_id":"3JW"}
+> <residue_number>
+1203
 
-> <model_server_stats.io_time_ms>
-3
-
-> <model_server_stats.parse_time_ms>
-7
-
-> <model_server_stats.create_model_time_ms>
-2
-
-> <model_server_stats.query_time_ms>
-176
-
-> <model_server_stats.encode_time_ms>
-0
-
-> <model_server_stats.element_count>
-26
+> <source>
+https://models.rcsb.org/v1/6WTO/ligand?auth_asym_id=A&label_comp_id=3JW&encoding=sdf
 
 $$$$

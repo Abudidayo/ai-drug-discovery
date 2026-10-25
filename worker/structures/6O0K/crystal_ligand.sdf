@@ -1,7 +1,7 @@
-LBM
-  ModelServer 0.9.13
+venetoclax, crystal pose from PDB 6O0K chain A, residue LBM 301
+  oxhack            3D
 
- 61 68  0  0  0  0  0  0  0  0  0
+ 61 68  0  0  0  0  0  0  0  0999 V2000
   -11.2570    0.5630  -17.6880 C   0  0  0  0  0  0  0  0  0  0  0  0
   -12.0680    1.6010  -18.0860 C   0  0  0  0  0  0  0  0  0  0  0  0
   -15.0160    3.0490  -16.5960 C   0  0  0  0  0  0  0  0  0  0  0  0
@@ -132,46 +132,22 @@ LBM
  54 60  2  0  0  0  0
  55 60  2  0  0  0  0
 M  END
-> <model_server_result.job_id>
--lKclisHhQxh1pRrnr0qRw
+> <comp_id>
+LBM
 
-> <model_server_result.datetime_utc>
-2026-10-25 02:33:52
+> <name>
+venetoclax
 
-> <model_server_result.server_version>
-0.9.13
-
-> <model_server_result.query_name>
-ligand
-
-> <model_server_result.source_id>
-pdb-bcif
-
-> <model_server_result.entry_id>
+> <pdb_id>
 6O0K
 
-> <model_server_params.name>
-atom_site
+> <chain>
+A
 
-> <model_server_params.value>
-{"auth_asym_id":"A","label_comp_id":"LBM"}
+> <residue_number>
+301
 
-> <model_server_stats.io_time_ms>
-3
-
-> <model_server_stats.parse_time_ms>
-6
-
-> <model_server_stats.create_model_time_ms>
-1
-
-> <model_server_stats.query_time_ms>
-180
-
-> <model_server_stats.encode_time_ms>
-0
-
-> <model_server_stats.element_count>
-122
+> <source>
+https://models.rcsb.org/v1/6O0K/ligand?auth_asym_id=A&label_comp_id=LBM&encoding=sdf
 
 $$$$

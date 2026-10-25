@@ -1,7 +1,7 @@
-EF2
-  ModelServer 0.9.13
+(S)-thalidomide, crystal pose from PDB 7BQU chain A, residue EF2 501
+  oxhack            3D
 
- 19 21  0  0  1  0  0  0  0  0  0
+ 19 21  0  0  1  0  0  0  0  0999 V2000
    24.7700   20.1070   13.4840 O   0  0  0  0  0  0  0  0  0  0  0  0
    25.2560   19.5740   14.4830 C   0  0  0  0  0  0  0  0  0  0  0  0
    26.0990   20.3480   15.2790 N   0  0  0  0  0  0  0  0  0  0  0  0
@@ -43,46 +43,22 @@ EF2
  15 18  2  0  0  0  0
  16 17  1  0  0  0  0
 M  END
-> <model_server_result.job_id>
-v7mLPf4CrHGSSHaKN0GJZQ
+> <comp_id>
+EF2
 
-> <model_server_result.datetime_utc>
-2026-10-25 02:33:56
+> <name>
+(S)-thalidomide
 
-> <model_server_result.server_version>
-0.9.13
-
-> <model_server_result.query_name>
-ligand
-
-> <model_server_result.source_id>
-pdb-bcif
-
-> <model_server_result.entry_id>
+> <pdb_id>
 7BQU
 
-> <model_server_params.name>
-atom_site
+> <chain>
+A
 
-> <model_server_params.value>
-{"auth_asym_id":"A","label_comp_id":"EF2"}
+> <residue_number>
+501
 
-> <model_server_stats.io_time_ms>
-2
-
-> <model_server_stats.parse_time_ms>
-7
-
-> <model_server_stats.create_model_time_ms>
-1
-
-> <model_server_stats.query_time_ms>
-175
-
-> <model_server_stats.encode_time_ms>
-0
-
-> <model_server_stats.element_count>
-19
+> <source>
+https://models.rcsb.org/v1/7BQU/ligand?auth_asym_id=A&label_comp_id=EF2&encoding=sdf
 
 $$$$
