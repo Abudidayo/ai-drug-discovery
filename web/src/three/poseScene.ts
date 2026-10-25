@@ -374,9 +374,9 @@ export class PoseScene {
     // Free the WebGL context now rather than whenever the browser gets round to it. 3Dmol 2.5
     // draws every viewer through one shared offscreen context (its canvas only shows the
     // result), and makes a fresh one for the next viewer once this one is lost.
-    const gl = this.viewer.getRenderer().getContext() as WebGLRenderingContext | null;
-    gl?.getExtension("WEBGL_lose_context")?.loseContext();
     // Detached, the viewer measures 0 × 0 and never tries to restore its lost context.
     this.holder.remove();
+    const gl = this.viewer.getRenderer().getContext() as WebGLRenderingContext | null;
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();
   }
 }
