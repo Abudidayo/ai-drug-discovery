@@ -13,6 +13,7 @@ import { capitalise, date, releaseName } from "../../lib/format";
 import { Loading, Unavailable } from "../ExperimentStatus";
 import { FigureGrid, FigureNote, Panel } from "../Figure";
 import { PageBody, PageFrame } from "../PageFrame";
+import { EXPLORE_PATH } from "../steps";
 import styles from "./EvaluationPage.module.css";
 
 const text = copy.evaluation;
@@ -264,7 +265,7 @@ export function EvaluationPage() {
     <PageFrame
       flow="document"
       header={
-        <Link to="/" className={styles.start}>
+        <Link to={EXPLORE_PATH} className={styles.start}>
           {text.start}
         </Link>
       }

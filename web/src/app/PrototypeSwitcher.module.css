@@ -1,0 +1,70 @@
+/* PROTOTYPE, throwaway: deliberately unlike the page, so it never reads as part of the design. */
+.bar {
+  position: fixed;
+  bottom: var(--space-16);
+  left: 50%;
+  z-index: 100;
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+  height: 40px;
+  padding: 0 var(--space-4);
+  border-radius: 999px;
+  background: rgb(31 34 38 / 92%);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 18%);
+  font-size: var(--text-label-sm);
+  color: var(--color-paper);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.arrow {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  color: inherit;
+}
+
+.arrow svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.5;
+}
+
+.arrow:hover {
+  background: rgb(255 255 255 / 12%);
+}
+
+.arrow:focus-visible {
+  outline-color: var(--color-paper);
+}
+
+.label {
+  min-width: 13em;
+  text-align: center;
+}
+
+.key {
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.count {
+  padding: 0 var(--space-12) 0 var(--space-8);
+  border-left: 1px solid rgb(255 255 255 / 20%);
+  color: rgb(255 255 255 / 60%);
+}
+
+@media (max-width: 720px) {
+  .label {
+    min-width: 0;
+  }
+
+  .count {
+    display: none;
+  }
+}

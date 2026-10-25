@@ -12,7 +12,7 @@ import { useNavigate } from "react-router";
 import { useCommonDiseases, useDiseaseSearch, useOpenDisease } from "../api/queries";
 import type { Experiment } from "../api/types";
 import { Panel } from "../app/Figure";
-import { HOME_PATH, stepPath } from "../app/steps";
+import { EXPLORE_PATH, stepPath } from "../app/steps";
 import { copy } from "../copy/en";
 import styles from "./DiseaseSearch.module.css";
 
@@ -82,7 +82,7 @@ export function DiseaseSearch({ current, preload = false }: DiseaseSearchProps) 
   const show = useCallback(
     (experimentId: string, replace: boolean) => {
       startNavigation(async () => {
-        await navigate(stepPath(experimentId, "disease") ?? HOME_PATH, { replace });
+        await navigate(stepPath(experimentId, "disease") ?? EXPLORE_PATH, { replace });
       });
     },
     [navigate],

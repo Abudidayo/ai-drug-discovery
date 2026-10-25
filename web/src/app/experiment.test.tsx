@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { copy } from "../copy/en";
 import { covidExperiment, EXPERIMENT_ID } from "../test/fixtures";
 import { renderApp } from "../test/render";
+import { EXPLORE_PATH } from "./steps";
 import { fakeApi, http, networkError, server, serveExperiment } from "../test/server";
 
 const E = `/e/${EXPERIMENT_ID}`;
@@ -23,7 +24,7 @@ describe("Choosing a disease", () => {
   it("builds the first common disease on arrival, on step 1, then Next shows its proteins", async () => {
     const created = fakeApi.created;
     const user = userEvent.setup();
-    const { router } = renderApp("/");
+    const { router } = renderApp(EXPLORE_PATH);
 
     // Nothing saved yet: the first common Disease starts building, and step 1 stays on screen
     // with it marked in the list.
@@ -68,7 +69,7 @@ describe("Choosing a disease", () => {
       ),
     );
     const user = userEvent.setup();
-    const { router } = renderApp("/");
+    const { router } = renderApp(EXPLORE_PATH);
     await waitFor(() => {
       expect(router.state.location.pathname).toMatch(/^\/e\/[0-9a-f-]+\/disease$/);
     });
@@ -154,11 +155,11 @@ describe("Choosing a disease", () => {
         response(503).json({ detail: "The ranking service is down." }),
       ),
     );
-    const { router } = renderApp("/");
+    const { router } = renderApp(EXPLORE_PATH);
     // The first common Disease couldn't be opened: step 1 stays, saying so, with a retry.
     expect(await screen.findByText(copy.search.createFailed)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: copy.retry })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/");
+    expect(router.state.location.pathname).toBe(EXPLORE_PATH);
   });
 
   it("swaps in a saved disease in place, with no loading and no new list", async () => {
@@ -270,7 +271,7 @@ describe("An Experiment that isn't ready", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: copy.experiment.chooseAnother })).toHaveAttribute(
       "href",
-      "/",
+      EXPLORE_PATH,
     );
   });
 

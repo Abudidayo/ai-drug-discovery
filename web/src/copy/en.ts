@@ -36,7 +36,7 @@ const decisions = {
  */
 
 export const copy = {
-  product: "Drug repurposing explorer",
+  product: "Half Life",
   back: "Back",
   next: "Next",
   stepsLabel: "Steps",
