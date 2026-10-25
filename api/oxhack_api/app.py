@@ -18,7 +18,7 @@ from .jobs_pg import PostgresQueue, PostgresWorker
 from .repo import AlreadyExists, MemoryRepo, Repo
 from .repo.postgres import PostgresRepo
 from .routes.api import router
-from .services.docking import DockingBackend, FixtureDocking
+from .services.docking import DockingBackend, FixtureDocking, VinaDocking
 from .services.evaluation import EvaluationSource, FixtureEvaluation
 from .services.jury import FixtureJury, JuryBackend
 from .services.live import LiveSource
@@ -53,11 +53,18 @@ def build_components(
     """Fixture-mode pieces by default; any piece can be replaced. Opens the database
     when the settings say postgres and no repo is given."""
     fixtures = settings.fixtures_dir
-    docking = docking or FixtureDocking(fixtures)
-    source = source or open_source(settings, docking)
     jury = jury or open_jury(settings)
+    opened = repo is None
     repo = repo or open_repo(settings)
-    seed_dock_jobs(repo, docking)
+    try:
+        # Vina mode reads each structure's measured control from the repo.
+        docking = docking or open_docking(settings, repo)
+        source = source or open_source(settings, docking)
+        seed_dock_jobs(repo, docking)
+    except Exception:
+        if opened:
+            repo.close()
+        raise
     jobs = JobFactory(repo=repo, source=source, jury=jury, docking=docking)
     if runner is None:
         if isinstance(repo, PostgresRepo):
@@ -75,6 +82,14 @@ def build_components(
         runner=runner,
         jobs=jobs,
     )
+
+
+def open_docking(settings: Settings, repo: Repo) -> DockingBackend:
+    """The docking backend the settings name. Vina mode needs the prepared structures
+    (`python -m oxhack_worker.prepare`); only the docking worker runs its jobs."""
+    if settings.docking == "fixture":
+        return FixtureDocking(settings.fixtures_dir)
+    return VinaDocking(settings.structures_dir, settings.results_dir, settings.fixtures_dir, repo)
 
 
 def open_molecules(settings: Settings) -> MoleculeSource:
@@ -131,8 +146,10 @@ def open_jury(settings: Settings) -> JuryBackend:
 
 
 def seed_dock_jobs(repo: Repo, docking: DockingBackend) -> None:
-    """Save the docking results computed ahead of time. A saved one that differs (its
-    files were prepared again, say) is refreshed, with the jobs that reuse it."""
+    """Save the jobs the backend starts with: fixture results computed ahead of time,
+    or queued redock controls for the docking worker. A saved precomputed result that
+    differs (its files were prepared again, say) is refreshed, with the jobs that
+    reuse it; a queued control is only ever added."""
     for job, inputs in docking.seed_jobs():
         saved = repo.get_dock_job(job.id)
         if saved is None:
@@ -142,7 +159,7 @@ def seed_dock_jobs(repo: Repo, docking: DockingBackend) -> None:
                 # Another process (the API or the worker) saved it first, or another job
                 # already computes the same inputs.
                 log.info("docking job %s is already saved", job.id)
-        elif saved != job:
+        elif job.status == "done" and saved != job:
             log.info("refreshing docking job %s from the fixtures", job.id)
             shared = {"scores": job.scores, "files": job.files, "fixture": job.fixture}
             with repo.transaction():

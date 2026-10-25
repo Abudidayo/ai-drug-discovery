@@ -4,7 +4,8 @@
 - The Model jury is asked at most once per Experiment, and only when it is ready.
 - Jury and docking requests are refused while an Experiment is archived.
 - Archiving is refused while the Experiment is building or a docking job is live.
-- An identical docking computation is reused instead of run twice.
+- An identical docking computation is reused instead of run twice, and an
+  Experiment has at most `MAX_LIVE_DOCK_JOBS` computations waiting or running.
 
 Each change and the job it needs are made in one `repo.locked()` block, so the
 Postgres repo checks the rule, writes the change and queues the job in one
@@ -34,6 +35,9 @@ from .jury import JuryBackend, JuryUnavailable
 from .source import ExperimentSource, SourceError
 
 LIVE_DOCK_STATUSES = ("queued", "running")
+MAX_LIVE_DOCK_JOBS = 3
+"""Most binding poses one Experiment may have waiting or computing at once
+(build-reference C7). A request that reuses a result does not count."""
 _DOCK_FILES: dict[str, DockFileName] = {name: name for name in DOCK_FILE_NAMES.values()}
 
 
@@ -214,6 +218,16 @@ class ExperimentService:
             )
             reused = self.repo.find_reusable_dock_job(inputs.cache_key)
             if reused is None:
+                computing = [
+                    j
+                    for j in experiment.dock_jobs
+                    if j.status in LIVE_DOCK_STATUSES and j.cached_from is None
+                ]
+                if len(computing) >= MAX_LIVE_DOCK_JOBS:
+                    raise Conflict(
+                        f"This Experiment already has {len(computing)} binding poses waiting "
+                        "or being computed. Request another once one has finished."
+                    )
                 try:
                     self.repo.add_dock_job(job, inputs)
                     self.runner.submit(JobRef("dock", job.id))

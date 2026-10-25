@@ -18,6 +18,10 @@ periodically), or failed with a reason after `max_attempts` claims.
 `PostgresQueue.submit` notifies `oxhack_jobs` in the caller's transaction, so
 Postgres wakes the workers when the work is committed, not before. Workers
 also poll, in case a notification is missed.
+
+A worker serves both queues unless told otherwise. With OXHACK_DOCKING=vina the
+pipeline worker serves `jobs` only and the docking worker (`oxhack_worker.queue`)
+serves `dock_jobs` only; each recovers only its own queue's stale jobs.
 """
 
 from __future__ import annotations
@@ -25,6 +29,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Collection
 from dataclasses import dataclass
 from typing import Final, Literal
 from uuid import UUID
@@ -35,7 +40,7 @@ from psycopg.types.json import Jsonb
 
 from .jobs import Job, JobFactory, JobRef, Progress, save_dock_job
 from .repo import AlreadyExists
-from .repo.postgres import PostgresRepo
+from .repo.postgres import Conn, PostgresRepo
 from .settings import Settings
 
 log = logging.getLogger(__name__)
@@ -43,6 +48,7 @@ log = logging.getLogger(__name__)
 CHANNEL: Final = "oxhack_jobs"
 
 Queue = Literal["jobs", "dock_jobs"]
+QUEUES: tuple[Queue, ...] = ("jobs", "dock_jobs")
 
 
 class PostgresQueue:
@@ -79,7 +85,7 @@ class Claim:
 
 
 class PostgresWorker:
-    """Claims queued jobs and runs them on `threads` threads."""
+    """Claims queued jobs from `queues` and runs them on `threads` threads."""
 
     def __init__(
         self,
@@ -92,7 +98,11 @@ class PostgresWorker:
         stale_after: float = 60.0,
         max_attempts: int = 3,
         step_delay: float = 0.0,
+        queues: Collection[Queue] = QUEUES,
     ) -> None:
+        if not queues or not set(queues) <= set(QUEUES):
+            raise ValueError(f"queues must be some of {QUEUES}, got {queues!r}")
+        self.queues = frozenset(queues)
         self._repo = repo
         self._factory = factory
         self._threads = threads
@@ -120,6 +130,8 @@ class PostgresWorker:
             stale_after=settings.job_stale_after_s,
             max_attempts=settings.job_max_attempts,
             step_delay=settings.fixture_delay_ms / 1000,
+            # With real docking, the docking worker (oxhack_worker.queue) runs dock_jobs.
+            queues=("jobs",) if settings.docking == "vina" else QUEUES,
         )
 
     # Lifecycle --------------------------------------------------------------
@@ -199,33 +211,36 @@ class PostgresWorker:
     def claim(self) -> Claim | None:
         """Take the oldest queued job, Experiment and jury work first, then docking."""
         with self._repo.connection() as conn:
-            row = conn.execute(
-                """
-                update jobs set status = 'running', started_at = now(), heartbeat_at = now(),
-                  attempts = attempts + 1, progress = '{}'::jsonb
-                where id = (
-                  select id from jobs where status = 'queued'
-                  order by created_at for update skip locked limit 1
-                )
-                returning id, kind, experiment_id, attempts
-                """
-            ).fetchone()
-            if row is not None:
-                ref = JobRef(row["kind"], row["experiment_id"])
-                return Claim("jobs", row["id"], ref, row["attempts"])
-            row = conn.execute(
-                """
-                update dock_jobs set status = 'running', started_at = now(),
-                  heartbeat_at = now(), attempts = attempts + 1
-                where id = (
-                  select id from dock_jobs where status = 'queued' and cached_from is null
-                  order by created_at for update skip locked limit 1
-                )
-                returning id, attempts
-                """
-            ).fetchone()
-            if row is not None:
-                return Claim("dock_jobs", row["id"], JobRef("dock", row["id"]), row["attempts"])
+            if "jobs" in self.queues:
+                row = conn.execute(
+                    """
+                    update jobs set status = 'running', started_at = now(),
+                      heartbeat_at = now(), attempts = attempts + 1, progress = '{}'::jsonb
+                    where id = (
+                      select id from jobs where status = 'queued'
+                      order by created_at for update skip locked limit 1
+                    )
+                    returning id, kind, experiment_id, attempts
+                    """
+                ).fetchone()
+                if row is not None:
+                    ref = JobRef(row["kind"], row["experiment_id"])
+                    return Claim("jobs", row["id"], ref, row["attempts"])
+            if "dock_jobs" in self.queues:
+                row = conn.execute(
+                    """
+                    update dock_jobs set status = 'running', started_at = now(),
+                      heartbeat_at = now(), attempts = attempts + 1
+                    where id = (
+                      select id from dock_jobs where status = 'queued' and cached_from is null
+                      order by created_at for update skip locked limit 1
+                    )
+                    returning id, attempts
+                    """
+                ).fetchone()
+                if row is not None:
+                    ref = JobRef("dock", row["id"])
+                    return Claim("dock_jobs", row["id"], ref, row["attempts"])
         return None
 
     def run_once(self) -> bool:
@@ -319,59 +334,70 @@ class PostgresWorker:
         them after `max_attempts` claims. Returns the IDs it changed."""
         changed: list[UUID] = []
         with self._repo.connection() as conn:
-            stale = conn.execute(
-                """
-                select id, kind, experiment_id, attempts from jobs
-                where status = 'running' and heartbeat_at < now() - make_interval(secs => %s)
-                for update skip locked
-                """,
-                (self._stale_after,),
-            ).fetchall()
-            for row in stale:
-                ref = JobRef(row["kind"], row["experiment_id"])
-                if row["attempts"] >= self._max_attempts:
-                    error = _gave_up(row["attempts"])
-                    log.warning("job %s (%s) failed: %s", row["id"], ref.kind, error)
-                    conn.execute(
-                        """
-                        update jobs set status = 'failed', error = %s, finished_at = now()
-                        where id = %s
-                        """,
-                        (error, row["id"]),
-                    )
-                    self._factory.abandon(ref, error)
-                else:
-                    log.warning("re-queueing job %s (%s): its worker stopped", row["id"], ref.kind)
-                    conn.execute(
-                        """
-                        update jobs set status = 'queued', started_at = null, heartbeat_at = null
-                        where id = %s
-                        """,
-                        (row["id"],),
-                    )
-                changed.append(row["id"])
-
-            stale_docks = conn.execute(
-                """
-                select id, attempts from dock_jobs
-                where status = 'running' and cached_from is null
-                  and coalesce(heartbeat_at, started_at, created_at)
-                      < now() - make_interval(secs => %s)
-                for update skip locked
-                """,
-                (self._stale_after,),
-            ).fetchall()
-            for row in stale_docks:
-                ref = JobRef("dock", row["id"])
-                if row["attempts"] >= self._max_attempts:
-                    log.warning("docking job %s failed: its worker stopped", row["id"])
-                    self._factory.abandon(ref, _gave_up(row["attempts"]))
-                else:
-                    log.warning("re-queueing docking job %s: its worker stopped", row["id"])
-                    self._requeue_dock(row["id"])
-                changed.append(row["id"])
+            if "jobs" in self.queues:
+                changed += self._requeue_stale_jobs(conn)
+            if "dock_jobs" in self.queues:
+                changed += self._requeue_stale_docks(conn)
         if changed:
             self._wake.set()
+        return changed
+
+    def _requeue_stale_jobs(self, conn: Conn) -> list[UUID]:
+        changed: list[UUID] = []
+        stale = conn.execute(
+            """
+            select id, kind, experiment_id, attempts from jobs
+            where status = 'running' and heartbeat_at < now() - make_interval(secs => %s)
+            for update skip locked
+            """,
+            (self._stale_after,),
+        ).fetchall()
+        for row in stale:
+            ref = JobRef(row["kind"], row["experiment_id"])
+            if row["attempts"] >= self._max_attempts:
+                error = _gave_up(row["attempts"])
+                log.warning("job %s (%s) failed: %s", row["id"], ref.kind, error)
+                conn.execute(
+                    """
+                    update jobs set status = 'failed', error = %s, finished_at = now()
+                    where id = %s
+                    """,
+                    (error, row["id"]),
+                )
+                self._factory.abandon(ref, error)
+            else:
+                log.warning("re-queueing job %s (%s): its worker stopped", row["id"], ref.kind)
+                conn.execute(
+                    """
+                    update jobs set status = 'queued', started_at = null, heartbeat_at = null
+                    where id = %s
+                    """,
+                    (row["id"],),
+                )
+            changed.append(row["id"])
+        return changed
+
+    def _requeue_stale_docks(self, conn: Conn) -> list[UUID]:
+        changed: list[UUID] = []
+        stale_docks = conn.execute(
+            """
+            select id, attempts from dock_jobs
+            where status = 'running' and cached_from is null
+              and coalesce(heartbeat_at, started_at, created_at)
+                  < now() - make_interval(secs => %s)
+            for update skip locked
+            """,
+            (self._stale_after,),
+        ).fetchall()
+        for row in stale_docks:
+            ref = JobRef("dock", row["id"])
+            if row["attempts"] >= self._max_attempts:
+                log.warning("docking job %s failed: its worker stopped", row["id"])
+                self._factory.abandon(ref, _gave_up(row["attempts"]))
+            else:
+                log.warning("re-queueing docking job %s: its worker stopped", row["id"])
+                self._requeue_dock(row["id"])
+            changed.append(row["id"])
         return changed
 
     def _requeue_dock(self, job_id: UUID) -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -20,6 +21,7 @@ from conftest import (
     ready_experiment,
 )
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from oxhack_api.repo import Repo
 from oxhack_api.schemas import DockJob, Structure
@@ -28,7 +30,7 @@ from oxhack_api.services.docking import (
     unsupported_reason,
 )
 from oxhack_api.services.source import FixtureSource
-from oxhack_api.settings import FIXTURES_DIR
+from oxhack_api.settings import FIXTURES_DIR, REPO_ROOT, Settings
 
 
 def test_structures_lists_the_prepared_set(client: TestClient) -> None:
@@ -245,3 +247,50 @@ def test_a_racing_duplicate_reuses_the_job_that_won(
     assert len(runner.jobs) == 1, "the computation runs once"
     jobs = client.get(f"/api/experiments/{second_experiment}").json()["dock_jobs"]
     assert [j["id"] for j in jobs] == [second["id"]]
+
+
+def test_an_experiment_has_at_most_three_computations_waiting(
+    client: TestClient, runner: SteppedRunner
+) -> None:
+    experiment_id = ready_experiment(client, runner)["id"]
+    tofacitinib = "CHEMBL221959"
+    for candidate, structure in (
+        (RUXOLITINIB, "6WTO_A"),
+        (RUXOLITINIB, "6WTN_A"),
+        (BARICITINIB, "6WTN_A"),
+    ):
+        response = dock(client, experiment_id, candidate, structure)
+        assert response.status_code == 202, response.text
+        assert response.json()["status"] == "queued"
+
+    refused = dock(client, experiment_id, tofacitinib, "6WTO_A")
+    assert refused.status_code == 409
+    assert refused.json()["detail"] == (
+        "This Experiment already has 3 binding poses waiting or being computed. "
+        "Request another once one has finished."
+    )
+    # Reusing a result, or following a live run, computes nothing new.
+    assert dock(client, experiment_id, BARICITINIB, "6WTO_A").json()["status"] == "done"
+    follower = dock(client, experiment_id, RUXOLITINIB, "6WTO_A").json()
+    assert follower["status"] == "queued"
+    assert follower["cached_from"] is not None
+
+    runner.drain()
+    assert dock(client, experiment_id, tofacitinib, "6WTO_A").status_code == 202
+
+
+def test_real_docking_needs_postgres() -> None:
+    with pytest.raises(ValidationError, match="OXHACK_DOCKING=vina needs OXHACK_REPO=postgres"):
+        Settings(docking="vina", repo="memory")
+
+
+def test_docking_folders_come_from_the_dev_container_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RESULTS_DIR", "/workspaces/results")
+    monkeypatch.setenv("DOCKING_VENV", "/home/vscode/.venvs/docking")
+    settings = Settings()
+    assert settings.results_dir == Path("/workspaces/results")
+    assert settings.docking_venv == Path("/home/vscode/.venvs/docking")
+    assert settings.structures_dir == REPO_ROOT / "worker" / "structures"
+    assert Settings(results_dir=Path("data/x")).results_dir == REPO_ROOT / "data" / "x"

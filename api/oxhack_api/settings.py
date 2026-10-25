@@ -71,6 +71,45 @@ class Settings(BaseSettings):
         default=4, ge=1, description="Threads that run background jobs, in or out of process."
     )
 
+    # Docking ------------------------------------------------------------------
+
+    docking: Literal["fixture", "vina"] = Field(
+        default="fixture",
+        description=(
+            "Binding poses. fixture: made-up scores for the prepared set in fixtures_dir. "
+            "vina: real AutoDock Vina jobs on the structures in structures_dir, queued in "
+            "Postgres and run by the docking worker (`python -m oxhack_worker.queue`)."
+        ),
+    )
+    structures_dir: Path = Field(
+        default=Path("worker/structures"),
+        description=(
+            "Prepared docking structures (`python -m oxhack_worker.prepare`). A relative "
+            "path is relative to the repository root."
+        ),
+    )
+    results_dir: Path = Field(
+        default=Path("data/docking"),
+        validation_alias=AliasChoices("OXHACK_RESULTS_DIR", "RESULTS_DIR"),
+        description=(
+            "Where the docking worker writes each job's files ({job_id}/), served from "
+            "/api/files. RESULTS_DIR in the dev container. Relative to the repository root."
+        ),
+    )
+    docking_venv: Path | None = Field(
+        default=None,
+        validation_alias=AliasChoices("OXHACK_DOCKING_VENV", "DOCKING_VENV"),
+        description=(
+            "The virtual environment with Vina, Meeko and RDKit (DOCKING_VENV in the dev "
+            "container). Only the docking worker needs it."
+        ),
+    )
+    dock_timeout_s: float = Field(
+        default=180,
+        gt=0,
+        description="A docking run still going after this long is killed and fails.",
+    )
+
     # Storage ------------------------------------------------------------------
 
     repo: Literal["memory", "postgres"] = Field(
@@ -124,6 +163,19 @@ class Settings(BaseSettings):
             self.network_dir = self.data_dir / "ranking" / NETWORK_BUNDLE
         elif not self.network_dir.is_absolute():
             self.network_dir = REPO_ROOT / self.network_dir
+        if not self.structures_dir.is_absolute():
+            self.structures_dir = REPO_ROOT / self.structures_dir
+        if not self.results_dir.is_absolute():
+            self.results_dir = REPO_ROOT / self.results_dir
+        return self
+
+    @model_validator(mode="after")
+    def _vina_needs_postgres(self) -> Settings:
+        if self.docking == "vina" and self.repo != "postgres":
+            raise ValueError(
+                "OXHACK_DOCKING=vina needs OXHACK_REPO=postgres: the docking worker is a "
+                "separate process that claims jobs from Postgres"
+            )
         return self
 
     @model_validator(mode="after")

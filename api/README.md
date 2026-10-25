@@ -38,6 +38,11 @@ uv run uvicorn oxhack_api.app:app --reload     # http://127.0.0.1:8000/docs
 | `OXHACK_JOB_HEARTBEAT_S` | `10` | How often a worker refreshes the heartbeat of the jobs it runs. |
 | `OXHACK_JOB_STALE_AFTER_S` | `60` | A running job with an older heartbeat lost its worker and is re-queued. |
 | `OXHACK_JOB_MAX_ATTEMPTS` | `3` | Claims of one job before a stale one is failed instead of re-queued. |
+| `OXHACK_DOCKING` | `fixture` | `fixture` (made-up scores) or `vina`: real AutoDock Vina jobs run by the docking worker (`python -m oxhack_worker.queue`, see `worker/README.md`). `vina` needs `OXHACK_REPO=postgres`. |
+| `OXHACK_STRUCTURES_DIR` | `worker/structures` | The prepared docking structures, for `vina`. |
+| `RESULTS_DIR` | `data/docking` | Where the docking worker writes each job's files; served from `/api/files`. |
+| `DOCKING_VENV` | none | The venv with Vina, Meeko and RDKit; only the docking worker needs it. |
+| `OXHACK_DOCK_TIMEOUT_S` | `180` | A docking run still going after this long is killed and fails. |
 
 ## Live mode
 
@@ -132,7 +137,9 @@ OXHACK_REPO=postgres OXHACK_DATABASE_URL=postgresql://postgres@localhost:5433/ox
 uv run python -m oxhack_api.worker      # stops on Ctrl-C or SIGTERM
 ```
 
-and start the API with `OXHACK_INPROCESS_WORKER=0`.
+and start the API with `OXHACK_INPROCESS_WORKER=0`. With `OXHACK_DOCKING=vina`
+this worker leaves `dock_jobs` to the docking worker; `scripts/serve.sh` starts
+the API, this worker and the docking worker together.
 
 Job states (both tables):
 

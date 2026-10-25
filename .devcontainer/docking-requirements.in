@@ -4,6 +4,8 @@
 # ProDy is left out: it has no Python 3.11 wheel, and gemmi covers receptor clean-up (C3).
 vina==1.2.7
 meeko==0.8.0
+# Meeko imports scipy (receptor_pdbqt.py) without declaring it as a dependency.
+scipy==1.17.1
 rdkit==2026.9.1
 gemmi==0.7.5
 posebusters==0.6.5
