@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./console";
 
 /*
  * Walks steps 1 to 4 against the real API in fixture mode (COVID-19), the plan's first working
@@ -114,8 +115,13 @@ test("the network persists across steps instead of being rebuilt", async ({ page
   await expect(network).toHaveAttribute("data-marker", "first");
 });
 
-test("an unknown Experiment says so plainly", async ({ page }) => {
-  await page.goto("/e/00000000-0000-4000-8000-000000000000/biology");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Experiment not found");
-  await expectDisclaimerOnce(page);
+test.describe("an unknown Experiment", () => {
+  // The API's 404 is what the page explains; the browser logs the failed request itself.
+  test.use({ expectedConsoleErrors: [/the server responded with a status of 404/] });
+
+  test("says so plainly", async ({ page }) => {
+    await page.goto("/e/00000000-0000-4000-8000-000000000000/biology");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Experiment not found");
+    await expectDisclaimerOnce(page);
+  });
 });

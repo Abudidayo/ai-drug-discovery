@@ -13,15 +13,3 @@ export function stepPath(experimentId: string | undefined, slug: StepSlug): stri
 export function neighbourStep(slug: StepSlug, offset: -1 | 1): StepSlug | undefined {
   return stepSlugs[stepIndex(slug) + offset];
 }
-
-/** Which plan phase fills each step's figure; shown on the placeholder panels until then. */
-export const stepPhase: Record<StepSlug, string> = {
-  disease: "3b",
-  biology: "3b",
-  candidates: "3b",
-  evidence: "3b",
-  jury: "6",
-  compare: "6",
-  pose: "7",
-  history: "4",
-};

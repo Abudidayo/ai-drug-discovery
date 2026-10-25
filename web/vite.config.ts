@@ -15,8 +15,16 @@ export default defineConfig({
     },
   },
   build: {
-    // three.js alone is ~530 kB minified; it loads lazily, only when a 3D figure is shown.
+    // three.js and 3Dmol.js are each ~530-580 kB minified; each loads lazily, only when a 3D
+    // figure needs it.
     chunkSizeWarningLimit: 600,
+    rolldownOptions: {
+      onwarn(warning, warn) {
+        // 3Dmol.js evaluates its own embedded view specs; the app never calls eval.
+        if (warning.code === "EVAL" && warning.id?.includes("/node_modules/3dmol/")) return;
+        warn(warning);
+      },
+    },
   },
   server: {
     proxy: {

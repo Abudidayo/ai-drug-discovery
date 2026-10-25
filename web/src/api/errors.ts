@@ -18,7 +18,7 @@ export class ApiError extends Error {
   }
 }
 
-function detailOf(body: unknown): string | null {
+export function detailOf(body: unknown): string | null {
   if (typeof body === "object" && body !== null && "detail" in body) {
     const { detail } = body;
     if (typeof detail === "string") return detail;
@@ -46,4 +46,20 @@ export async function unwrap<T>(call: Promise<FetchResult<T>>): Promise<T> {
   const { data, error, response } = result;
   if (response.ok && data !== undefined) return data;
   throw new ApiError(response.status, detailOf(error));
+}
+
+/**
+ * Downloads a plain-text file the API serves (a docking result file). Fails like `unwrap`: status
+ * 0 when the API can't be reached, else the HTTP status and the API's reason.
+ */
+export async function fetchText(url: string, signal?: AbortSignal): Promise<string> {
+  let response: Response;
+  try {
+    response = await globalThis.fetch(url, { signal });
+  } catch {
+    throw new ApiError(0, null);
+  }
+  if (response.ok) return response.text();
+  const body: unknown = await response.json().catch(() => null);
+  throw new ApiError(response.status, detailOf(body));
 }

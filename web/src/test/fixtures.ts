@@ -9,6 +9,7 @@ import type {
   BuildStage,
   Conformer,
   DiseaseSearchResult,
+  DockFiles,
   DockJob,
   Experiment,
   ExperimentSummary,
@@ -133,16 +134,52 @@ export function covidWithJury(status: JuryRun["status"] = "done", finished = 3):
   return { ...covidExperiment(), jury: covidJury(status, finished) };
 }
 
-/** A docking job for baricitinib in 6WTO. */
-export function dockJob(status: DockJob["status"], id = "5d0c7a43-8c3e-4b8e-9a51-0e7f0c2b1a01") {
+/** Where a docking job's files are served, as `DockJob.files` lists them. */
+export function dockFiles(jobId: string): DockFiles {
+  const file = (name: string, digit: string) => ({
+    url: `/api/files/${jobId}/${name}`,
+    sha256: digit.repeat(64),
+  });
+  return {
+    receptor: file("receptor.pdb", "a"),
+    poses: file("poses.sdf", "b"),
+    crystal_ligand: file("crystal_ligand.sdf", "c"),
+    scores: file("scores.json", "d"),
+    log: file("log.txt", "e"),
+  };
+}
+
+/** The saved redocking control: baricitinib docked back into 6WTO, with its files. */
+export function redockControl(): DockJob {
   const structure = structures[0];
+  const id = structure?.control.job_id;
+  if (structure === undefined || id == null) throw new Error("No redock control in the fixture");
+  return {
+    ...dockJob("done", id),
+    kind: "redock_control",
+    experiment_id: null,
+    control_rmsd: structure.control.rmsd,
+  };
+}
+
+/**
+ * A docking job for baricitinib in 6WTO (or `candidateId` in its structure). A done job has
+ * scores and files, like the API's saved demo result.
+ */
+export function dockJob(
+  status: DockJob["status"],
+  id = "5d0c7a43-8c3e-4b8e-9a51-0e7f0c2b1a01",
+  candidateId = "CHEMBL2105759",
+) {
+  const structure = structures.find((s) => s.ligand.candidate_id === candidateId) ?? structures[0];
   if (structure === undefined) throw new Error("No structures in the fixture");
+  const done = status === "done";
   const job: DockJob = {
     id,
     kind: "candidate",
     status,
     experiment_id: EXPERIMENT_ID,
-    candidate_id: "CHEMBL2105759",
+    candidate_id: candidateId,
     target_id: structure.target_id,
     structure_id: structure.id,
     settings: {
@@ -155,15 +192,15 @@ export function dockJob(status: DockJob["status"], id = "5d0c7a43-8c3e-4b8e-9a51
       meeko_version: null,
       rdkit_version: null,
     },
-    scores: null,
-    files: null,
+    scores: done ? [{ pose: 1, score: -10.2 }] : null,
+    files: done ? dockFiles(id) : null,
     control_rmsd: null,
-    error: null,
+    error: status === "failed" ? "Vina stopped: the box is outside the receptor." : null,
     cached_from: null,
     fixture: true,
     created_at: "2026-10-25T09:10:00Z",
     started_at: status === "queued" ? null : "2026-10-25T09:10:01Z",
-    finished_at: null,
+    finished_at: done || status === "failed" ? "2026-10-25T09:11:30Z" : null,
   };
   return job;
 }

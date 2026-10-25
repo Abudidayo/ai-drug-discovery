@@ -1,5 +1,5 @@
 import { useOutletContext, useParams } from "react-router";
-import { isStepSlug, stepCopy } from "../../copy/en";
+import { isStepSlug } from "../../copy/en";
 import { BiologyTargets } from "../../steps/BiologyTargets";
 import { CandidatesStep } from "../../steps/CandidatesStep";
 import { CompareStep } from "../../steps/CompareStep";
@@ -7,8 +7,7 @@ import { DiseaseSearch } from "../../steps/DiseaseSearch";
 import { EvidenceStep } from "../../steps/EvidenceStep";
 import { HistoryStep } from "../../steps/HistoryStep";
 import { JuryStep } from "../../steps/JuryStep";
-import { Panel } from "../Figure";
-import { StepPlaceholder } from "../StepPlaceholder";
+import { PoseStep } from "../../steps/PoseStep";
 import type { StepContext } from "./ExperimentLayout";
 
 /** One step's own panels, placed into the layout's figure grid beside the network. */
@@ -31,13 +30,9 @@ export function StepFigure() {
       return ready && <JuryStep experiment={ready} />;
     case "compare":
       return ready && <CompareStep key={ready.id} experiment={ready} />;
+    case "pose":
+      return ready && <PoseStep key={ready.id} experiment={ready} />;
     case "history":
       return <HistoryStep current={experiment} />;
-    default:
-      return (
-        <Panel area="main" label={stepCopy(step).title}>
-          <StepPlaceholder step={step} />
-        </Panel>
-      );
   }
 }

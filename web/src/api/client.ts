@@ -19,3 +19,8 @@ export const api = createClient<paths>({
   baseUrl: apiOrigin,
   fetch: (request) => globalThis.fetch(request),
 });
+
+/** An API path the API itself handed out (such as a docking file's `url`), as a full URL. */
+export function apiUrl(path: string): string {
+  return new URL(path, apiOrigin).href;
+}

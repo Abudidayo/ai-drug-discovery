@@ -38,6 +38,15 @@
     "plot objection";
 }
 
+/* The binding pose takes the stage; what it means and what is missing sit beside it. */
+.grid[data-layout="pose"] {
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 7.4fr) minmax(0, 4.6fr);
+  grid-template-areas:
+    "pose scores"
+    "pose unsupported";
+}
+
 .grid[data-layout="single"] {
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "main";
@@ -95,6 +104,18 @@
 
 .panel[data-area="objection"] {
   grid-area: objection;
+}
+
+.panel[data-area="pose"] {
+  grid-area: pose;
+}
+
+.panel[data-area="scores"] {
+  grid-area: scores;
+}
+
+.panel[data-area="unsupported"] {
+  grid-area: unsupported;
 }
 
 .panel[data-area="main"] {
@@ -221,6 +242,14 @@
 
   .grid[data-layout="jury"] {
     grid-template-areas: "plot" "agreement" "objection";
+  }
+
+  .grid[data-layout="pose"] {
+    grid-template-areas: "pose" "scores" "unsupported";
+  }
+
+  .panel[data-area="pose"] {
+    min-height: 480px;
   }
 
   .panel[data-area="net"] {

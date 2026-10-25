@@ -1,10 +1,17 @@
 import type { components } from "../api/schema";
+import type { UnsupportedReason } from "../lib/docking";
 
 type BuildStage = components["schemas"]["BuildStage"];
 type Decision = components["schemas"]["Decision"];
 type JurorStatus = components["schemas"]["JurorStatus"];
 type EvidenceSource = components["schemas"]["EvidenceSource"];
 type TargetExcludedReason = components["schemas"]["TargetExcludedReason"];
+type ControlStatus = components["schemas"]["ControlStatus"];
+
+/** A length in ångströms, e.g. 1.74 Å or 2 Å: at most two decimals, no trailing zeros. */
+function angstrom(value: number): string {
+  return `${String(Number(value.toFixed(2)))} Å`;
+}
 
 /**
  * The copy deck: every sentence the interface says, in one place (docs/design.md, "Plain words").
@@ -237,20 +244,69 @@ export const copy = {
   },
 
   pose: {
-    structure: (pdbId: string, resolutionAngstrom: number) =>
-      `Crystal structure ${pdbId}, ${resolutionAngstrom.toFixed(1)} Å`,
+    pick: "Change drug",
+    /** The structure line: which crystal structure of which protein, and how sharp it is. */
+    structure: (pdbId: string, symbol: string, resolutionAngstrom: number) =>
+      `Crystal structure ${pdbId} of ${symbol}, ${angstrom(resolutionAngstrom)} resolution`,
+    viewerLabel: (drug: string, protein: string) =>
+      `${drug} in ${protein}, in 3D. Drag to rotate, scroll to zoom.`,
+    show: "Show binding pose",
+    archived: "This experiment is archived. Restore it in Saved experiments to compute a pose.",
+    queued: "Waiting to start",
+    running: "Computing the binding pose. This can take up to three minutes.",
+    failed: "The binding pose couldn’t be computed.",
+    requestFailed: "The binding pose couldn’t be requested. The server isn’t answering.",
+    unavailable: "Docking isn’t available right now.",
+    /** Docking is down, but this pair was computed before. Replaces `unavailable`. */
+    saved: "Docking isn’t available right now, so this is a saved result.",
+    noFiles: "This result has a score but no 3D model to show.",
+    loading: "Loading the 3D model",
+    filesFailed: "The 3D model couldn’t be loaded.",
+    noneSupported: "None of these drugs can be docked yet.",
+    scoresLabel: "How far to trust this pose",
     score: "Docking score",
-    scoreHelp: "A fit estimate from the docking program. Not binding strength.",
+    scoreHelp:
+      "A rough fit estimate from the docking program, without units. More negative is a better fit. It isn’t a measured binding strength.",
     redock: "Redock check",
-    redockHelp: "How far a re-predicted pose lands from the real one. Under 2 Å is a good match.",
-    caveat: "A pose shows how a drug might fit. It doesn’t show how well it works.",
+    redockHelp: (threshold: number) =>
+      `We dock the crystal’s own drug back into this structure and measure how far it lands from its real position. Under ${angstrom(threshold)} means the setup finds a known answer; it says nothing about other drugs.`,
+    redockStatus: {
+      passed: "Good match",
+      failed: "Poor match",
+      not_measured: "Not measured yet",
+    } satisfies Record<ControlStatus, string>,
+    /** Fixture data, said once for every made-up value on the screen. */
+    fixture: (result: "pose" | "score" | null, control: boolean): string | null => {
+      const subject =
+        result === "pose"
+          ? "this pose, its docking score"
+          : result === "score"
+            ? "this docking score"
+            : null;
+      if (subject === null) return control ? "Demo data: the redock check is made up." : null;
+      if (control) return `Demo data: ${subject} and the redock check are made up.`;
+      return result === "pose"
+        ? "Demo data: this pose and its docking score are made up."
+        : "Demo data: this docking score is made up.";
+    },
+    caveat:
+      "A pose is a guess at how a drug could sit in this pocket. It isn’t evidence that the drug binds here, or that it works.",
     controls: {
       surface: "Pocket surface",
-      control: "Redock overlay",
+      overlay: "Crystal position",
       spin: "Spin",
       reset: "Reset view",
     },
+    legend: { protein: "Protein", drug: "Drug" },
     unsupportedTitle: "Not available yet",
+    unsupported: {
+      no_structure: (names: string, count: number) =>
+        `${names}: no prepared structure of ${count === 1 ? "its" : "their"} target proteins yet.`,
+      antibody: (names: string, count: number) =>
+        `${names} ${count === 1 ? "is an antibody" : "are antibodies"}. Docking needs a small molecule.`,
+      not_dockable: (names: string, count: number) =>
+        `${names}: ${count === 1 ? "its" : "their"} structure isn’t ready for docking yet.`,
+    } satisfies Record<UnsupportedReason, (names: string, count: number) => string>,
   },
 
   history: {
@@ -282,9 +338,6 @@ export const copy = {
     body: "This page couldn’t be shown. Reload to try again.",
     home: "Choose a disease",
   },
-
-  /** Placeholder panels while the app is built phase by phase (see the workstream C plan). */
-  pending: (phase: string) => `This step’s figure arrives in phase ${phase}.`,
 } as const;
 
 export type StepCopy = (typeof copy.steps)[number];

@@ -29,9 +29,6 @@ function expectOnStep(slug: StepSlug) {
   expect(current[0]).toHaveAccessibleName(title);
 }
 
-/** Steps whose figures later phases build. */
-const PLACEHOLDER_STEPS: StepSlug[] = ["pose"];
-
 describe("Shell", () => {
   describe.each(stepSlugs)("step %s", (slug) => {
     it("says the title once as a heading and marks the nav by state only", async () => {
@@ -63,11 +60,6 @@ describe("Shell", () => {
       expect(buttons).toEqual([copy.back, copy.next]);
       expect(document.body).not.toHaveTextContent(/step \d|\d (of|\/) 8/i);
     });
-  });
-
-  it.each(PLACEHOLDER_STEPS)("renders a placeholder figure on %s naming its phase", (slug) => {
-    renderAt(`${E}/${slug}`);
-    expect(screen.getByText(/arrives in phase \w+\./)).toBeInTheDocument();
   });
 
   it("disables Back on the first step and Next on the last", () => {

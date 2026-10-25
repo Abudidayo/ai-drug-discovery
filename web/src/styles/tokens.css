@@ -19,6 +19,13 @@
   /* 3D plates: neutral proteins and their links, drawn like the charts' greys. */
   --color-node: #c7cbd0;
   --color-edge: #a7acb2;
+  /* The binding pose: the target protein's backbone in a pale drug-target blue, so the drug in
+     ink stands out; the drug's other elements in muted standard chemistry colours. */
+  --color-backbone: #9fc2e2;
+  --color-element-n: #2a62c9;
+  --color-element-o: #d0352b;
+  --color-element-s: #d4a800;
+  --color-element-halogen: #3d8a4f;
   /* Interaction states derived from ink and paper. */
   --color-hover: #f1f2f4;
   --color-ink-hover: #2a2d31;

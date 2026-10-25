@@ -2,10 +2,12 @@ import { useQueries } from "@tanstack/react-query";
 import { type CSSProperties, lazy, Suspense, useState, type ReactNode } from "react";
 import { conformerQuery, useStructures } from "../api/queries";
 import type { Candidate, DockJob, Experiment, JuryRun, Structure } from "../api/types";
+import { DrugPicker } from "../app/DrugPicker";
 import { Panel } from "../app/Figure";
 import { Marker } from "../charts/Marker";
 import { copy, stepCopy } from "../copy/en";
 import { approvals, defaultPicks, warningSentence } from "../lib/candidates";
+import { structureFor } from "../lib/docking";
 import { drugName, listOf } from "../lib/format";
 import { decisionsFor } from "../lib/jury";
 import type { StripItem } from "../three/MoleculeStrip";
@@ -39,10 +41,7 @@ function poseText(
   if (live) return copy.compare.pose.running(symbol(live.target_id, live.structure_id));
   if (!candidate.dockable) return copy.compare.pose.unavailable;
   if (structures === undefined) return null;
-  const targets = new Set(candidate.targets.map((target) => target.id));
-  const structure =
-    structures.find((s) => s.ligand.candidate_id === candidate.candidate_id) ??
-    structures.find((s) => targets.has(s.target_id));
+  const structure = structureFor(candidate, structures);
   return structure
     ? copy.compare.pose.possible(structure.target_symbol)
     : copy.compare.pose.unavailable;
@@ -169,26 +168,20 @@ export function CompareStep({ experiment }: { experiment: Experiment }) {
           <span role="columnheader" className={styles.corner} />
           {chosen.map((candidate, column) => (
             <span role="columnheader" key={column} className={styles.pick}>
-              <select
-                aria-label={copy.compare.pick}
+              <DrugPicker
+                label={copy.compare.pick}
                 value={candidate.candidate_id}
-                onChange={(event) => {
-                  pick(column, event.target.value);
+                options={candidates.map((option) => ({
+                  id: option.candidate_id,
+                  name: drugName(option.name),
+                  disabled:
+                    option.candidate_id !== candidate.candidate_id &&
+                    picks.includes(option.candidate_id),
+                }))}
+                onChange={(id) => {
+                  pick(column, id);
                 }}
-              >
-                {candidates.map((option) => (
-                  <option
-                    key={option.candidate_id}
-                    value={option.candidate_id}
-                    disabled={
-                      option.candidate_id !== candidate.candidate_id &&
-                      picks.includes(option.candidate_id)
-                    }
-                  >
-                    {drugName(option.name)}
-                  </option>
-                ))}
-              </select>
+              />
             </span>
           ))}
         </div>

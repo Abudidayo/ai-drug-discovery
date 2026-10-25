@@ -32,8 +32,64 @@ vi.mock("three", async (importOriginal) => {
   return { ...three, WebGLRenderer: FakeWebGLRenderer };
 });
 
+/**
+ * 3Dmol.js stands in as a viewer that keeps its models and surfaces in lists and draws nothing.
+ * Like the real 3Dmol 2.x, `addSurface` answers a promise of the surface's ID, and it puts one
+ * canvas in its element, so the step's WebGL canvases can be counted.
+ */
+vi.mock("3dmol", () => {
+  class FakeModel {
+    setStyle = noop;
+    selectedAtoms = () => [{ x: 0, y: 0, z: 0, chain: "A", resi: 1 }];
+  }
+  class FakeViewer {
+    readonly models: FakeModel[] = [];
+    readonly surfaces = new Set<number>();
+    private readonly canvas: HTMLCanvasElement;
+    private nextSurface = 1;
+    constructor(element: HTMLElement) {
+      this.canvas = document.createElement("canvas");
+      element.append(this.canvas);
+    }
+    addModel = () => {
+      const model = new FakeModel();
+      this.models.push(model);
+      return model;
+    };
+    removeModel = (model: FakeModel) => {
+      this.models.splice(this.models.indexOf(model), 1);
+    };
+    addSurface = () => {
+      const id = this.nextSurface++;
+      this.surfaces.add(id);
+      return Promise.resolve(id);
+    };
+    removeSurface = (id: number) => {
+      this.surfaces.delete(id);
+    };
+    getCanvas = () => this.canvas;
+    getRenderer = () => ({ getContext: () => this.canvas.getContext("webgl2") });
+    getView = () => [0, 0, 0, 0, 0, 0, 0, 1];
+    setStyle = noop;
+    setViewStyle = noop;
+    setView = noop;
+    zoomTo = noop;
+    zoom = noop;
+    spin = noop;
+    rotate = noop;
+    render = noop;
+    clear = noop;
+  }
+  return {
+    createViewer: (element: HTMLElement) => new FakeViewer(element),
+    SurfaceType: { VDW: 1 },
+  };
+});
+
 HTMLCanvasElement.prototype.getContext = function getContext(type: string) {
-  return type.startsWith("webgl") ? ({} as RenderingContext) : null;
+  return type.startsWith("webgl")
+    ? ({ getExtension: () => null } as unknown as RenderingContext)
+    : null;
 } as typeof HTMLCanvasElement.prototype.getContext;
 
 /** Reports a 800 × 600 box for every observed element, once, like a first layout. */

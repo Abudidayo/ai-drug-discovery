@@ -7,6 +7,8 @@ import {
   conformers,
   covidExperiment,
   covidJury,
+  dockJob,
+  redockControl,
   searchDiseases,
   structures,
   summaryOf,
@@ -51,8 +53,8 @@ function update(
 }
 
 /**
- * The contract's own Experiment type. It differs from the app's only in fixed-length tuples
- * (a docking box's centre), which the tests never fill: their docking job lists are empty.
+ * The contract's own Experiment type. It differs from the app's only in fixed-length tuples (a
+ * docking box's centre and size), which the fixtures fill with three numbers each.
  */
 const contract = (experiment: Experiment) => experiment as components["schemas"]["Experiment"];
 
@@ -147,6 +149,39 @@ export const handlers = [
     response(200).json({
       structures: structures as components["schemas"]["Structure"][],
     }),
+  ),
+
+  // Like the fixture API's demo pair: an identical earlier result is reused, already done.
+  http.post("/api/dock", async ({ request, response }) => {
+    const body = await request.json();
+    const experiment = latest(body.experiment_id);
+    if (!experiment) {
+      return response(404).json({ detail: "There is no saved Experiment with this ID." });
+    }
+    if (experiment.archived_at !== null) {
+      return response(409).json({
+        detail: "This Experiment is archived. Restore it to compute a binding pose.",
+      });
+    }
+    const job = {
+      ...dockJob("done", "9e1f3a20-6b7c-4d8e-8f90-a1b2c3d4e5f6", body.candidate_id),
+      cached_from: redockControl().id,
+    };
+    update(experiment.id, (e) => ({ ...e, dock_jobs: [...e.dock_jobs, job] }));
+    return response(202).json(job as components["schemas"]["DockJob"]);
+  }),
+
+  http.get("/api/dock/{job_id}", ({ params, response }) => {
+    const control = redockControl();
+    if (params.job_id !== control.id) {
+      return response(404).json({ detail: "There is no docking job with this ID." });
+    }
+    return response(200).json(control as components["schemas"]["DockJob"]);
+  }),
+
+  // The viewer is a stand-in in tests, so a file's content only has to arrive.
+  http.get("/api/files/{job_id}/{name}", ({ params, response }) =>
+    response.untyped(new HttpResponse(`fixture ${params.name}\n`)),
   ),
 
   http.get("/api/molecules/{pubchem_cid}/conformer", ({ params, response }) => {

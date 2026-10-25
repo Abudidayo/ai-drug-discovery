@@ -6,9 +6,9 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
-import { api } from "./client";
-import { ApiError, unwrap } from "./errors";
-import type { Conformer, Experiment, ExperimentStatus, JuryRun } from "./types";
+import { api, apiUrl } from "./client";
+import { ApiError, fetchText, unwrap } from "./errors";
+import type { Conformer, DockFile, Experiment, ExperimentStatus, JuryRun } from "./types";
 
 /** How long typing must pause before the disease search asks the API. */
 export const SEARCH_DEBOUNCE_MS = 250;
@@ -28,6 +28,8 @@ export const queryKeys = {
   history: (archived: boolean) => ["history", { archived }] as const,
   allHistory: ["history"] as const,
   structures: ["structures"] as const,
+  dockJob: (id: string) => ["dock", id] as const,
+  dockFile: (url: string, sha256: string) => ["dock-files", url, sha256] as const,
 };
 
 /**
@@ -201,6 +203,58 @@ export function useStructures() {
     queryKey: queryKeys.structures,
     queryFn: ({ signal }) =>
       unwrap(api.GET("/api/structures", { signal })).then((list) => list.structures),
+    staleTime: Infinity,
+  });
+}
+
+/**
+ * Asks for a binding pose of one Candidate in one prepared structure. The new job is put on the
+ * cached Experiment at once, and the Experiment is fetched again, so polling follows the job
+ * until it is done. An identical earlier computation comes back already done.
+ */
+export function useRequestDock(experimentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ candidateId, structureId }: { candidateId: string; structureId: string }) =>
+      unwrap(
+        api.POST("/api/dock", {
+          body: {
+            experiment_id: experimentId,
+            candidate_id: candidateId,
+            structure_id: structureId,
+          },
+        }),
+      ),
+    onSuccess: (job) => {
+      queryClient.setQueryData<Experiment>(queryKeys.experiment(experimentId), (experiment) =>
+        experiment === undefined
+          ? experiment
+          : {
+              ...experiment,
+              dock_jobs: [...experiment.dock_jobs.filter((other) => other.id !== job.id), job],
+            },
+      );
+    },
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.experiment(experimentId) }),
+  });
+}
+
+/** One docking job, such as a structure's saved redocking control. Off while `id` is null. */
+export function useDockJob(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.dockJob(id ?? ""),
+    queryFn: ({ signal }) =>
+      unwrap(api.GET("/api/dock/{job_id}", { params: { path: { job_id: id ?? "" } }, signal })),
+    enabled: id !== null,
+  });
+}
+
+/** A docking result file as text. Its checksum is in the key, so a file never changes under it. */
+export function dockFileQuery(file: DockFile) {
+  return queryOptions({
+    queryKey: queryKeys.dockFile(file.url, file.sha256),
+    queryFn: ({ signal }) => fetchText(apiUrl(file.url), signal),
     staleTime: Infinity,
   });
 }

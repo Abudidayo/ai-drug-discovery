@@ -1,9 +1,10 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./console";
 
 /*
- * Steps 5, 6 and 8 against the real API in fixture mode (COVID-19): ask the Model jury and watch
- * each model answer, compare three drugs, then archive and restore the Experiment. Wording comes
- * from web/src/copy/en.ts; model names come from the API.
+ * Steps 5 to 8 against the real API in fixture mode (COVID-19): ask the Model jury and watch
+ * each model answer, compare three drugs, show a binding pose in 3D, then archive and restore the
+ * Experiment. Wording comes from web/src/copy/en.ts; model names come from the API.
  */
 
 const DISCLAIMER = /^For learning only\./;
@@ -102,4 +103,108 @@ test("an archived experiment can't ask the jury, and says why", async ({ page })
   const ask = page.getByRole("button", { name: "Ask the Model jury" });
   await expect(ask).toBeDisabled();
   await expect(page.getByText(/^This experiment is archived\./)).toHaveCount(1);
+});
+
+/**
+ * Counts every WebGL context the page creates, on a canvas or offscreen (3Dmol.js draws through
+ * an offscreen one), so the test can tell how many are still alive.
+ */
+async function trackWebGLContexts(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const contexts: WebGLRenderingContext[] = [];
+    interface HasContext {
+      getContext: (this: unknown, ...args: never[]) => unknown;
+    }
+    const track = (proto: HasContext) => {
+      const original = proto.getContext;
+      proto.getContext = function getContext(this: unknown, ...args: never[]) {
+        const context = original.apply(this, args);
+        const isGL =
+          context instanceof WebGLRenderingContext || context instanceof WebGL2RenderingContext;
+        if (isGL && !contexts.includes(context)) contexts.push(context);
+        return context;
+      };
+    };
+    track(HTMLCanvasElement.prototype);
+    track(OffscreenCanvas.prototype);
+    Object.assign(window, {
+      liveWebGLContexts: () => contexts.filter((context) => !context.isContextLost()).length,
+    });
+  });
+}
+
+function liveContexts(page: Page): Promise<number> {
+  return page.evaluate(() =>
+    (window as unknown as { liveWebGLContexts: () => number }).liveWebGLContexts(),
+  );
+}
+
+test("a student shows baricitinib's binding pose and checks it against the crystal", async ({
+  page,
+}) => {
+  await trackWebGLContexts(page);
+  const id = await readyExperiment(page);
+
+  // Walk on from Compare: the pose takes the stage and the network stays hidden.
+  await page.goto(`/e/${id}/compare`);
+  await expectStep(page, "Compare");
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expectStep(page, "Binding pose");
+  await expect(page.getByRole("combobox", { name: "Change drug" })).toHaveValue("CHEMBL2105759");
+  await expect(
+    page.getByText("Crystal structure 6WTO of JAK2, 1.74 Å resolution", { exact: true }),
+  ).toHaveCount(1);
+  await expect(page.getByText(/^Fostamatinib, Dexamethasone, Imatinib/)).toHaveCount(1);
+  await expect(page.getByText(/are antibodies\. Docking needs a small molecule\.$/)).toHaveCount(1);
+  await expect(
+    page.getByRole("img", { name: "Protein network in 3D. Drag to rotate." }),
+  ).toBeHidden();
+
+  // The cached demo pair comes back at once.
+  await page.getByRole("button", { name: "Show binding pose" }).click();
+  const view = page.getByRole("img", {
+    name: "Baricitinib in JAK2, in 3D. Drag to rotate, scroll to zoom.",
+  });
+  await expect(view).toHaveAttribute("data-ready", "true", { timeout: 15_000 });
+  await expect(view.locator("canvas")).toHaveCount(1);
+  await expect(view.locator("canvas")).toBeVisible();
+  // Each number once, marked as demo data, and never called by the program's or statistic's name.
+  await expect(page.getByText("Docking score", { exact: true })).toHaveCount(1);
+  await expect(page.getByText("−10.2", { exact: true })).toHaveCount(1);
+  await expect(page.getByText("Redock check", { exact: true })).toHaveCount(1);
+  await expect(page.getByText("Good match", { exact: true })).toHaveCount(1);
+  await expect(
+    page.getByText("Demo data: this pose, its docking score and the redock check are made up."),
+  ).toHaveCount(1);
+  await expect(page.locator("body")).not.toContainText(/vina|rmsd/i);
+
+  // The pocket surface is computed in the background; it turns off and on again cleanly.
+  const surface = page.getByRole("button", { name: "Pocket surface" });
+  await expect(surface).toHaveAttribute("aria-pressed", "true");
+  await expect(view).toHaveAttribute("data-surface", "on", { timeout: 20_000 });
+  await surface.click();
+  await expect(surface).toHaveAttribute("aria-pressed", "false");
+  await expect(view).toHaveAttribute("data-surface", "off");
+  await surface.click();
+  await expect(view).toHaveAttribute("data-surface", "on", { timeout: 20_000 });
+
+  // The crystal position, drawn over the pose and taken away again.
+  const overlay = page.getByRole("button", { name: "Crystal position" });
+  await expect(overlay).toHaveAttribute("aria-pressed", "false");
+  await overlay.click();
+  await expect(overlay).toHaveAttribute("aria-pressed", "true");
+  await overlay.click();
+  await expect(overlay).toHaveAttribute("aria-pressed", "false");
+  await page.getByRole("button", { name: "Spin" }).click();
+  await page.getByRole("button", { name: "Reset view" }).click();
+
+  // The hidden network and the pose: two live WebGL contexts, within the limit of three.
+  expect(await page.locator("canvas").count()).toBeLessThanOrEqual(3);
+  expect(await liveContexts(page)).toBe(2);
+
+  // Leaving the step releases the pose's context, once the step's transition has played.
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expectStep(page, "Saved experiments");
+  await expect(view).toHaveCount(0);
+  await expect.poll(() => liveContexts(page)).toBe(1);
 });

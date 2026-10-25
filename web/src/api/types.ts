@@ -37,3 +37,6 @@ export type Decision = Schema<"Decision">;
 export type ExperimentSummary = Schema<"ExperimentSummary">;
 export type Structure = Schema<"Structure">;
 export type DockJob = Schema<"DockJob">;
+export type DockFile = Schema<"DockFile">;
+export type DockFiles = Schema<"DockFiles">;
+export type ControlStatus = Schema<"ControlStatus">;

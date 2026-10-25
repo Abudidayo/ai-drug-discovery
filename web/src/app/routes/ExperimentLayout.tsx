@@ -20,7 +20,14 @@ export interface StepContext {
 }
 
 /** Steps whose figure needs a ready Experiment; until then they show its build state. */
-const RESULT_STEPS: readonly StepSlug[] = ["biology", "candidates", "evidence", "jury", "compare"];
+const RESULT_STEPS: readonly StepSlug[] = [
+  "biology",
+  "candidates",
+  "evidence",
+  "jury",
+  "compare",
+  "pose",
+];
 
 const LAYOUTS: Partial<Record<StepSlug, FigureLayout>> = {
   disease: "search",
@@ -121,5 +128,7 @@ function fallbackLayout(step: StepSlug, experiment: Experiment | undefined): Fig
   if (step === "disease") return "search";
   // The jury's result is three panels; asking it and following its progress is one.
   if (step === "jury" && experiment?.jury?.status === "done") return "jury";
+  // The pose takes the stage; the network stays hidden, so it costs no drawing.
+  if (step === "pose") return "pose";
   return "single";
 }

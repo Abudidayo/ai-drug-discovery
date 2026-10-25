@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import type { Experiment } from "../api/types";
 import { copy } from "../copy/en";
@@ -12,7 +13,7 @@ import {
   EXPERIMENT_ID,
 } from "../test/fixtures";
 import { renderApp } from "../test/render";
-import { http, serveExperiment, server } from "../test/server";
+import { fakeApi, http, serveExperiment, server } from "../test/server";
 
 const E = `/e/${EXPERIMENT_ID}`;
 const MODELS = ["Claude Sonnet 5", "GPT-5.4", "GLM-5.3"];
@@ -242,6 +243,191 @@ describe("Step 6, Compare", () => {
     await waitFor(() => {
       expect(cellsOf(copy.compare.dockable)[0]).toBe(copy.compare.pose.done("JAK2"));
     });
+  });
+});
+
+const POSE_LABEL = copy.pose.viewerLabel("Baricitinib", "JAK2");
+const STRUCTURE_LINE = copy.pose.structure("6WTO", "JAK2", 1.74);
+const NO_STRUCTURE = copy.pose.unsupported.no_structure(
+  "Fostamatinib, Dexamethasone, Imatinib, Remdesivir and Colchicine",
+  5,
+);
+const ANTIBODIES = copy.pose.unsupported.antibody(
+  "Anifrolumab, Siltuximab, Tocilizumab and Sarilumab",
+  4,
+);
+
+function control(name: string) {
+  return screen.getByRole("button", { name });
+}
+
+/** The pose's 3D view once its files are in and the viewer has drawn them. */
+async function poseView() {
+  const view = await screen.findByRole("img", { name: POSE_LABEL }, { timeout: 4000 });
+  await waitFor(() => {
+    expect(view).toHaveAttribute("data-ready", "true");
+  });
+  return view;
+}
+
+describe("Step 7, Binding pose", () => {
+  it("shows a computed pose with its controls, and says each number, help and reason once", async () => {
+    serveExperiment({ ...covidExperiment(), dock_jobs: [dockJob("done")] });
+    const user = userEvent.setup();
+    renderApp(`${E}/pose`);
+    const view = await poseView();
+
+    const picker = screen.getByRole("combobox", { name: copy.pose.pick });
+    expect(picker).toHaveValue("CHEMBL2105759");
+    expect(
+      within(picker)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual([
+      "Baricitinib",
+      "Ruxolitinib",
+      "Tofacitinib",
+      "Upadacitinib",
+      "Fedratinib",
+      "Thalidomide",
+    ]);
+    expectOnce(
+      STRUCTURE_LINE,
+      copy.pose.score,
+      copy.pose.scoreHelp,
+      "−10.2",
+      copy.pose.redock,
+      copy.pose.redockHelp(2),
+      copy.pose.redockStatus.passed,
+      copy.pose.fixture("pose", true) ?? "",
+      copy.pose.caveat,
+      copy.pose.unsupportedTitle,
+      NO_STRUCTURE,
+      ANTIBODIES,
+      copy.pose.legend.protein,
+      copy.pose.legend.drug,
+      copy.disclaimer,
+    );
+    expect(screen.getByText(/^0\.74/)).toHaveAttribute("data-fixture", "true");
+    // Plain words: the program and the statistic are never named.
+    expect(document.body).not.toHaveTextContent(/vina|rmsd/i);
+    // The hidden network and the pose: never more than three WebGL canvases on the step.
+    expect(view.querySelectorAll("canvas")).toHaveLength(1);
+    expect(document.querySelectorAll("canvas").length).toBeLessThanOrEqual(3);
+
+    // Four controls above the view: the surface starts on, spin too (motion isn't reduced).
+    expect(control(copy.pose.controls.surface)).toHaveAttribute("aria-pressed", "true");
+    expect(control(copy.pose.controls.overlay)).toHaveAttribute("aria-pressed", "false");
+    expect(control(copy.pose.controls.spin)).toHaveAttribute("aria-pressed", "true");
+    expect(control(copy.pose.controls.reset)).toBeEnabled();
+    await waitFor(() => {
+      expect(view).toHaveAttribute("data-surface", "on");
+    });
+    await user.click(control(copy.pose.controls.surface));
+    expect(control(copy.pose.controls.surface)).toHaveAttribute("aria-pressed", "false");
+    await waitFor(() => {
+      expect(view).toHaveAttribute("data-surface", "off");
+    });
+    await user.click(control(copy.pose.controls.surface));
+    await waitFor(() => {
+      expect(view).toHaveAttribute("data-surface", "on");
+    });
+    await user.click(control(copy.pose.controls.overlay));
+    expect(control(copy.pose.controls.overlay)).toHaveAttribute("aria-pressed", "true");
+    await user.click(control(copy.pose.controls.spin));
+    expect(control(copy.pose.controls.spin)).toHaveAttribute("aria-pressed", "false");
+    await user.click(control(copy.pose.controls.reset));
+  });
+
+  it("asks for a pose, follows the job while it waits and runs, then shows it", async () => {
+    const experiment = covidExperiment();
+    serveExperiment(experiment);
+    server.use(
+      http.post("/api/dock", ({ response }) => {
+        fakeApi.experiments.set(experiment.id, [
+          { ...experiment, dock_jobs: [dockJob("running")] },
+          { ...experiment, dock_jobs: [dockJob("done")] },
+        ]);
+        return response(202).json(dockJob("queued") as never);
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(`${E}/pose`);
+    // Before a request: the structure and its redock check, but no docking score yet.
+    const show = await screen.findByRole("button", { name: copy.pose.show });
+    expectOnce(STRUCTURE_LINE, copy.pose.redock, copy.pose.fixture(null, true) ?? "");
+    expect(screen.queryByText(copy.pose.score)).not.toBeInTheDocument();
+
+    await user.click(show);
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      new RegExp(`^(${copy.pose.queued}|${copy.pose.running})$`),
+    );
+    expect(await screen.findByText(copy.pose.running)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: copy.pose.show })).not.toBeInTheDocument();
+    await poseView();
+    expectOnce(copy.pose.score, "−10.2");
+  });
+
+  it("says plainly when the pose couldn’t be computed, and offers to try again", async () => {
+    serveExperiment({ ...covidExperiment(), dock_jobs: [dockJob("failed")] });
+    const user = userEvent.setup();
+    renderApp(`${E}/pose`);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(copy.pose.failed);
+    expect(alert).toHaveTextContent("Vina stopped: the box is outside the receptor.");
+    expect(screen.queryByText(copy.pose.score)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: copy.retry }));
+    await poseView();
+    expect(screen.queryByText(copy.pose.failed)).not.toBeInTheDocument();
+  });
+
+  it("falls back to a saved result when docking is unavailable, and says so once", async () => {
+    serveExperiment(covidExperiment());
+    server.use(
+      http.post("/api/dock", ({ response }) =>
+        response.untyped(
+          HttpResponse.json({ detail: "The docking worker is down." }, { status: 503 }),
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp(`${E}/pose`);
+    await user.click(await screen.findByRole("button", { name: copy.pose.show }));
+    await poseView();
+    expectOnce(copy.pose.saved, copy.pose.score);
+    expect(screen.queryByText(copy.pose.unavailable)).not.toBeInTheDocument();
+
+    // Ruxolitinib in 6WTN has no saved result to fall back to.
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: copy.pose.pick }),
+      "CHEMBL1789941",
+    );
+    expectOnce(copy.pose.structure("6WTN", "JAK2", 1.83), copy.pose.redockStatus.not_measured);
+    await user.click(screen.getByRole("button", { name: copy.pose.show }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(copy.pose.unavailable);
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.queryByText(copy.pose.score)).not.toBeInTheDocument();
+  });
+
+  it("disables asking on an archived experiment, with one short reason", async () => {
+    serveExperiment({ ...covidExperiment(), archived_at: "2026-10-25T10:00:00Z" });
+    renderApp(`${E}/pose`);
+    const show = await screen.findByRole("button", { name: copy.pose.show });
+    expect(show).toBeDisabled();
+    expect(show).toHaveAccessibleDescription(copy.pose.archived);
+    expectOnce(copy.pose.archived);
+  });
+
+  it("shows a score without a 3D model when a result has no files", async () => {
+    serveExperiment({
+      ...covidExperiment(),
+      dock_jobs: [{ ...dockJob("done"), files: null }],
+    });
+    renderApp(`${E}/pose`);
+    expect(await screen.findByText(copy.pose.noFiles)).toBeInTheDocument();
+    expectOnce(copy.pose.score, "−10.2", copy.pose.fixture("score", true) ?? "");
+    expect(screen.queryByRole("button", { name: copy.pose.controls.surface })).toBeNull();
   });
 });
 

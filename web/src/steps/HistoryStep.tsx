@@ -30,7 +30,13 @@ function dataLine(item: ExperimentSummary): string {
 export function HistoryStep({ current }: { current: Experiment | undefined }) {
   const [chosen, setChosen] = useState<View | null>(null);
   const [failure, setFailure] = useState<{ id: string; message: string } | null>(null);
-  const view: View = chosen ?? (current?.archived_at != null ? "archived" : "active");
+  // The list opens where the open experiment is, once it has loaded. Archiving it afterwards
+  // keeps the reader on the saved list, where they just watched it leave.
+  const [opening, setOpening] = useState<View | null>(null);
+  if (opening === null && current !== undefined) {
+    setOpening(current.archived_at === null ? "active" : "archived");
+  }
+  const view: View = chosen ?? opening ?? "active";
   const lists = { active: useHistory(false), archived: useHistory(true) };
   const list = lists[view];
   const action = useArchive();

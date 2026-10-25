@@ -27,27 +27,6 @@
   padding-bottom: var(--space-8);
 }
 
-/* The drug's name is the column's heading, and also the control that changes it. */
-.pick select {
-  max-width: 100%;
-  padding: 0 22px 2px 0;
-  border: 0;
-  border-bottom: 1px dashed var(--color-grey-2);
-  border-radius: 0;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23000' stroke-width='1.5'/%3E%3C/svg%3E")
-    no-repeat right 2px center;
-  font-size: 20px;
-  font-weight: var(--weight-semibold);
-  letter-spacing: -0.01em;
-  text-overflow: ellipsis;
-  appearance: none;
-  cursor: pointer;
-}
-
-.pick select:hover {
-  border-bottom-color: var(--color-ink);
-}
-
 .band {
   min-height: 0;
 }
@@ -161,9 +140,5 @@
   .pick,
   .cell {
     scroll-snap-align: start;
-  }
-
-  .pick select {
-    font-size: var(--text-body);
   }
 }
