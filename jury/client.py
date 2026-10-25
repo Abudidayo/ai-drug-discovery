@@ -305,7 +305,9 @@ def _numbers(text, identifiers):
                 (prefix + member).casefold() in known for member in members.split("/")):
             return " "
         return match[0]
-    text = re.sub(r"(?<!\w)([A-Za-z]+-?|[0-9]+-[A-Za-z]+)([0-9]+[A-Za-z]*(?:/[0-9]+[A-Za-z]*)+)(?!\w)",
+    # A prefix may hold digits when it ends in a letter: MAP2K1/2 is MAP2K1 and MAP2K2.
+    text = re.sub(r"(?<!\w)([A-Za-z][A-Za-z0-9]*[A-Za-z]-?|[A-Za-z]-?|[0-9]+-[A-Za-z]+)"
+                  r"([0-9]+[A-Za-z]*(?:/[0-9]+[A-Za-z]*)+)(?!\w)",
                   family_list, text)
     def family_range(match):
         prefix, start, end = match.groups()

@@ -236,6 +236,23 @@ def test_exact_numbers_in_each_text_field(text, accepted, field):
     assert flags["numbers_match"] is accepted
 
 
+
+@pytest.mark.parametrize("text,accepted", [
+    # Kimi K3's live myeloma reply (25 Oct) for mirdametinib, a MAP2K1 and MAP2K2 inhibitor.
+    ("A MAP2K1/2 inhibitor; association 0.80.", True),
+    ("A MAP2K1/9 inhibitor; association 0.80.", False),  # MAP2K9 is not one of its Targets
+    ("A MAP2K1/2/3 inhibitor; association 0.80.", False),
+])
+def test_slashed_family_names_whose_prefix_ends_in_digits_and_letters(text, accepted):
+    packet = deepcopy(PACKET)
+    targets = packet["candidates"][0]["targets"]
+    targets[0]["name"], targets[1]["name"] = "MAP2K1", "MAP2K2"
+    value = reply()
+    value["reviews"][0]["rationale"] = text
+    reviews, flags = validate_reply(json.dumps(value), packet)
+    assert (reviews is not None) is accepted
+    assert flags["numbers_match"] is accepted
+
 def test_bioactivity_numbers():
     value = reply()
     value["reviews"][0].update(supporting_evidence_ids=["E8"],
