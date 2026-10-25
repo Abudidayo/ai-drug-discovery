@@ -4,6 +4,7 @@ import { ApiError } from "../../api/errors";
 import { hasEarlyResult, isBuilding, useExperiment } from "../../api/queries";
 import type { Experiment } from "../../api/types";
 import { copy, isStepSlug, type StepSlug } from "../../copy/en";
+import { followUpStates } from "../../lib/followUps";
 import { DRUG_PARAM } from "../../steps/EvidenceStep";
 import { BuildFailed, BuildProgress, Loading, Unavailable } from "../ExperimentStatus";
 import { FigureGrid, type FigureLayout } from "../Figure";
@@ -122,7 +123,12 @@ function ExperimentScreen({ experimentId, step }: { experimentId: string; step: 
   }
 
   return (
-    <Shell step={step} experimentId={experimentId} disease={disease}>
+    <Shell
+      step={step}
+      experimentId={experimentId}
+      disease={disease}
+      followUps={experiment && followUpStates(experiment)}
+    >
       {figure}
     </Shell>
   );

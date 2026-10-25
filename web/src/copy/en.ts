@@ -41,6 +41,13 @@ export const copy = {
   back: "Back",
   next: "Next",
   stepsLabel: "Steps",
+  /** How the step navigation describes work the API prepares in the background. */
+  followUp: {
+    working: "In progress",
+    ready: "Ready",
+    /** Said once to screen readers when one becomes ready while the reader is elsewhere. */
+    readyNotice: (step: string) => `${step} is ready`,
+  },
   retry: "Try again",
 
   /**
