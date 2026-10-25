@@ -43,13 +43,6 @@ export const crops = {
     x: 82,
     y: 38,
   },
-  cell: {
-    image: story2,
-    alt: "Proteins drift through the inside of a cell.",
-    zoom: 300,
-    x: 100,
-    y: 60,
-  },
   network: {
     image: story1,
     alt: "A monitor traces a path from a disease, through proteins, to an existing medicine.",

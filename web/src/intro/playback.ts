@@ -30,27 +30,6 @@ export function useReducedMotion(): boolean {
   );
 }
 
-/** Counts up to `target` once on mount; under reduced motion it shows the target at once. */
-export function useCountUp(target: number, duration = 1400): number {
-  const reduced = useReducedMotion();
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    if (reduced) return;
-    const started = performance.now();
-    let frame = 0;
-    const tick = (now: number) => {
-      const progress = Math.min(1, (now - started) / duration);
-      setValue(Math.round(target * (1 - Math.pow(1 - progress, 3))));
-      if (progress < 1) frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(frame);
-    };
-  }, [target, duration, reduced]);
-  return reduced ? target : value;
-}
-
 /** How the camera reaches a chapter: at once, on its own (slow), or because the reader chose it. */
 export type CameraMode = "instant" | "automatic" | "pointer";
 

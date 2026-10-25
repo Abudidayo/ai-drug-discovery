@@ -11,14 +11,9 @@
   perspective: 1400px;
 }
 
-.labPlate[data-centred="true"] .labCaption {
-  justify-content: center;
-}
-
 .labFrame {
   position: relative;
-  aspect-ratio: var(--plate-aspect, 16 / 10);
-  height: var(--plate-height, auto);
+  aspect-ratio: 16 / 10;
   overflow: hidden;
   border-radius: 6px;
   background: var(--story-night);
@@ -84,7 +79,7 @@
   flex-wrap: wrap;
   gap: var(--space-8) var(--space-24);
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   margin-top: var(--space-16);
   font-size: var(--text-label);
   color: var(--color-grey-1);
@@ -156,13 +151,6 @@
   }
 }
 
-.dotsLabel {
-  margin-left: var(--space-8);
-  font-size: var(--text-label);
-  font-weight: var(--weight-medium);
-  color: var(--color-ink);
-}
-
 /* A detail of an illustration. */
 
 .crop {
@@ -223,26 +211,6 @@
   transform: translateX(-50%) rotate(-5deg);
 }
 
-.sticker[data-tone="disease"] {
-  background: #ffe1c9;
-  color: #6b2c00;
-}
-
-.sticker[data-tone="drug"] {
-  background: #d6e8f7;
-  color: #00365a;
-}
-
-.sticker[data-tone="route"] {
-  background: #cdeee2;
-  color: #004d37;
-}
-
-.sticker[data-tone="ink"] {
-  background: var(--color-ink);
-  color: var(--color-paper);
-}
-
 .sticker[data-animate="true"] {
   animation: stick 560ms var(--ease-settle) 250ms both;
 }
@@ -284,17 +252,24 @@
 /* The blooms take the illustrations' indigo, violet and periwinkle so the page and the
    pictures read as one palette. */
 .bloom[data-role="disease"] {
+  top: -22%;
+  right: -8%;
   background: var(--story-periwinkle);
   opacity: 0.32;
 }
 
 .bloom[data-role="drug"] {
+  top: 6%;
+  right: 22%;
+  width: 30vw;
   background: var(--story-indigo);
   animation-delay: -6s;
   opacity: 0.14;
 }
 
 .bloom[data-role="route"] {
+  top: 40%;
+  left: -14%;
   background: var(--story-violet);
   animation-delay: -12s;
   opacity: 0.16;
@@ -307,53 +282,6 @@
   }
 }
 
-.backdrop[data-look="corner"] .bloom[data-role="disease"] {
-  top: -22%;
-  right: -8%;
-}
-
-.backdrop[data-look="corner"] .bloom[data-role="drug"] {
-  top: 6%;
-  right: 22%;
-  width: 30vw;
-}
-
-.backdrop[data-look="corner"] .bloom[data-role="route"] {
-  top: 40%;
-  left: -14%;
-}
-
-.backdrop[data-look="centre"] .bloom[data-role="disease"] {
-  top: -30%;
-  left: 8%;
-}
-
-.backdrop[data-look="centre"] .bloom[data-role="drug"] {
-  top: -20%;
-  right: 4%;
-}
-
-.backdrop[data-look="centre"] .bloom[data-role="route"] {
-  top: 18%;
-  left: 36%;
-  width: 28vw;
-}
-
-.backdrop[data-look="wide"] .bloom[data-role="disease"] {
-  top: -40%;
-  left: -10%;
-}
-
-.backdrop[data-look="wide"] .bloom[data-role="drug"] {
-  top: -30%;
-  right: -10%;
-}
-
-.backdrop[data-look="wide"] .bloom[data-role="route"] {
-  bottom: -30%;
-  left: 30%;
-}
-
 .grid {
   position: absolute;
   inset: 0;
@@ -362,72 +290,10 @@
   mask-image: radial-gradient(70% 60% at 70% 20%, #000 0%, transparent 75%);
 }
 
-.backdrop[data-look="centre"] .grid {
-  mask-image: radial-gradient(60% 50% at 50% 30%, #000 0%, transparent 75%);
-}
-
-.backdrop[data-look="wide"] .grid {
-  mask-image: linear-gradient(180deg, #000, transparent 70%);
-}
-
-/* The marquee of sources. */
-
-/* Inline-size containment keeps the long row from widening the page's layout. */
-.marquee {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  contain: inline-size;
-  overflow: hidden;
-  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
-}
-
-.marqueeRow {
-  display: flex;
-  flex: none;
-  gap: var(--space-48);
-  padding-right: var(--space-48);
-  animation: glide 28s linear infinite;
-}
-
-.marqueeRow li {
-  display: flex;
-  gap: var(--space-48);
-  align-items: center;
-  font-family: var(--font-serif);
-  font-size: 28px;
-  letter-spacing: -0.01em;
-  color: var(--color-grey-1);
-  white-space: nowrap;
-}
-
-.marqueeRow li::after {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-route);
-  content: "";
-}
-
-.marqueeRow li:nth-child(3n + 1)::after {
-  background: var(--color-disease);
-}
-
-.marqueeRow li:nth-child(3n + 2)::after {
-  background: var(--color-drug);
-}
-
-@keyframes glide {
-  to {
-    transform: translateX(-100%);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .shine,
   .cropArt,
   .bloom,
-  .marqueeRow,
   .sticker[data-animate="true"] {
     animation: none;
   }

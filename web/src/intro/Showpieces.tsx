@@ -19,23 +19,9 @@ const LAB_DURATIONS = labChapters.map((chapter) => chapter.duration);
 /**
  * The lab, framed like a figure plate. It plays Jessica's four chapters on a loop: the bench,
  * then the camera moves into the monitor for the years, the compounds and the question. The
- * plate leans gently towards the pointer.
+ * plate leans gently towards the pointer, and its chapter buttons sit centred under it.
  */
-export function LabPlate({
-  className,
-  caption,
-  controls = true,
-  chapterName = true,
-  centred = false,
-}: {
-  className?: string | undefined;
-  caption?: ReactNode;
-  controls?: boolean;
-  /** Name the current chapter beside its buttons. */
-  chapterName?: boolean;
-  /** Centre the chapter buttons under the plate. */
-  centred?: boolean;
-}) {
+export function LabPlate() {
   const chapters = useChapters(LAB_DURATIONS, { loop: true });
   const frame = useRef<HTMLDivElement>(null);
   const note = labChapters[chapters.index]?.note;
@@ -60,7 +46,7 @@ export function LabPlate({
   }
 
   return (
-    <figure className={cx(styles.labPlate, className)} data-centred={centred}>
+    <figure className={styles.labPlate}>
       <div className={styles.stage} onPointerMove={lean} onPointerLeave={rest}>
         <div className={styles.labFrame} ref={frame}>
           <LaboratoryScene
@@ -79,18 +65,15 @@ export function LabPlate({
           )}
         </div>
       </div>
-      {(controls || caption !== undefined) && (
-        <figcaption className={styles.labCaption}>
-          {controls && <ChapterDots chapters={chapters} named={chapterName} />}
-          {caption}
-        </figcaption>
-      )}
+      <figcaption className={styles.labCaption}>
+        <ChapterDots chapters={chapters} />
+      </figcaption>
     </figure>
   );
 }
 
 /** Jessica's numbered chapter buttons, drawn in the app's ink; the current one fills as it plays. */
-function ChapterDots({ chapters, named }: { chapters: Chapters; named: boolean }) {
+function ChapterDots({ chapters }: { chapters: Chapters }) {
   return (
     <div className={styles.dots} role="group" aria-label="The lab's chapters">
       {labChapters.map((chapter, index) => {
@@ -121,25 +104,14 @@ function ChapterDots({ chapters, named }: { chapters: Chapters; named: boolean }
           </button>
         );
       })}
-      {named && (
-        <span className={styles.dotsLabel} aria-live="polite">
-          {labChapters[chapters.index]?.short}
-        </span>
-      )}
     </div>
   );
 }
 
 /** A detail of one of Jessica's illustrations, drifting slowly like a documentary still. */
-export function CropImage({
-  crop,
-  className,
-}: {
-  crop: StoryCrop;
-  className?: string | undefined;
-}) {
+export function CropImage({ crop }: { crop: StoryCrop }) {
   return (
-    <div className={cx(styles.crop, className)} role="img" aria-label={crop.alt}>
+    <div className={styles.crop} role="img" aria-label={crop.alt}>
       <div
         className={styles.cropArt}
         style={{
@@ -152,30 +124,23 @@ export function CropImage({
   );
 }
 
-export type StickerTone = "tape" | "disease" | "drug" | "route" | "ink";
-
 /** A label taped onto the page, like the ones drawn into Jessica's shortlist scene. */
 export function Sticker({
   children,
-  tone = "tape",
   tilt = 0,
   animate = false,
   className,
-  style,
 }: {
   children: ReactNode;
-  tone?: StickerTone;
   tilt?: number;
   animate?: boolean;
   className?: string | undefined;
-  style?: CSSProperties;
 }) {
   return (
     <span
       className={cx(styles.sticker, className)}
-      data-tone={tone}
       data-animate={animate}
-      style={{ ...style, "--tilt": `${String(tilt)}deg` } as CSSProperties}
+      style={{ "--tilt": `${String(tilt)}deg` } as CSSProperties}
     >
       {children}
     </span>
@@ -183,30 +148,13 @@ export function Sticker({
 }
 
 /** Soft blooms of the three role colours and a fading dot grid, behind a section. */
-export function Backdrop({ look }: { look: "corner" | "centre" | "wide" }) {
+export function Backdrop() {
   return (
-    <div className={styles.backdrop} data-look={look} aria-hidden="true">
+    <div className={styles.backdrop} aria-hidden="true">
       <span className={styles.bloom} data-role="disease" />
       <span className={styles.bloom} data-role="drug" />
       <span className={styles.bloom} data-role="route" />
       <span className={styles.grid} />
-    </div>
-  );
-}
-
-/** The public data and services the work stands on, gliding past on a loop. */
-export function SourceMarquee({ names }: { names: readonly string[] }) {
-  const row = (hidden: boolean) => (
-    <ul className={styles.marqueeRow} aria-hidden={hidden || undefined}>
-      {names.map((name) => (
-        <li key={name}>{name}</li>
-      ))}
-    </ul>
-  );
-  return (
-    <div className={styles.marquee}>
-      {row(false)}
-      {row(true)}
     </div>
   );
 }

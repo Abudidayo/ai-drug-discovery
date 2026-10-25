@@ -2,7 +2,7 @@ import type { RouteObject } from "react-router";
 import { EvaluationPage } from "./routes/EvaluationPage";
 import { ExperimentLayout } from "./routes/ExperimentLayout";
 import { ExplorePage } from "./routes/ExplorePage";
-import { IntroPage } from "./routes/IntroPage.prototype";
+import { IntroPage } from "./routes/IntroPage";
 import { NotFoundPage } from "./routes/NotFoundPage";
 import { RouteErrorPage } from "./routes/RouteErrorPage";
 import { StepFigure } from "./routes/StepFigure";
