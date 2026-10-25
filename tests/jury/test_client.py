@@ -10,7 +10,7 @@ import openai
 import pytest
 
 from jury.client import (
-    CortexModel, ModelReply, RESPONSE_FORMAT, build_prompt, consensus, mock_model, run_jury,
+    CortexModel, ModelReply, PROMPT_VERSION, RESPONSE_FORMAT, build_prompt, consensus, mock_model, run_jury,
     validate_config, validate_packet, validate_reply, visible_packet,
 )
 
@@ -53,7 +53,8 @@ def test_prompt_allowlist_and_no_input_ranking():
 def test_seeded_orders_and_output_shape():
     result = run_jury(PACKET, CONFIG, mock_model)
     assert set(result) == set(FIXTURE)
-    assert result["jury"] == CONFIG
+    assert result["jury"] == {**CONFIG, 'prompt_version': PROMPT_VERSION}
+    assert PROMPT_VERSION == 'jury-v4'
     assert len(result["jurors"]) == 3
     for i, j in enumerate(result["jurors"]):
         order = [c["label"] for c in PACKET["candidates"]]
@@ -341,6 +342,7 @@ def test_sdk_endpoint_auth_config_model_and_no_hidden_retries(monkeypatch):
 def test_endpoint_routing_structured_output_and_usage(monkeypatch, model, candidate_count):
     monkeypatch.setenv("SNOWFLAKE_ACCOUNT", "test-account")
     monkeypatch.setenv("SNOWFLAKE_PAT", "fake-test-token")
+    monkeypatch.setenv("SNOWFLAKE_REASONING_EFFORT", json.dumps({model: "low"}))
     real_openai = openai.OpenAI
     calls = []
     raw = json.dumps(reply())
@@ -353,6 +355,10 @@ def test_endpoint_routing_structured_output_and_usage(monkeypatch, model, candid
         assert request.headers["authorization"] == "Bearer fake-test-token"
         assert request.extensions["timeout"]["read"] == 300
         body = json.loads(request.content)
+        if model.startswith('claude-'):
+            assert body['output_config']['effort'] == 'low'
+        else:
+            assert body['reasoning_effort'] == 'low'
         assert body["model"] == model
         assert body["messages"] == [{"role": "user", "content": prompt}]
         if model.startswith("claude-"):
@@ -361,14 +367,17 @@ def test_endpoint_routing_structured_output_and_usage(monkeypatch, model, candid
             assert body["max_tokens"] == max(4096, 1024 * candidate_count)
             assert "temperature" not in body  # Opus 5.5 rejects sampling parameters.
             assert "response_format" not in body
-            assert body["output_config"] == {"format": {
+            assert body["output_config"] == {"effort": "low", "format": {
                 "type": "json_schema", "schema": RESPONSE_FORMAT["json_schema"]["schema"]}}
             return httpx.Response(200, json={"content": [
                 {"type": "thinking", "thinking": "This is not part of the vote."},
                 {"type": "text", "text": raw[:20]}, {"type": "text", "text": raw[20:]}],
                 "usage": {"input_tokens": 123, "output_tokens": 456}, "stop_reason": "end_turn"})
         assert str(request.url) == "https://test-account.snowflakecomputing.com/api/v2/cortex/v1/chat/completions"
-        assert body["temperature"] == 0
+        if model.startswith('openai-gpt-5'):
+            assert 'temperature' not in body
+        else:
+            assert body["temperature"] == 0
         assert "anthropic-version" not in request.headers
         assert body["response_format"] == RESPONSE_FORMAT
         assert "output_config" not in body
@@ -543,3 +552,52 @@ def test_total_call_budget_reserves_one_attempt_per_juror():
                for j in result['jurors'][1:])
     with pytest.raises(ValueError, match='at least one attempt'):
         run_jury(PACKET, CONFIG, invalid, max_calls=2)
+
+
+def test_v4_research_scope_and_explicit_citation_fields():
+    prompt = build_prompt(PACKET, [c['label'] for c in PACKET['candidates']])
+    assert 'research ranking of existing regulator-approved drugs' in prompt
+    assert 'not treatment advice for a patient' in prompt
+    assert 'approvals may be for other Diseases' in prompt
+    assert 'Inline citations do not populate these arrays' in prompt
+    assert 'All fields are required' in prompt
+    assert 'including non-numeric claims' in prompt
+
+
+def test_recorded_opus_refusal_is_invalid_and_not_a_token_limit():
+    case = json.loads((Path(__file__).parent / 'data/covid_jury_failures.json').read_text())
+    usage = case['opus_usage'][1]
+    assert usage['stop_reason'] == 'refusal'
+    assert usage['output_tokens'] == 690 < usage['max_output_tokens'] == 15360
+    reviews, flags = validate_reply(case['opus_refusal']['raw_output'], case['packet'])
+    assert reviews is None and flags['errors'] == ['JSON decoding failed']
+
+
+def test_recorded_kimi_citations_remain_required_in_v4():
+    import re
+
+    case = json.loads((Path(__file__).parent / 'data/covid_jury_failures.json').read_text())
+    value = json.loads(case['kimi']['raw_output'])
+    missing = {}
+    for review in value['reviews']:
+        cited = set(review['supporting_evidence_ids'] + review['contradicting_evidence_ids']
+                    + review['safety']['evidence_ids'])
+        for field in ('rationale', 'objection', 'missing_evidence'):
+            ids = set(re.findall(r'\bE[0-9]+\b', json.dumps(review[field]))) - cited
+            if ids:
+                missing[(review['label'], field)] = ids
+    assert missing == {
+        ('C2', 'rationale'): {'E104'}, ('C4', 'rationale'): {'E44', 'E46'},
+        ('C4', 'objection'): {'E55'}, ('C12', 'objection'): {'E87', 'E88'},
+        ('C7', 'objection'): {'E114'}, ('C5', 'rationale'): {'E93', 'E95'},
+        ('C3', 'objection'): {'E121'},
+    }
+    reviews, flags = validate_reply(json.dumps(value), case['packet'])
+    assert reviews is None and not flags['numbers_match']
+    for review in value['reviews']:
+        for field, array in (('rationale', 'supporting_evidence_ids'),
+                             ('objection', 'contradicting_evidence_ids')):
+            review[array].extend(sorted(missing.get((review['label'], field), set())))
+    assert validate_reply(json.dumps(value), case['packet'])[0] is not None
+    value['reviews'][0]['objection'] += ' An invented dose of 99 mg.'
+    assert validate_reply(json.dumps(value), case['packet'])[0] is None

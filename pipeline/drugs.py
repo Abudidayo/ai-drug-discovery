@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import hashlib
 import json
 import logging
@@ -20,7 +20,7 @@ from pathlib import Path
 import re
 from statistics import median
 import time
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 import xml.etree.ElementTree as ET
 
 import duckdb
@@ -268,6 +268,39 @@ def approval_rows(indications: list[dict], reports: list[dict]) -> dict:
     return dict(approvals)
 
 
+def load_approval_overrides(path: Path = Path(__file__).with_name("approval_overrides.json")) -> list[dict]:
+    """Curated regulator records, never inferred from stage, names or model output."""
+    rows = json.loads(path.read_text())
+    hosts = {"FDA": {"www.accessdata.fda.gov"}, "EMA": {"www.ema.europa.eu"},
+             "PMDA": {"www.pmda.go.jp"}}
+    required = {"drug_id", "disease_id", "regulator", "approval_date", "application_number",
+                "url", "approval_url", "checked_on", "label_text"}
+    seen = set()
+    if not isinstance(rows, list):
+        raise ValueError("Approval overrides must be a list")
+    for row in rows:
+        if (not isinstance(row, dict) or set(row) != required
+                or any(not isinstance(value, str) or not value.strip() for value in row.values())
+                or not re.fullmatch(r"CHEMBL[0-9]+", row["drug_id"])
+                or not re.fullmatch(r"[A-Za-z]+_[A-Za-z0-9]+", row["disease_id"])
+                or row["regulator"] not in hosts):
+            raise ValueError("Invalid approval override record")
+        for key in ("url", "approval_url"):
+            url = urlsplit(row[key])
+            if (url.scheme != "https" or url.netloc not in hosts[row["regulator"]]
+                    or not url.path or url.fragment):
+                raise ValueError("Approval override requires an official regulator URL")
+        approved, checked = (date.fromisoformat(row[key]) for key in ("approval_date", "checked_on"))
+        if (approved.isoformat() != row["approval_date"] or checked.isoformat() != row["checked_on"]
+                or not approved <= checked <= datetime.now(timezone.utc).date()):
+            raise ValueError("Invalid approval override dates")
+        identity = (row["drug_id"], row["disease_id"], row["regulator"])
+        if identity in seen:
+            raise ValueError("Duplicate approval override")
+        seen.add(identity)
+    return rows
+
+
 def target_index(targets: list[dict]) -> tuple[dict, dict]:
     genes, proteins = {}, defaultdict(set)
     for row in targets:
@@ -301,7 +334,8 @@ def map_chembl_target(target: dict | None, proteins: dict) -> tuple[list[str], s
 
 
 def build_universe(tables: dict, chembl_molecules: list[dict], mechanisms: list[dict],
-                   chembl_targets: list[dict], activities: dict[str, list[dict]]) -> dict:
+                   chembl_targets: list[dict], activities: dict[str, list[dict]],
+                   *, overrides: list[dict] | tuple = ()) -> dict:
     """Pure transformation; offline tests use small recorded source responses."""
     molecules = {row["id"]: row for row in tables["drug_molecule"]}
     groups, parent_problems = parent_groups(list(molecules.values()), chembl_molecules)
@@ -315,6 +349,20 @@ def build_universe(tables: dict, chembl_molecules: list[dict], mechanisms: list[
     cb_targets = {row["target_chembl_id"]: row for row in chembl_targets}
     source_to_parent = {source: parent for parent, sources in groups.items() for source in sources}
     drugs, target_rows, actions = {}, {}, defaultdict(set)
+    override_rows, override_unmapped = defaultdict(list), []
+    cb_parents = {row["molecule_chembl_id"]: (row.get("molecule_hierarchy") or {}).get("parent_chembl_id")
+                  for row in chembl_molecules}
+    for row in overrides:
+        parent = row["drug_id"]
+        reason = None
+        if parent not in molecules or cb_parents.get(parent) is None:
+            reason = "missing_parent_mapping"
+        elif parent not in groups or parent in parent_problems or cb_parents[parent] != parent:
+            reason = "ambiguous_parent"
+        if reason:
+            override_unmapped.append({"drug_id": parent, "disease_id": row["disease_id"], "reason": reason})
+        else:
+            override_rows[parent].append(row)
 
     def unmapped(parent: str, source: str, item: str, reason: str) -> None:
         drugs[parent]["unmapped"].append({"source": source, "item": item, "reason": reason})
@@ -340,7 +388,7 @@ def build_universe(tables: dict, chembl_molecules: list[dict], mechanisms: list[
 
     for parent, sources in sorted(groups.items()):
         approved = [approvals[source] for source in sources if source in approvals]
-        if not approved:
+        if not approved and parent not in override_rows:
             continue
         drugs[parent] = {
             "drug_id": parent, "name": molecules[parent]["name"],
@@ -354,6 +402,18 @@ def build_universe(tables: dict, chembl_molecules: list[dict], mechanisms: list[
         for source in sources:
             if source in parent_problems:
                 unmapped(parent, "parent", source, parent_problems[source])
+
+        # Apply only missing parent–Disease approvals, preserving OT provenance.
+        ot_diseases = set(drugs[parent]["approval"]["disease_ids"])
+        additions = [row for row in override_rows[parent] if row["disease_id"] not in ot_diseases]
+        if additions:
+            approval = drugs[parent]["approval"]
+            approval["disease_ids"] = sorted(ot_diseases | {row["disease_id"] for row in additions})
+            approval["sources"] = sorted(set(approval["sources"]) | {
+                "EMA Human Drugs" if row["regulator"] == "EMA" else row["regulator"] for row in additions})
+            approval["overrides"] = sorted(
+                ({"disease_id": row["disease_id"], "url": row["url"]} for row in additions),
+                key=lambda row: (row["disease_id"], row["url"]))
 
     # Bulk ENSG mappings can inherit an ambiguous UniProt mapping, and even RNA
     # mechanisms carry ENSG IDs. Validate both before accepting a protein edge.
@@ -459,7 +519,7 @@ def build_universe(tables: dict, chembl_molecules: list[dict], mechanisms: list[
             unmapped(parent, "mechanism", gene, "ambiguous_action_type")
         target["support"].sort(key=("mechanism", "bioactivity").index)
         drugs[parent]["targets"].append(target)
-    reasons = Counter()
+    reasons = Counter(row["reason"] for row in override_unmapped)
     for drug in drugs.values():
         unique = {json.dumps(item, sort_keys=True): item for item in drug["unmapped"]}
         drug["unmapped"] = [unique[key] for key in sorted(unique)]
@@ -473,6 +533,9 @@ def build_universe(tables: dict, chembl_molecules: list[dict], mechanisms: list[
         "coverage": {
             "drugs": len(drugs),
             "drugs_with_targets": sum(bool(row["targets"]) for row in drugs.values()),
+            "approval_overrides": sum(len({item["disease_id"] for item in row["approval"].get("overrides", [])})
+                                      for row in drugs.values()),
+            "unmapped_approval_overrides": override_unmapped,
             "unmapped_items": sum(reasons.values()),
             "unmapped_by_reason": dict(sorted(reasons.items())),
         },
@@ -491,11 +554,13 @@ def run(cache: Cache) -> dict:
         raise ValueError("The ChEMBL API is no longer release 37; refusing mixed-release data")
     tables = read_tables(cache)
     approved = approval_rows(tables["clinical_indication"], tables["clinical_report"])
+    overrides = load_approval_overrides()
+    eligible = set(approved) | {row["drug_id"] for row in overrides}
     # Include all members of approved OT families, not just records at APPROVAL;
     # a salt can carry the approval while the parent carries the mechanism.
     initial_groups, _ = parent_groups(tables["drug_molecule"], [])
     source_ids = sorted({source for sources in initial_groups.values()
-                         if any(source in approved for source in sources) for source in sources})
+                         if any(source in eligible for source in sources) for source in sources})
     chembl_molecules = []
     for batch in batches(source_ids):
         chembl_molecules.extend(cache.pages("molecule", {
@@ -507,7 +572,7 @@ def run(cache: Cache) -> dict:
     molecules = {row["id"]: row for row in tables["drug_molecule"]}
     small_molecules = sorted({source for parent, sources in groups.items()
                              if molecules[parent]["drugType"] == "Small molecule"
-                             and any(source in approved for source in sources) for source in sources})
+                             and any(source in eligible for source in sources) for source in sources})
 
     def activity(source: str) -> tuple[str, list[dict]]:
         return source, cache.pages("activity", {
@@ -529,7 +594,7 @@ def run(cache: Cache) -> dict:
     targets = []
     for batch in batches(target_ids):
         targets.extend(cache.pages("target", {"target_chembl_id__in": ",".join(batch)}))
-    return build_universe(tables, chembl_molecules, mechanisms, targets, activities)
+    return build_universe(tables, chembl_molecules, mechanisms, targets, activities, overrides=overrides)
 
 
 def main() -> None:

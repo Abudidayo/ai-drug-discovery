@@ -1,5 +1,7 @@
 # Stream A sample contracts
 
+Live A2 outputs may include `approval.overrides` (Disease IDs and regulator URLs); coverage counts these verified additions separately.
+
 One illustrative Experiment for the Disease **plasma cell myeloma**
 (`MONDO_0009693`). These small files let Streams A, B and C build together.
 
