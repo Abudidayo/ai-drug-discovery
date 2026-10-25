@@ -1,5 +1,8 @@
 # KG-Bench (Bioinformatics 42(5), btag159): what it benchmarks, and an honest 24-hour evaluation for the OxHack '26 repurposing app
 
+> **Older research snapshot.** Where this note differs from `plan.md`, follow `plan.md`. In particular: docking runs AutoDock Vina on CPU (no rented GPUs), the Model jury uses three Snowflake Cortex model families (no Gemini), and IDs are mapped through UniProt and Ensembl IDs, never gene symbols.
+
+
 ## What is the paper and what exactly does it benchmark?
 
 ### Takeaway

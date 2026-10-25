@@ -1,5 +1,8 @@
 # OxHack '26: rules, schedule, prize tracks and the HRT prize, with a strategy for an evidence-first drug-repurposing app
 
+> **Older research snapshot.** Where this note differs from `plan.md`, follow `plan.md`. In particular: docking runs AutoDock Vina on CPU (no rented GPUs), the Model jury uses three Snowflake Cortex model families (no Gemini), and IDs are mapped through UniProt and Ensembl IDs, never gene symbols.
+
+
 Research done Sat 24 Oct 2026, roughly 12:30–13:55 UTC (13:30–14:55 BST). The event was already live: MLH showed "Live Now", and the organiser countdown puts the start of hacking at 12:00 BST today. Pages were fetched raw (curl) and quotes were taken from the HTML text. Devpost pages carry no "last updated" stamp. The only dated organiser post found is from 26 Sep 2026. The Devpost Updates tab is still empty.
 
 ---

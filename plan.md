@@ -108,9 +108,9 @@ flowchart TD
 
 1. Download a **human** STRING interaction dataset and select an explicitly documented edge subset and confidence threshold. Record if edges are physical interactions or functional associations.
 2. Retain only proteins that can be mapped to the Target identifiers used by Open Targets and ChEMBL.
-3. Store the graph as versioned edge lists and a sparse adjacency representation (SciPy); record isolated and disconnected nodes.
+3. Store the graph as versioned edge lists and a sparse adjacency representation (SciPy). Score only on its **largest connected component**; retain proteins outside it in the mapping report as `not_in_network`, with the reason recorded.
 4. Validate basic properties: node/edge counts, duplicate edges, self-loops, mapping rates and connected-component sizes.
-5. **Precompute distances once.** Compute all-pairs shortest-path distances on the pinned graph (unweighted, e.g. SciPy `csgraph.shortest_path` run in row chunks) and store them as a `uint8` matrix of about n² bytes (roughly 360 MB for 19,000 proteins). Ranking a Disease, including the degree-matched random samples, then needs only lookups; nothing is recomputed per request.
+5. **Precompute distances once.** Compute all-pairs shortest-path distances on the pinned largest connected component (unweighted, e.g. SciPy `csgraph.shortest_path` run in row chunks) and store them as a `uint8` matrix of about n² bytes (roughly 360 MB for 19,000 proteins). Reserve `255` for unreachable pairs; never average it or cast infinity directly to `uint8`. Check that finite distances fit in `0–254` before saving. Ranking a Disease, including the degree-matched random samples, then needs only lookups; nothing is recomputed per request.
 
 ### 4.2 Build the Candidate universe
 
@@ -129,13 +129,17 @@ flowchart TD
    d(C,D)=\frac{1}{|T_C|}\sum_{c\in T_C}\min_{t\in T_D}\operatorname{dist}(c,t)
    \]
 
-   where `T_C` are the drug's Targets and `T_D` are Disease-associated Targets. Lower distances mean greater network proximity, **not greater clinical efficacy**.
-4. Account for network hub bias: compare observed distance with distances from **degree-matched random Target sets** of equal size, using a deterministic random seed. Report the observed distance and a null-model z-score; smaller z-scores indicate closer-than-expected proximity under this chosen null. Freeze the number of randomisations (e.g. 200 for the MVP) and test stability.
+   where `T_C` and `T_D` contain only the drug's Targets and Disease-associated Targets retained in the largest connected component. Report retained and excluded Target counts for both sets. Lower distances mean greater network proximity, **not greater clinical efficacy**.
+4. Account for network hub bias: compare observed distance with distances from **degree-matched random Target sets** of equal size, using a deterministic random seed. Randomise both the drug Target set and Disease Target set. Draw replacement proteins from degree bins containing **at least 100 proteins**, grouping adjacent degrees and merging any undersized final bin into its neighbour, following the binning approach in [Guney et al. (2016)](https://doi.org/10.1038/ncomms10331). Sample distinct proteins within each random set. Report the observed distance and a null-model z-score; smaller z-scores indicate closer-than-expected proximity under this chosen null. Freeze the number of randomisations (e.g. 200 for the MVP) and test stability.
 5. Return ranked Candidates, pathway/network connections explaining their proximity, coverage status and full calculation provenance. Paths are *network explanations*, not proven mechanisms.
 
 **Important:** direct overlaps can dominate the score, so also calculate an evidence-only ranking and a count of directly shared Targets. Run an ablation excluding direct drug–Disease Target overlaps to test whether indirect network connections truly add anything.
 
-**Scoring eligibility:** at least one Disease Target and at least one Candidate Target must map into a common connected part of the graph. If not, return `not_scorable` with an exact reason. Do not fill missing values with invented scores.
+**Scoring eligibility:** at least one Disease Target and at least one Candidate Target must map into the largest connected component. Otherwise return `not_scorable`, with no network score and an exact reason; keep the Candidate visible. If no Disease Targets remain, use the direct-evidence fallback in section 4.4. Never substitute zero for a missing score.
+
+**Zero null spread:** if all random distances are identical, the z-score is undefined. Return `distance_only`, preserve the observed distance, set `degree_matched_z = null`, and flag `zero_null_variance`. Keep these Candidates after all Candidates with valid z-scores and report their count.
+
+**Deterministic ordering:** sort scored Candidates by ascending z-score, then ascending observed distance, then ascending ChEMBL ID. Sort the following `distance_only` group by ascending observed distance, then ChEMBL ID. Keep `not_scorable` Candidates unranked in the network result and available to the evidence fallback. Measure tie frequency and zero-spread counts in the pilot rather than assuming they will be rare or common.
 
 ### 4.4 Transparent fallback
 
@@ -286,7 +290,7 @@ A GPU is **not a requirement**. TxGNN and KG-Bench RGCN are useful research refe
 }
 ```
 
-**The IDs are real and follow section 3; every score and rank is fictional, not a study result.** For an unscorable Candidate: `status = "not_scorable"`, `network = null`, and an explicit `unscorable_reason`. Jury results are stored as a separate object, so reviewers cannot unknowingly inherit the network score.
+**The IDs are real and follow section 3; every score and rank is fictional, not a study result.** For an unscorable Candidate: `status = "not_scorable"`, `network = null`, and an explicit `unscorable_reason`. For zero null spread: `status = "distance_only"`, retain `network.mean_distance` and `network.rank` under section 4.3's ordering, set `network.degree_matched_z = null`, and include `network.warning = "zero_null_variance"`. Jury results are stored as a separate object, so reviewers cannot unknowingly inherit the network score.
 
 ### 9.3 Minimum persistent tables
 

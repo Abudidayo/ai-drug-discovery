@@ -43,13 +43,18 @@ Done when `psql "$DATABASE_URL" -c 'select 1'` works.
 2. Create a service in `eu-west-2` (London). Save the downloaded config file: it is the only time the password is shown.
 3. Create the tables listed in `plan.md` section 9.3.
 
-### Vultr (stream C)
+### GitHub Codespaces (stream C)
 
-Done when the VM answers over SSH.
+Done when `curl https://<codespace name>-8000.app.github.dev/api/healthz` returns 200.
 
-1. Register at `mlh.link/vultr-discover` to get the promo code. Create the Vultr account and enter the code under Billing → Gift Code.
-2. Deploy a CPU-optimised VM in London (`lhr`) running Ubuntu LTS, with 8 vCPU and 16 GB.
-3. Open ports 22, 80 and 8000 in the Vultr firewall.
+The demo codespace owner does this once:
+1. Give `gh` the `codespace` scope: `gh auth refresh -h github.com -s codespace`, then approve the device code in the browser. It refreshes the active account, so run `gh auth switch -u Abudidayo` first if that is not the one. Where `GH_TOKEN` is set for another account (Conductor sets one), prefix both commands with `env -u GH_TOKEN`.
+2. In GitHub → Settings → Codespaces:
+   - add the secrets `DATABASE_URL`, `SNOWFLAKE_ACCOUNT` and `SNOWFLAKE_PAT`, available to `Abudidayo/ai-drug-discovery`;
+   - set the default idle timeout to 240 minutes;
+   - leave retention at the default (30 days).
+3. Tiger Cloud: Codespaces has no fixed outgoing IP. Check that the service has no IP allow list, or allow all IPs for the event.
+4. Create and check the codespace as in [`.devcontainer/README.md`](../.devcontainer/README.md).
 
 ### Data cache (stream A)
 
@@ -185,10 +190,10 @@ GET https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id={id}&
 ```
 
 - Group the activities by target and keep targets with a median pChEMBL of at least 7.
-- **ChEMBL target to gene symbol:** call `/target.json?target_chembl_id__in={ids}`.
+- **ChEMBL target to Ensembl gene ID** (`plan.md` section 3; never through gene symbols): call `/target.json?target_chembl_id__in={ids}`.
   - Keep only `target_type == "SINGLE PROTEIN"`.
-  - Read the symbol from `target_components[].target_component_synonyms[]` where `syn_type == "GENE_SYMBOL"`.
-- **Gene symbol to Ensembl ID:** use `mapIds` with `entityNames: ["target"]`.
+  - Take the UniProt accession from `target_components[].accession`.
+  - Map the accession to an Ensembl gene ID through Open Targets `target.proteinIds` entries whose source starts with `uniprot_`. If it matches no gene or several, mark the target `unmapped` with the reason.
 - `limit` is capped at 1000, so follow `page_meta.next`. Cache results per drug.
 
 **A8. Direct-evidence score (the baseline in `plan.md` section 6.1).** For each drug, take its targets (mechanism and bioactivity):
@@ -198,7 +203,7 @@ GET https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id={id}&
 
 Sort by `(evidence_score, breadth)`. The UI shows every supported target, with no other bonus for hitting more targets.
 
-**A10. Build evidence items** (`E1`, `E2`, …) per candidate, for the UI and the jury:
+**A10. Build evidence items** for the UI and the jury. Number them `E1`, `E2`, … once per Experiment, so each ID is unique across all its candidates (`plan.md` section 3):
 
 - **Target association:** symbol, mode score and datatype breakdown, linked to `https://platform.opentargets.org/evidence/{ensembl_id}/{disease_id}`.
 - **Mechanism:** the `mechanismOfAction` sentence plus its references.

@@ -1,5 +1,8 @@
 # Open Targets GraphQL + ChEMBL / PubChem / RCSB PDB integration cookbook (live-verified 24 Oct 2026)
 
+> **Older research snapshot.** Where this note differs from `plan.md`, follow `plan.md`. In particular: docking runs AutoDock Vina on CPU (no rented GPUs), the Model jury uses three Snowflake Cortex model families (no Gemini), and IDs are mapped through UniProt and Ensembl IDs, never gene symbols.
+
+
 **Everything below marked "verified" was executed live from this machine on 24 Oct 2026 (UTC ~12:40–13:30).** Versions hit: **Open Targets Platform 26.09** (API `26.9.0`, `dataPrefix: platform2609`, data published 2026-09-18) and **ChEMBL_37** (released 2026-05-01). Latencies are single-sample wall-clock from one UK-ish consumer connection; treat as order-of-magnitude.
 
 ---
