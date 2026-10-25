@@ -157,6 +157,17 @@ The UI highlights five Candidates and allows the rest to be expanded. A Candidat
 
 **Choosing the jurors (pilot, before freezing).** Checked in the team account on 24 Oct: `claude-opus-5-5`, `claude-sonnet-5`, `openai-gpt-5.4` and `glm-5.3` answer through `AI_COMPLETE`; `openai-gpt-6.1-sol` is listed but not yet served; `llama3.1-8b` works but is too small for this review. Starting jury: `claude-opus-5-5`, `openai-gpt-5.4`, `glm-5.3`. Before the final test, run a small pilot on 2–3 pilot Diseases that are not in the final test set, comparing a few models per family (for example Opus vs Sonnet, GPT-5.4 vs GPT-6.1 Sol if it is served, GLM vs Qwen vs DeepSeek). Pick the jury by these rules, declared in advance: (1) valid-reply rate, (2) citation validity on a manually checked sample, (3) Hits@5 and MRR on the pilot panels, (4) latency and credit cost. Then freeze the configuration and never change it on final-test results.
 
+**Chosen jury (25 Oct).** `openai-gpt-5.4`, `glm-5.3` and `kimi-k3`, the last two at low reasoning effort, with prompt `jury-v7`. Three companies: OpenAI, Zhipu and Moonshot. Consensus uses every valid juror, with at least two required. Why:
+- **Claude dropped:** `claude-opus-5-5` was strong when it answered (blind MRR 0.42 in `results/experiment_b_replication/`), but its biology safety filter refused about half its attempts there.
+- **No refusals:** in the 6-Disease bake-off (`results/juror_bakeoff/`), this jury had no refusals, 16 of 18 valid votes and the best jury MRR (0.29, chance 0.22).
+- **Rejected alternatives:**
+  - `openai-gpt-5.5` was no better than GPT-5.4;
+  - `grok-4.7` took about 4 minutes per review;
+  - `openai-gpt-5.6`/`6.x` models aren't available to this account;
+  - Gemini is out by team decision.
+
+Chosen on pilot Diseases only; no final-test result was used.
+
 All jurors receive the **same source-grounded evidence items** and the same Candidate set, with independently shuffled ordering. Initially hide network score, network rank, the shortlist-selection reason and any existing overall Candidate rank. Disclose that the listed Candidates are being investigated; avoid asking the models to endorse them.
 
 For each Candidate, require:
