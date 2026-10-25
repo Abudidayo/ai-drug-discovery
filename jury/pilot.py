@@ -401,7 +401,7 @@ def v2_lexicon(packet, identities):
                   and (re.search(r"[A-Za-z]", name) or re.fullmatch(r"[0-9]{2,7}-[0-9]{2}-[0-9]", name)))
 
 
-def v2_jobs(output, *, conditions=V2_CONDITIONS):
+def v2_jobs(output, *, conditions=V2_CONDITIONS, models=V2_MODELS):
     from pipeline.panels import blind_prompt_leaks
     output = Path(output)
     panels = json.loads((output / "panels.json").read_text())["panels"]
@@ -414,9 +414,9 @@ def v2_jobs(output, *, conditions=V2_CONDITIONS):
         expected = {d["drug_id"] for d in [panel["true_drug"], *panel["decoys"]]}
         if any(len(p["candidates"]) != 15 or {c["candidate_id"] for c in p["candidates"]} != expected for p in packets.values()):
             raise ValueError("Each condition must contain exactly the frozen 15-drug panel")
-        for model_index, model in enumerate(V2_MODELS):
+        for model_index, model in enumerate(models):
             order = [c["label"] for c in next(iter(packets.values()))["candidates"]]
-            random.Random(SEED + index*len(V2_MODELS)+model_index).shuffle(order)
+            random.Random(SEED + index*len(models)+model_index).shuffle(order)
             for condition in conditions:
                 packet = packets[condition]
                 validate_packet(packet)
@@ -816,8 +816,9 @@ def b_live_attempt(job, model_call=None):
     start = perf_counter()
     try:
         if model_call is None:
-            client = CortexModel(reasoning_effort=B_EFFORT)
-            if client.reasoning_effort != B_EFFORT:
+            effort = job.get('reasoning_effort', B_EFFORT)
+            client = CortexModel(reasoning_effort=effort)
+            if client.reasoning_effort != effort:
                 raise ValueError('Environment overrides the frozen low-effort configuration')
             model_call = lambda m, p: client(m, p, 0)
         reply = model_call(job['model'], job['prompt'])
@@ -838,19 +839,23 @@ def b_live_attempt(job, model_call=None):
             'condition': job['condition'], 'status': attempt['status']}
 
 
-def run_b(output='data/experiment_b', report_dir='results/experiment_b', *, replication=False):
+def run_b(output='data/experiment_b', report_dir='results/experiment_b', *, replication=False, bakeoff=False):
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from copy import deepcopy
     output = Path(output)
-    if os.environ.get('SNOWFLAKE_REASONING_EFFORT') and json.loads(os.environ['SNOWFLAKE_REASONING_EFFORT']) != B_EFFORT:
+    effort = BAKEOFF_EFFORT if bakeoff else B_EFFORT
+    if os.environ.get('SNOWFLAKE_REASONING_EFFORT') and json.loads(os.environ['SNOWFLAKE_REASONING_EFFORT']) != effort:
         raise ValueError('Remove conflicting SNOWFLAKE_REASONING_EFFORT before the frozen run')
-    if replication:
+    if bakeoff:
+        freeze_bakeoff(output, report_dir)
+        jobs = bakeoff_jobs(output)
+    elif replication:
         freeze_b(output, report_dir, replication=True)
         jobs = b_jobs(output, replication=True)
     else:
         freeze_b(output, report_dir)
         jobs = b_jobs(output)
-    max_calls = 60 if replication else B_MAX_CALLS
+    max_calls = 40 if bakeoff else (60 if replication else B_MAX_CALLS)
     (output / 'runs').mkdir(exist_ok=True)
     # A single writer/process owns the journal; prevent simultaneous runners.
     lock = output / 'live.lock'
@@ -859,6 +864,8 @@ def run_b(output='data/experiment_b', report_dir='results/experiment_b', *, repl
     try:
         for pass_number in (1, 2):
             used = sum(len(json.loads(p.read_text())['attempts']) for p in (output / 'runs').glob('*.json'))
+            if used > max_calls:
+                raise ValueError('Existing journal exceeds live-call budget')
             pending = []
             for job in jobs:
                 path = Path(job['path'])
@@ -1166,14 +1173,264 @@ def report_replication(result, report_dir, output):
     return result
 
 
+# Selection-only bake-off: reuse v2 packets/jobs and Experiment B's dispatch journal.
+BAKEOFF_MODELS = ['openai-gpt-5.5', 'openai-gpt-5.4', 'glm-5.3', 'kimi-k3', 'grok-4.7']
+BAKEOFF_EFFORT = {m: ('low' if m != 'grok-4.7' else None) for m in BAKEOFF_MODELS}
+BAKEOFF_JURIES = {f'{gpt}+{left}+{right}': [gpt, left, right]
+    for gpt in BAKEOFF_MODELS[:2]
+    for left, right in [('glm-5.3', 'kimi-k3'), ('kimi-k3', 'grok-4.7'), ('glm-5.3', 'grok-4.7')]}
+
+
+def prepare_bakeoff(output='data/juror_bakeoff', data_dir='data'):
+    """Extend the saved v2_paths packets using Experiment B's Reactome helper."""
+    from pipeline.packets import add_pathways
+    from pipeline.pathways import load_pathways
+    from pipeline.panels import blind_packet
+    output, data_dir = Path(output), Path(data_dir)
+    if (output / 'preregistered.json').exists():
+        raise ValueError('Bake-off is frozen; do not rebuild inputs')
+    source, paths = data_dir / 'pilot/v2', data_dir / 'pilot/v2_paths'
+    panels = json.loads((source / 'panels.json').read_text())
+    if len(panels['panels']) != 6 or panels != json.loads((paths / 'panels.json').read_text()):
+        raise ValueError('Require exactly the six unchanged pilot v2 panels')
+    reactome_path = data_dir / 'reactome/97/Ensembl2Reactome.human.tsv'
+    reactome = json.loads((reactome_path.parent / 'manifest.json').read_text())
+    if reactome['release'] != 'reactome-97' or sha256(reactome_path.read_bytes()).hexdigest() != reactome['sha256']:
+        raise ValueError('Reactome 97 cache checksum mismatch')
+    pathways, rejected = load_pathways(reactome_path)
+    output.mkdir(parents=True, exist_ok=True)
+    # Retain byte-identical cohort and source identity lexicon; no new selection.
+    for name, root in [('panels.json', source), ('identities.json', paths)]:
+        (output / name).write_bytes((root / name).read_bytes())
+    path_coverage = json.loads((data_dir / 'a6_paths/coverage.json').read_text())
+    identities = json.loads((paths / 'identities.json').read_text())
+    checks = []
+    inputs = [source / 'panels.json', paths / 'panels.json', paths / 'identities.json',
+              paths / 'reconstruct.py', data_dir / 'a6_paths/coverage.json',
+              reactome_path, reactome_path.parent / 'manifest.json']
+    graph_files = {}
+    for panel in panels['panels']:
+        did = panel['disease']['id']
+        packet_path, targets_path = paths / f'blind-{did}.json', source / f'targets-{did}.json'
+        packet = json.loads(packet_path.read_text())
+        saved_paths = json.loads((paths / f'paths-{did}.json').read_text())
+        for name, record in saved_paths['graph']['artifact_files'].items():
+            artifact = data_dir / 'a6/stage1' / name
+            if artifact not in graph_files:
+                graph_files[artifact] = sha256(artifact.read_bytes()).hexdigest()
+            if graph_files[artifact] != record['sha256']:
+                raise ValueError('Saved paths differ from pinned graph artifacts')
+        if not any(e['kind'] == 'network_path' for e in packet['evidence']):
+            raise ValueError('Expected the existing v2_paths evidence packet')
+        coverage = {}
+        packet = add_pathways(packet, json.loads(targets_path.read_text()), pathways,
+                              release=reactome['release'], coverage=coverage)
+        packet = blind_packet(packet, identities['drug_aliases'])
+        validate_packet(packet)
+        write_json(output / f'blind-{did}.json', packet)
+        inputs.extend([packet_path, targets_path, paths / f'paths-{did}.json'])
+        checks.append({'disease_id': did, 'network_paths': path_coverage[f'pilot/{did}'],
+                       'pathways': coverage, 'evidence_kinds': dict(Counter(e['kind'] for e in packet['evidence']))})
+    write_json(output / 'coverage.json', checks)
+    write_json(output / 'provenance.json', {
+        'inputs_sha256': {**{str(p): sha256(p.read_bytes()).hexdigest() for p in inputs},
+                          **{str(p): digest for p, digest in graph_files.items()}},
+        'reactome': reactome, 'reactome_unmapped_by_reason': rejected,
+        'paths': 'Reused pilot/v2_paths packets and PathReconstructor exports, without regenerating or selecting Candidates.'})
+
+
+def bakeoff_jobs(output):
+    jobs = v2_jobs(output, conditions=['blind'], models=BAKEOFF_MODELS)
+    for job in jobs:
+        # Same prompt placement as Experiment B, including its concise-ballot suffix.
+        job['prompt'] = build_prompt(job['packet'], job['presented_order']).replace(
+            'Evidence packet:\n', B_SUFFIX + '\nEvidence packet:\n', 1)
+        job['reasoning_effort'] = BAKEOFF_EFFORT
+    return jobs
+
+
+def freeze_bakeoff(output, report_dir):
+    """Freeze inputs, source and all thirty prompts before any dispatch."""
+    from jury.client import PROMPT_VERSION
+    output, report_dir = Path(output), Path(report_dir)
+    jobs = bakeoff_jobs(output)
+    if len(jobs) != 30 or PROMPT_VERSION != 'jury-v7':
+        raise ValueError('Expected thirty jury-v7 bake-off jobs')
+    sources = [Path(__file__), Path('jury/client.py'), Path('pipeline/panels.py'),
+               Path('pipeline/packets.py'), Path('pipeline/pathways.py')]
+    files = [output / name for name in ['panels.json', 'identities.json', 'coverage.json', 'provenance.json']]
+    files.extend(sorted(output.glob('blind-*.json')))
+    declaration = {
+        'models': BAKEOFF_MODELS, 'juries': BAKEOFF_JURIES, 'prompt_version': PROMPT_VERSION,
+        'condition': 'blind', 'reasoning_effort': BAKEOFF_EFFORT, 'temperature': 0,
+        'max_live_calls': 40, 'max_attempts': 2, 'sdk_retries': 0,
+        'retry_policy': 'All 30 first attempts, then at most 10 retries in seeded v2 job order, with validator feedback. Reservations count even if interrupted.',
+        'jury_policy': 'Current consensus: every valid juror, at least two; competition ranks for Borda ties. Failures count as misses over six panels.',
+        'selection_priority': ['panels with consensus', 'total valid constituent ballots', 'Hits@5', 'MRR'],
+        'protocol_sha256': sha256((report_dir / 'protocol.md').read_bytes()).hexdigest(),
+        'inputs_sha256': {str(p): sha256(p.read_bytes()).hexdigest() for p in files},
+        'source_sha256': {str(p): sha256(p.read_bytes()).hexdigest() for p in sources},
+        'jobs': [{**{k: j[k] for k in ['disease_id', 'model', 'condition', 'presented_order']},
+                  'prompt_sha256': sha256(j['prompt'].encode()).hexdigest()} for j in jobs],
+    }
+    path = output / 'preregistered.json'
+    if path.exists():
+        if json.loads(path.read_text())['declaration'] != declaration:
+            raise ValueError('Frozen bake-off changed')
+    else:
+        write_json(path, {'frozen_at': datetime.now(timezone.utc).isoformat(), 'declaration': declaration})
+    write_json(report_dir / 'protocol_frozen.json', json.loads(path.read_text()))
+    return declaration
+
+
+def bakeoff_failure(attempt):
+    if attempt['status'] == 'valid':
+        return None
+    if attempt.get('stop_reason') == 'refusal':
+        return 'refusal'
+    if attempt.get('error'):
+        error = attempt['error']
+        return error['type'] + (f"/HTTP{error['http_status']}" if error.get('http_status') else '')
+    return 'validation' if attempt['status'] == 'invalid' else 'interrupted_or_reserved'
+
+
+def score_bakeoff(output='data/juror_bakeoff', report_dir='results/juror_bakeoff'):
+    """Score saved receipts only; no model or source queries."""
+    output, report_dir = Path(output), Path(report_dir)
+    declaration = freeze_bakeoff(output, report_dir)
+    provenance = json.loads((output / 'provenance.json').read_text())
+    for name, expected in provenance['inputs_sha256'].items():
+        if sha256(Path(name).read_bytes()).hexdigest() != expected:
+            raise ValueError(f'Bake-off source input changed: {name}')
+    panels = json.loads((output / 'panels.json').read_text())['panels']
+    jobs = bakeoff_jobs(output)
+    runs = [json.loads(Path(j['path']).read_text()) for j in jobs]
+    if len(list((output / 'runs').glob('*.json'))) != 30:
+        raise ValueError('Expected exactly thirty job receipts')
+    used = sum(len(r['attempts']) for r in runs)
+    if used > 40 or any(not 1 <= len(r['attempts']) <= 2 for r in runs):
+        raise ValueError('Bake-off attempt budget violated')
+    by_key = {}
+    for job, run in zip(jobs, runs):
+        for key in ['disease_id', 'model', 'condition', 'presented_order']:
+            if run[key] != job[key]:
+                raise ValueError('Receipt differs from frozen job')
+        for number, attempt in enumerate(run['attempts'], 1):
+            prompt = job['prompt']
+            if number == 2:
+                errors = (run['attempts'][0].get('validation') or {}).get('errors', [])
+                prompt = ('Your previous reply failed validation: ' + '; '.join(errors) +
+                          '. Return a complete corrected JSON ballot.\n' + prompt)
+            if (attempt['prompt_sha256'] != sha256(prompt.encode()).hexdigest()
+                    or attempt['protocol_sha256'] != declaration['protocol_sha256']):
+                raise ValueError('Attempt differs from frozen prompt/protocol')
+            if attempt['status'] in ['valid', 'invalid']:
+                reviews, flags = validate_reply(attempt['raw_output'], job['packet'],
+                    name_aliases=job['name_aliases'], stop_reason=attempt.get('stop_reason'))
+                if flags != attempt['validation'] or reviews != attempt['reviews']:
+                    raise ValueError('Receipt failed uniform revalidation')
+        by_key[(run['disease_id'], run['model'])] = run
+    models, juries = {}, {}
+    for model in BAKEOFF_MODELS:
+        model_runs = [by_key[(p['disease']['id'], model)] for p in panels]
+        attempts = [a for r in model_runs for a in r['attempts']]
+        rows = [{'disease_id': p['disease']['id'], 'valid': bool(final_attempt(r)),
+                 **recovery((final_attempt(r) or {}).get('reviews'), p['true_drug']['drug_id'])}
+                for p, r in zip(panels, model_runs)]
+        usage = {}
+        for key in ['input_tokens', 'output_tokens']:
+            counts = [a.get(key) for a in attempts]
+            usage[key] = {'known_total': sum(c for c in counts if c is not None),
+                          'missing_attempts': sum(c is None for c in counts),
+                          'total': sum(counts) if all(c is not None for c in counts) else None}
+        models[model] = {**b_metrics(rows), 'valid_ballots': sum(r['valid'] for r in rows),
+            'first_attempt_valid': sum(r['attempts'][0]['status'] == 'valid' for r in model_runs),
+            'attempts': len(attempts), 'refusals': sum(bakeoff_failure(a) == 'refusal' for a in attempts),
+            'failure_types': dict(Counter(f for a in attempts if (f := bakeoff_failure(a)))),
+            'final_failure_types': dict(Counter(bakeoff_failure(r['attempts'][-1]) for r in model_runs if not final_attempt(r))),
+            'validation_errors': dict(Counter(e for a in attempts for e in (a.get('validation') or {}).get('errors', []))),
+            'median_latency_ms': (median(a['latency_ms'] for a in attempts if a.get('latency_ms') is not None)
+                                  if any(a.get('latency_ms') is not None for a in attempts) else None),
+            'token_usage': usage, 'reasoning_effort': BAKEOFF_EFFORT[model]}
+    for name, members in BAKEOFF_JURIES.items():
+        rows = []
+        for panel in panels:
+            did = panel['disease']['id']
+            packet = json.loads((output / f'blind-{did}.json').read_text())
+            jurors = []
+            for model in members:
+                run = by_key[(did, model)]
+                final = final_attempt(run)
+                jurors.append({'model': model, 'status': 'valid' if final else run['attempts'][-1]['status'],
+                               'reviews': final['reviews'] if final else None})
+            result = consensus(packet, jurors)
+            rows.append({'disease_id': did, 'consensus': result if result['jurors_counted'] >= 2 else None,
+                         'consensus_status': {k: result[k] for k in ['jurors_counted', 'failed_jurors', 'reason']},
+                         **recovery(result['ranking'], panel['true_drug']['drug_id'])})
+        juries[name] = {**b_metrics(rows), 'models': members,
+            'panels_with_consensus': sum(r['consensus'] is not None for r in rows),
+            'three_valid_panels': sum(r['consensus_status']['jurors_counted'] == 3 for r in rows),
+            'valid_constituent_ballots': sum(r['consensus_status']['jurors_counted'] for r in rows)}
+    recommended = max(juries, key=lambda name: tuple(juries[name][k] for k in
+        ['panels_with_consensus', 'valid_constituent_ballots', 'hits_at_5', 'mrr']))
+    result = {'protocol': declaration, 'calls_used': used, 'call_cap': 40,
+              'chance': {'hits_at_5': 5/15, 'mrr': sum(1/i for i in range(1, 16))/15},
+              'panels': panels, 'coverage': json.loads((output / 'coverage.json').read_text()),
+              'models': models, 'juries': juries, 'recommended_jury': recommended,
+              'runs': runs}
+    write_json(report_dir / 'results.json', result)
+    lines = ['# Juror bake-off on six pilot v2 panels', '',
+        f'Recommendation: **{" + ".join(juries[recommended]["models"])}**. Select by panels with consensus, then total valid constituent ballots, then blind Hits@5 and MRR. These are three different model companies; all requests use Snowflake Cortex.', '',
+        f'{used}/40 live calls including retries; 30 model/panel jobs. No availability probes or SDK retries. All six panels were already used for model selection; no final-test Disease was used.', '',
+        'Blind jury-v7; existing v2_paths packets (Zaid\'s read-only PathReconstructor exports) plus Experiment B\'s Reactome helper. Releases: Open Targets 26.09, ChEMBL 37, STRING 12.5, Reactome 97. Evidence, labels and Candidate IDs are source-derived. No new source downloads or model-generated facts entered the packets.', '',
+        'GPT-5.5, GPT-5.4, GLM and Kimi use low reasoning effort. Grok uses provider default: no reasoning_effort parameter was sent and effort support was not probed. Temperature is 0 when supported by the current adapter; GPT low effort omits temperature. No change to validation or refusal handling.', '',
+        'Failures score zero over all six panels. Chance: Hits@5 **33.3%**, MRR **0.221** for one true drug uniformly ranked among 15. Consensus uses every valid ballot, at least two, with current Borda competition ties; ties can make this chance reference optimistic for a jury. Median latency is per attempt, including retries. Token totals include all attempts; unknown usage stays unknown.', '',
+        '| Model | Valid / 6 | First valid | Refusals | Other attempt failures | Attempts | Hits@5 | MRR | Median seconds | Input tokens | Output tokens |',
+        '|---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|']
+    def token_text(value):
+        return str(value['total']) if value['total'] is not None else f"unknown ({value['known_total']} known; {value['missing_attempts']} missing)"
+    for model, m in models.items():
+        other = {k: v for k, v in m['failure_types'].items() if k != 'refusal'}
+        latency = f"{m['median_latency_ms']/1000:.2f}" if m['median_latency_ms'] is not None else 'unknown'
+        lines.append(f"| {model} | {m['valid_ballots']}/6 | {m['first_attempt_valid']}/6 | {m['refusals']} | {other or 'none'} | {m['attempts']} | {m['hits_at_5']:.1%} | {m['mrr']:.3f} | {latency} | {token_text(m['token_usage']['input_tokens'])} | {token_text(m['token_usage']['output_tokens'])} |")
+    lines += ['', 'Per-panel true-drug rank. A dash is a failed/invalid ballot and counts as a miss.', '',
+        '| Disease (ID) | GPT-5.5 | GPT-5.4 | GLM | Kimi | Grok |', '|---|---:|---:|---:|---:|---:|']
+    for index, panel in enumerate(panels):
+        ranks = [str(models[m]['per_panel'][index]['rank'] or '—') for m in BAKEOFF_MODELS]
+        lines.append(f"| {panel['disease']['name']} ({panel['disease']['id']}) | " + ' | '.join(ranks) + ' |')
+    lines += ['', '| Jury | Consensus / 6 | All three / 6 | Valid votes / 18 | Hits@5 | MRR |',
+              '|---|---:|---:|---:|---:|---:|']
+    for name, j in juries.items():
+        lines.append(f"| {name} | {j['panels_with_consensus']}/6 | {j['three_valid_panels']}/6 | {j['valid_constituent_ballots']}/18 | {j['hits_at_5']:.1%} | {j['mrr']:.3f} |")
+    lines += ['', 'Jury per-panel ranks in the same Disease order as above; parentheses show valid jurors counted.', '',
+              '| Jury | Adrenal | Biliary | COPD | Hypertension | Hyperhidrosis | Glioma |', '|---|---:|---:|---:|---:|---:|---:|']
+    for name, j in juries.items():
+        values = [f"{r['rank'] or '—'} ({r['consensus_status']['jurors_counted']})" for r in j['per_panel']]
+        lines.append(f'| {name} | ' + ' | '.join(values) + ' |')
+    lines += ['', 'Six reused selection panels and one initial ballot per model/panel are a small, dependent sample. This is a practical selection recommendation, not evidence of general superiority, clinical benefit or performance above chance. Decoys are unlabelled. Blinding screens known drug aliases and IDs but cannot rule out recognition from biology. Earlier named-versus-blind pilot results showed a substantial knowledge-leakage gap; this run is blind only and cannot estimate that gap anew.', '',
+        'Refusals are counted from the current validator/provider stop reason; unparseable refusal text without such metadata falls under validation failure. The current non-Anthropic adapter does not expose chat finish reasons, so provider-level refusals may be undercounted. Raw replies, validation errors, receipt hashes, token counts, per-panel consensus and mapping exclusions are retained in results.json and the data journal. Manual citation-entailment review and effective provider reasoning levels remain unverified.', '']
+    (report_dir / 'summary.md').write_text('\n'.join(lines))
+    return result
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--experiment-b", action="store_true")
     parser.add_argument("--replication", action="store_true")
+    parser.add_argument("--juror-bakeoff", action="store_true")
     parser.add_argument("--v2", action="store_true")
     parser.add_argument("--output", type=Path, default=Path("data/pilot"))
     args = parser.parse_args()
+    if args.juror_bakeoff:
+        output = Path('data/juror_bakeoff') if args.output == Path('data/pilot') else args.output
+        report = Path('results/juror_bakeoff')
+        if args.live:
+            if not (output / 'preregistered.json').exists():
+                prepare_bakeoff(output)
+            run_b(output, report, bakeoff=True)
+        score_bakeoff(output, report)
+        raise SystemExit(0)
     if args.replication:
         output = Path('data/experiment_b_replication') if args.output == Path('data/pilot') else args.output
         report = Path('results/experiment_b_replication')
