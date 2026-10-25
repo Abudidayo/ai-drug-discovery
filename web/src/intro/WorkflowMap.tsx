@@ -1,5 +1,4 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import completeWorkflow from "./assets/complete-workflow.svg";
 import { usePlayback } from "./playback";
 import workflowMap from "./workflow-map.json";
 import styles from "./workflowMap.module.css";
@@ -7,8 +6,7 @@ import { WorkflowVisual } from "./WorkflowVisual";
 
 /*
  * The workflow at a glance (after Jessica's TechnicalOverview): seven nodes on a 1280 x 520 map,
- * with three signals that travel each route in turn and light the node they leave or reach. The
- * complete engineering diagram and its notes sit behind "Technical details".
+ * with three signals that travel each route in turn and light the node they leave or reach.
  */
 
 const { nodes, routes } = workflowMap;
@@ -26,13 +24,12 @@ const SAMPLES = 40;
 
 const cx = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(" ");
 
-function Glyph({ name }: { name: "play" | "pause" | "replay" | "chevron" }) {
+function Glyph({ name }: { name: "play" | "pause" | "replay" }) {
   return (
     <svg className={styles.glyph} viewBox="0 0 16 16" aria-hidden="true">
       {name === "play" && <path d="M5 3.5v9l7-4.5Z" />}
       {name === "pause" && <path d="M5.5 3.5v9M10.5 3.5v9" />}
       {name === "replay" && <path d="M3.5 8a4.5 4.5 0 1 0 1.3-3.2M3.5 2.5v2.8h2.8" />}
-      {name === "chevron" && <path d="m4.5 6 3.5 3.5L11.5 6" />}
     </svg>
   );
 }
@@ -69,7 +66,6 @@ export function WorkflowMap({ className }: { className?: string | undefined }) {
   const [revision, setRevision] = useState(0);
   const [phase, setPhase] = useState(0);
   const [arrived, setArrived] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const canvas = useRef<HTMLDivElement>(null);
   const plane = useRef<HTMLDivElement>(null);
   const paths = useRef<(SVGPathElement | null)[]>([]);
@@ -77,7 +73,6 @@ export function WorkflowMap({ className }: { className?: string | undefined }) {
   const animations = useRef<Animation[]>([]);
   const id = useId().replaceAll(":", "");
   const arrow = `workflow-arrow-${id}`;
-  const detailsId = `workflow-details-${id}`;
   const route = routes[phase];
   const active = arrived ? route?.to : route?.from;
 
@@ -236,42 +231,6 @@ export function WorkflowMap({ className }: { className?: string | undefined }) {
           <Glyph name="replay" />
           Replay
         </button>
-        <button
-          type="button"
-          className={styles.detailsToggle}
-          aria-expanded={detailsOpen}
-          aria-controls={detailsId}
-          onClick={() => {
-            setDetailsOpen((value) => !value);
-          }}
-        >
-          Technical details
-          <Glyph name="chevron" />
-        </button>
-      </div>
-      <div id={detailsId} className={styles.details} hidden={!detailsOpen}>
-        <div className={styles.diagram}>
-          <img
-            src={completeWorkflow}
-            alt="Open Targets, ChEMBL, STRING and Reactome connect drugs to disease biology. Physical-network RWR and direct evidence select up to 15 candidates. Source statements and E-IDs feed independent openai-gpt-5.4, glm-5.3 and kimi-k3 reviews through Snowflake Cortex. Schema, citation and numeric checks produce critiques and Borda consensus. TigerData PostgreSQL preserves experiments, evidence and votes. Optional RCSB PDB, Docker, RDKit, Meeko and AutoDock Vina support predicted pose inspection."
-          />
-        </div>
-        <div className={styles.notes}>
-          <p>
-            <strong>Network relevance.</strong> Default RWR: p(next) = 0.7 Pᵀp + 0.3 p₀. Drug score
-            is mean stationary mass at mapped targets. Missing coverage stays explicit.
-          </p>
-          <p>
-            <strong>Traceable review.</strong> Stored statements and exact model wording stay
-            inspectable. At least two valid jurors are required; objections and disagreements remain
-            visible.
-          </p>
-          <p>
-            <strong>Research outputs.</strong> Associations and predicted poses need further
-            testing. Large graph and pose files remain in file storage; TigerData retains their
-            references and hashes.
-          </p>
-        </div>
       </div>
     </section>
   );

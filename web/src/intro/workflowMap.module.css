@@ -208,15 +208,6 @@
   cursor: default;
 }
 
-.detailsToggle {
-  margin-left: auto;
-}
-
-.detailsToggle[aria-expanded="true"] {
-  border-color: var(--story-violet);
-  color: var(--story-indigo);
-}
-
 .glyph {
   width: 14px;
   height: 14px;
@@ -225,68 +216,10 @@
   stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
-  transition: transform var(--duration-quick) var(--ease-out);
-}
-
-.detailsToggle[aria-expanded="true"] .glyph {
-  transform: rotate(180deg);
-}
-
-/* Technical details: the complete diagram is drawn for a night background, so it keeps one. */
-
-.details {
-  margin-top: var(--space-16);
-}
-
-.details[hidden] {
-  display: none;
-}
-
-.diagram {
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  padding: var(--space-16);
-  border-radius: 4px;
-  background: var(--story-night);
-}
-
-.diagram img {
-  display: block;
-  width: 100%;
-  min-width: 1050px;
-  max-width: none;
-  height: auto;
-}
-
-.notes {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-24);
-  margin-top: var(--space-16);
-  font-size: var(--text-label);
-  line-height: var(--leading-body);
-  color: var(--color-grey-1);
-}
-
-.notes strong {
-  font-weight: var(--weight-semibold);
-  color: var(--color-ink);
-}
-
-@media (max-width: 720px) {
-  .notes {
-    grid-template-columns: 1fr;
-    gap: var(--space-12);
-  }
-
-  .detailsToggle {
-    margin-left: 0;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .node,
-  .glyph {
+  .node {
     transition: none;
   }
 }
