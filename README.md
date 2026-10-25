@@ -4,6 +4,8 @@
 
 Pick a disease. HalfLife finds approved drugs that might help, shows why, and lets three AI models argue over the evidence.
 
+**Live demo:** https://oxhack-workstream-c-x55r7x9w6gv4hp9gw-5173.app.github.dev/
+
 The ranking comes from biomedical data and graph algorithms, not from an AI model. The AI only reviews the shortlist.
 
 ## How it works
@@ -17,7 +19,7 @@ flowchart TD
     E --> F["Rank every drug<br/>random walk with restart"]
     F --> G["Shortlist of 15<br/>10 network + 5 direct evidence"]
     G --> H["Evidence packets<br/>with network paths"]
-    H --> I["Model jury<br/>3 AI models, blind"]
+    H --> I["Model jury, blind<br/>GPT-5.4 · GLM-5.3 · Kimi K3<br/>via Snowflake Cortex"]
     I --> J["Compare Candidates<br/>+ optional docking"]
 ```
 
