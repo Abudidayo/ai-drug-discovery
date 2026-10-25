@@ -84,8 +84,29 @@ def test_stream_a_jury_result_maps_without_inventing_votes() -> None:
     for juror, recorded in zip(mapped.jurors, result["jurors"], strict=True):
         assert [u.model_dump() for u in juror.token_usage] == recorded.get("token_usage", [])
     labels = {c["label"]: c["candidate_id"] for c in packet["candidates"]}
+    assert mapped.outcome is not None
     assert set(mapped.outcome.contested) <= set(labels.values())
     assert mapped.outcome.agreement == result["consensus"]["kendalls_w"]
+
+
+def test_fewer_than_two_valid_jurors_give_no_consensus() -> None:
+    """Stream A's jury-v7 rule: one valid ballot is no consensus. Its votes and every
+    juror's record are kept; the run has no outcome."""
+    result = json.loads((FIXTURES / "jury_result.json").read_text())
+    packet = json.loads((FIXTURES / "evidence_packet.json").read_text())
+    valid = [j for j in result["jurors"] if j["status"] == "valid"]
+    for juror in valid[1:]:
+        juror.update(status="invalid", reviews=None)
+    result["consensus"] = None
+    result["consensus_status"] = {
+        "jurors_counted": 1,
+        "failed_jurors": [j["model"] for j in result["jurors"] if j["status"] != "valid"],
+        "reason": "fewer_than_two_valid_jurors",
+    }
+    mapped = map_jury_result(result, packet)
+    assert mapped.outcome is None
+    assert list(mapped.votes) == [valid[0]["model"]]
+    assert len(mapped.jurors) == len(result["jurors"])
 
 
 @pytest.mark.parametrize(

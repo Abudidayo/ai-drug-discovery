@@ -133,7 +133,8 @@ class MappedJury:
     jurors: list[Juror]
     votes: dict[str, list[JuryVote]]
     """Each valid juror's votes, by model ID."""
-    outcome: JuryOutcome
+    outcome: JuryOutcome | None
+    """Null when fewer than two jurors gave a valid review: stream A gives no consensus."""
 
 
 def map_jury_result(result: JSON, packet: JSON) -> MappedJury:
@@ -180,6 +181,9 @@ def map_jury_result(result: JSON, packet: JSON) -> MappedJury:
             for review in juror["reviews"]
         ]
     combined = result["consensus"]
+    if combined is None:
+        # Stream A gives no consensus from fewer than two valid ballots (consensus_status).
+        return MappedJury(jurors=jurors, votes=votes, outcome=None)
     consensus = Consensus(
         method=combined["method"],
         jurors_counted=combined["jurors_counted"],
@@ -269,10 +273,10 @@ class StreamAJury:
         mapped = map_jury_result(result, packet)
         for juror in mapped.jurors:
             yield JurorFinished(juror, mapped.votes.get(juror.model_id, []))
-        if mapped.outcome.consensus.jurors_counted == 0:
+        if mapped.outcome is None:
             raise JuryUnavailable(
-                "No juror returned a review that passed the checks, so there is no consensus. "
-                "Each juror's errors say why."
+                "Fewer than two jurors returned a review that passed the checks, so there is "
+                "no consensus. Each juror's errors say why."
             )
         return mapped.outcome
 
