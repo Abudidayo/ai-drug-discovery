@@ -6,11 +6,12 @@ the evaluation results. `oxhack_api/schemas.py` is the single source of truth
 for every request and response; `openapi.json` is generated from it and the
 web app's TypeScript types are generated from that.
 
-Today the API runs in **fixture mode**: Experiments, jury reviews, structures
-and docking results come from `oxhack_api/fixtures/`. They are kept in memory
-by default, or saved in Postgres with `OXHACK_REPO=postgres` (see below). The
-live pipeline (phase 5), the live jury (phase 6) and the docking worker
-(phase 7) plug into the same seams.
+By default the API runs in **fixture mode**: Experiments, jury reviews,
+structures and docking results come from `oxhack_api/fixtures/`. They are kept
+in memory by default, or saved in Postgres with `OXHACK_REPO=postgres` (see
+below). **Live mode** (`OXHACK_SOURCE=live`, see "Live mode") builds
+Experiments for any Disease with stream A's pipeline and stream B's network
+ranking. The docking worker (phase 7) plugs into the same seams.
 
 ## Run
 
@@ -22,6 +23,10 @@ uv run uvicorn oxhack_api.app:app --reload     # http://127.0.0.1:8000/docs
 
 | Variable | Default | Meaning |
 |---|---|---|
+| `OXHACK_SOURCE` | `fixture` | `fixture` or `live` (see "Live mode"). |
+| `OXHACK_JURY` | `fixture` | `fixture`, `mock` (practice reviewers, no model called) or `cortex`. Live mode needs `mock` or `cortex`. |
+| `OXHACK_DATA_DIR` | `data` | Prepared data for live mode; relative to the repository root. |
+| `OXHACK_NETWORK_DIR` | `<data dir>/ranking/string-12.5-c700-e400` | Stream B's protein network bundle. |
 | `OXHACK_FIXTURE_DELAY_MS` | `400` | Pause between background job steps, so the UI can show progress. |
 | `OXHACK_FIXTURES_DIR` | `oxhack_api/fixtures` | Folder holding the fixture files. |
 | `OXHACK_WORKER_THREADS` | `4` | Threads that run background jobs, in the API or in the worker. |
@@ -33,6 +38,45 @@ uv run uvicorn oxhack_api.app:app --reload     # http://127.0.0.1:8000/docs
 | `OXHACK_JOB_HEARTBEAT_S` | `10` | How often a worker refreshes the heartbeat of the jobs it runs. |
 | `OXHACK_JOB_STALE_AFTER_S` | `60` | A running job with an older heartbeat lost its worker and is re-queued. |
 | `OXHACK_JOB_MAX_ATTEMPTS` | `3` | Claims of one job before a stale one is failed instead of re-queued. |
+
+## Live mode
+
+Prepare the data once (about 460 MB under the git-ignored `data/`; every step
+is resumable and skips what is already there):
+
+```sh
+cd api
+uv run python -m oxhack_api.prepare
+OXHACK_SOURCE=live OXHACK_JURY=mock uv run uvicorn oxhack_api.app:app
+```
+
+`prepare` downloads the Open Targets 26.09 tables and builds stream A's drug
+universe, then Reactome's pathway mapping, then the protein network:
+STRING 12.5's human protein list and physical links (12 MB), stream A's
+STRING-to-gene mapping (`string_id_map.json`) and stream B's artefact bundle
+(`ranking/README.md`): 19,199 genes, 113,969 links, and a 12,834 by 12,834
+shortest-distance matrix (166 MB). On an M-series Mac the network takes about
+20 seconds.
+
+A build (`services/live.py`) runs stream A's A1 for the Disease Targets, ranks
+the approved drugs, then adds stream A's evidence. The ranking is chosen when
+the API starts (`app.open_ranking`):
+
+- **`network`** when the bundle exists: stream B's `RankingEngine`
+  (`services/ranking.py`, `NetworkRanking`), loaded once on a background
+  thread. Its statuses (`scored`, `distance_only`, `not_scorable`), coded
+  reasons and shortlist (10 network + 5 evidence, deduplicated, then filled)
+  pass through; each placed drug's `path` is its shortest route; the drawn
+  network holds the shortlisted drugs' routes and the Disease Targets linked
+  to them (about 40 proteins). The evidence adds each drug's representative
+  routes (`network_path`, cited to STRING) and shared Reactome pathways
+  (`pathway`).
+- **`evidence_only`** otherwise, with a warning in the log: plan.md section
+  4.4's direct-evidence ranking, no network.
+
+Each build keeps its audit trail in `data/experiments/<id>/`, including
+stream B's complete ranking (`network_ranking.json.gz`) and its SHA-256.
+`uv run pytest -m network` runs real COVID-19 and myeloma builds.
 
 ## Run against Postgres
 

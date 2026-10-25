@@ -127,9 +127,20 @@ TargetExcludedReason = TypeAliasType(
 NetworkRole = TypeAliasType("NetworkRole", Literal["disease", "drug", "both", "link"])
 SafetyStatus = TypeAliasType("SafetyStatus", Literal["warnings_recorded", "unknown"])
 EvidenceKind = TypeAliasType(
-    "EvidenceKind", Literal["target_association", "mechanism", "bioactivity", "approval", "warning"]
+    "EvidenceKind",
+    Literal[
+        "target_association",
+        "mechanism",
+        "bioactivity",
+        "approval",
+        "warning",
+        "network_path",
+        "pathway",
+    ],
 )
-EvidenceSource = TypeAliasType("EvidenceSource", Literal["open_targets", "chembl"])
+EvidenceSource = TypeAliasType(
+    "EvidenceSource", Literal["open_targets", "chembl", "string", "reactome"]
+)
 JuryStatus = TypeAliasType("JuryStatus", Literal["queued", "running", "done", "failed"])
 JurorStatus = TypeAliasType(
     "JurorStatus", Literal["pending", "running", "valid", "invalid", "failed"]
@@ -384,7 +395,12 @@ class EvidenceItem(Model):
     id: EvidenceId
     kind: EvidenceKind = Field(description="What the item records.")
     source: EvidenceSource = Field(description="Database the fact comes from.")
-    source_id: str = Field(description="The record's own ID in that database.")
+    source_id: str = Field(
+        description=(
+            "The record's own ID in that database. For a network_path, the route's protein IDs "
+            "joined by '>', then '@' and the SHA-256 of the network it was found in."
+        )
+    )
     url: str = Field(description="Link to the original record.")
     release: DataRelease = Field(description="Data release the record was read from.")
     statement: str = Field(

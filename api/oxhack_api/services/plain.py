@@ -9,6 +9,8 @@ the wording stays the same everywhere.
 
 from __future__ import annotations
 
+import re
+
 # ChEMBL action types, as verbs.
 _ACTIONS: dict[str, str] = {
     "inhibitor": "Blocks",
@@ -114,3 +116,65 @@ def network_unavailable(drug: str, disease: str) -> str:
         f"No protein network was available, so {drug} was ranked only by how strongly its "
         f"own Targets are linked to {disease}."
     )
+
+
+def unscorable(reason: str, drug: str, disease: str) -> str:
+    """Why one Candidate has no place in the protein network, by the ranking's reason code."""
+    if reason == "network_unavailable":
+        return network_unavailable(drug, disease)
+    if reason == "no_retained_drug_targets":
+        return (
+            f"None of {drug}'s targets are in the main protein network, so it has no place "
+            f"in it. It was chosen for its direct links to {disease}."
+        )
+    if reason == "no_retained_disease_targets":
+        return (
+            f"None of {disease}'s proteins are in the main protein network, so {drug} can't "
+            "be placed near them."
+        )
+    raise ValueError(f"unknown reason {reason}")
+
+
+def network_path(symbols: list[str]) -> str:
+    """One route in the protein network, from a drug's Target to a Disease protein, by the
+    proteins' symbols in order. A single protein is a Target that is a Disease protein."""
+    if not symbols:
+        raise ValueError("a route names at least one protein")
+    first, last, through = symbols[0], symbols[-1], symbols[1:-1]
+    if len(symbols) == 1:
+        return f"{first} is itself a disease protein, so the drug acts on it directly."
+    steps = "1 step" if len(symbols) == 2 else f"{len(symbols) - 1} steps"
+    text = f"{first} connects to {last} in {steps} in the protein network"
+    return f"{text}, through {join(through)}." if through else f"{text}."
+
+
+# A gene, protein or complex name keeps its capitals: IL-6, STAT5, (ERK2), PI3K/AKT, C3.
+_NAME_WORD = re.compile(r"\W*(?:.[^\sa-z]*[A-Z]|[A-Z][0-9])")
+
+
+def pathway_name(name: str) -> str:
+    """A pathway's name as words in a sentence: 'Signaling by Erythropoietin' becomes
+    'signalling by erythropoietin pathway'. Gene and protein names keep their capitals."""
+    words = [
+        word if _NAME_WORD.match(word) else word.lower()
+        for word in name.replace("ignaling", "ignalling").split()
+    ]
+    text = " ".join(words)
+    return text if text.endswith("pathway") else f"{text} pathway"
+
+
+def pathway(disease_proteins: list[str], name: str) -> str:
+    """A pathway one of the drug's Targets shares with Disease proteins, by their symbols.
+
+    One pathway record is one evidence item, shared by every Candidate with a Target in
+    it, so the summary names the Disease proteins in it and not a drug's own Target."""
+    if not disease_proteins:
+        raise ValueError("a shared pathway includes at least one disease protein")
+    if len(disease_proteins) == 1:
+        members = f"the disease protein {disease_proteins[0]}"
+    elif len(disease_proteins) <= 3:
+        members = f"the disease proteins {join(disease_proteins)}"
+    else:
+        first, second = disease_proteins[:2]
+        members = f"{len(disease_proteins)} disease proteins, among them {first} and {second}"
+    return f"Targets a protein in the {pathway_name(name)}, which also includes {members}."

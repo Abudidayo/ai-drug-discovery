@@ -35,6 +35,7 @@ const SOURCES: Record<string, string> = {
   opentargets: "Open Targets",
   chembl: "ChEMBL",
   string: "STRING",
+  reactome: "Reactome",
 };
 
 /** A pinned data release in words, e.g. opentargets-26.09 as "Open Targets 26.09". */

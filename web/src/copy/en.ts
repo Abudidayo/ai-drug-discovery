@@ -167,10 +167,12 @@ export const copy = {
 
   evidence: {
     listLabel: "Sourced facts",
-    sources: { open_targets: "Open Targets", chembl: "ChEMBL" } satisfies Record<
-      EvidenceSource,
-      string
-    >,
+    sources: {
+      open_targets: "Open Targets",
+      chembl: "ChEMBL",
+      string: "STRING",
+      reactome: "Reactome",
+    } satisfies Record<EvidenceSource, string>,
     warningTitle: "Label warning",
     noWarnings: "No label warnings are recorded. That doesn’t mean the drug is safe.",
     missingTitle: "Not yet known",

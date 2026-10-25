@@ -5,22 +5,28 @@ on the job's thread, in the stages the job runner reports:
 
 - **targets**: stream A's A1 (`pipeline.disease_targets`): every Open Targets
   26.09 association of the Disease, rescored without clinical-precedence and
-  cancer-biomarker evidence; the top 50 are the Disease Targets. With no network
-  ranking every Target is kept (`retained`).
-- **ranking**: the `RankingBackend` ranks the approved drug universe
+  cancer-biomarker evidence; the top 50 are the Disease Targets. The network
+  ranking keeps those in its protein network (`retained`); with no network
+  ranking every Target is kept.
+- **ranking**: the `RankingBackend` (stream B's network ranking when its bundle
+  is prepared, else the evidence ranking) ranks the approved drug universe
   (`drug_targets.json`, stream A's A2) into a shortlist of at most 15. A
   shortlisted drug that ChEMBL does not list as its own parent, or whose
   regulator-backed approval Open Targets cannot confirm, is left out and the next
   one takes its place; this is stream A's rule from `pipeline.experiment`.
 - **evidence**: stream A's A4 (`build_evidence_packet`): each Candidate's
-  sourced evidence, warnings and PubChem ID. Every item's plain `summary` is
-  built with `plain.py` from structured records (the association score, the
-  ChEMBL mechanism record, the bioactivity pair, the approval report, the
-  warning's toxicity class), never by reading the `statement` text.
+  sourced evidence, warnings and PubChem ID, the Reactome pathways its Targets
+  share with the Disease Targets, and, with the network ranking, its
+  representative routes in the protein network (`add_network_paths`). Every
+  item's plain `summary` is built with `plain.py` from structured records (the
+  association score, the ChEMBL mechanism record, the bioactivity pair, the
+  approval report, the warning's toxicity class, the route's proteins, the
+  pathway's members), never by reading the `statement` text.
 
 Each build also writes its audit trail to `<data_dir>/experiments/<id>/`: the
-Disease Targets, the ranking, the jury evidence packet, mapping coverage and
-stream A's bioactivity cross-check.
+Disease Targets, the ranking (with stream B's complete output, gzipped, and its
+SHA-256), the jury evidence packet, mapping coverage and stream A's bioactivity
+cross-check.
 
 **Known answer.** A Candidate is the Experiment's known-answer check when stream
 A's drug universe records a regulator-backed approval of it for this exact
@@ -66,16 +72,21 @@ from ..stream_a import (
     OT_DATASETS,
     OT_RELEASE,
     EvidenceSources,
+    NetworkPaths,
     OpenTargetsError,
+    Pathways,
+    reactome_release,
     write_json,
 )
 from . import plain
-from .ranking import Ranking, RankingBackend, RankingInput
+from .ranking import Ranking, RankingBackend, RankingInput, archive_full
 from .source import BuildResult, BuildSteps, ExperimentPlan, SourceError
 
 log = logging.getLogger(__name__)
 
 PREPARE_HINT = "Run `uv run python -m oxhack_api.prepare` first."
+STRING_MAP = Path("string_id_map.json")
+"""Stream A's STRING-to-gene mapping (A3) under the data folder; network routes cite it."""
 
 Dockable = Callable[[str, Sequence[str]], bool]
 """Whether a binding pose can be computed for a drug (by ChEMBL ID) acting on these Targets."""
@@ -238,7 +249,12 @@ class LiveSource:
             )
             if not path.exists()
         ]
-        if missing:
+        reactome = reactome_release(data_dir)
+        if reactome is None:
+            missing.append("reactome/<release>/")
+        if ranking.method == "network" and not (data_dir / STRING_MAP).is_file():
+            missing.append(str(STRING_MAP))
+        if missing or reactome is None:
             raise DataNotPrepared(
                 f"The live source has no {', '.join(missing)} in {data_dir}. {PREPARE_HINT}"
             )
@@ -248,13 +264,20 @@ class LiveSource:
         self._offline = offline
         self._catalogue = DiseaseCatalogue(data_dir / DISEASE_PARQUET)
         self._drugs = cast(JSON, json.loads((data_dir / "drug_targets.json").read_text()))
+        self._symbols = _gene_symbols(data_dir / "ot" / "target")
+        self._pathways = Pathways(*reactome)
+        self._string_mappings: list[JSON] = (
+            cast(list[JSON], json.loads((data_dir / STRING_MAP).read_text())["mappings"])
+            if ranking.method == "network"
+            else []
+        )
         # Stream A queries Parquet on DuckDB's shared default connection, which is not
         # thread-safe, so the stages of concurrent builds take turns.
         self._lock = threading.Lock()
 
     @property
     def data_releases(self) -> list[DataRelease]:
-        return [OT_RELEASE, CHEMBL_RELEASE, *self._ranking.releases]
+        return [OT_RELEASE, CHEMBL_RELEASE, *self._ranking.releases, self._pathways.release]
 
     def search_diseases(self, query: str, limit: int) -> list[DiseaseSearchResult]:
         return self._catalogue.search(query, limit)
@@ -292,6 +315,9 @@ class LiveSource:
                 target_ids=[t["target_id"] for t in disease_targets["targets"]],
                 scores=scores,
                 drugs=self._drugs["drugs"],
+                symbols=self._symbols,
+                release=disease_targets["release"],
+                rule=disease_targets["rule"],
             )
             ranking = self._shortlist(sources, request)
         targets = [
@@ -310,6 +336,17 @@ class LiveSource:
         yield "evidence"
         with self._lock, _upstream_errors():
             ids = [ranked.candidate_id for ranked in ranking.shortlist]
+            routes = (
+                None
+                if ranking.graph is None
+                else NetworkPaths(
+                    paths={r.candidate_id: r.routes for r in ranking.shortlist},
+                    graph=ranking.graph,
+                    symbols=self._symbols,
+                    string_mappings=self._string_mappings,
+                    disease_target_ids=ranking.retained_target_ids,
+                )
+            )
             updates, packet = sources.evidence_packet(
                 {"id": entry.id, "name": entry.name},
                 ids,
@@ -317,6 +354,8 @@ class LiveSource:
                 self._drugs,
                 experiment_id=str(experiment_id),
                 releases=list(dict.fromkeys([*self._drugs["releases"], *self._ranking.releases])),
+                pathways=self._pathways,
+                network_paths=routes,
             )
             candidates = self._candidates(sources, disease, disease_targets, ranking, updates)
             self._archive(
@@ -324,7 +363,10 @@ class LiveSource:
                 ranking,
                 disease_targets=disease_targets,
                 evidence_packet=packet,
-                coverage=sources.coverage,
+                coverage={
+                    **sources.coverage,
+                    "network_paths": None if routes is None else routes.coverage,
+                },
                 consistency=sources.bioactivity_consistency(self._drugs, updates),
             )
         return BuildResult(targets=targets, network=ranking.network, candidates=candidates)
@@ -371,7 +413,7 @@ class LiveSource:
         by_update = {update["candidate_id"]: update for update in updates}
         by_drug = {drug["drug_id"]: drug for drug in self._drugs["drugs"]}
         symbols = {t["target_id"]: t["name"] for t in disease_targets["targets"]}
-        summaries = _Summaries(sources, disease.name, symbols)
+        summaries = _Summaries(sources, disease.name, symbols, self._symbols, self._pathways)
         candidates: list[Candidate] = []
         for position, ranked in enumerate(ranking.shortlist, 1):
             update = by_update[ranked.candidate_id]
@@ -383,9 +425,9 @@ class LiveSource:
             target_ids = [t.id for t in targets]
             name = cast(str, update["name"])
             detail = (
-                plain.network_unavailable(name.capitalize(), disease.name)
-                if ranked.unscorable_reason == "network_unavailable"
-                else None
+                None
+                if ranked.unscorable_reason is None
+                else plain.unscorable(ranked.unscorable_reason, _display(name), disease.name)
             )
             candidates.append(
                 Candidate(
@@ -417,12 +459,18 @@ class LiveSource:
         folder = self._data_dir / "experiments" / str(experiment_id)
         for name, value in files.items():
             write_json(folder / f"{name}.json", value)
+        full = (
+            None
+            if ranking.full is None
+            else archive_full(folder / "network_ranking.json.gz", ranking.full)
+        )
         write_json(
             folder / "ranking.json",
             {
                 "method": self._ranking.method,
                 "settings": self._ranking.settings().model_dump(mode="json"),
                 "eligible": ranking.eligible,
+                "full_ranking": full,
                 "shortlist": [
                     {
                         "candidate_id": r.candidate_id,
@@ -438,13 +486,38 @@ class LiveSource:
         )
 
 
+def _display(name: str) -> str:
+    """A ChEMBL name (BARICITINIB) in sentence case, as the web app shows it."""
+    return name.capitalize() if name.isupper() else name
+
+
+def _gene_symbols(target_dir: Path) -> dict[str, str]:
+    """Every Open Targets Target's approved symbol, by Ensembl gene ID."""
+    with duckdb.connect() as connection:
+        rows = connection.execute(
+            "select id, approvedSymbol from read_parquet(?) where approvedSymbol is not null",
+            [str(target_dir / "*.parquet")],
+        ).fetchall()
+    return {cast(str, gene): cast(str, symbol) for gene, symbol in rows}
+
+
 class _Summaries:
     """Plain summaries of stream A's evidence items, from the structured records."""
 
-    def __init__(self, sources: EvidenceSources, disease: str, symbols: dict[str, str]) -> None:
+    def __init__(
+        self,
+        sources: EvidenceSources,
+        disease: str,
+        symbols: dict[str, str],
+        all_symbols: dict[str, str],
+        pathways: Pathways,
+    ) -> None:
         self._sources = sources
         self._disease = disease
         self._symbols = symbols
+        """The Disease Targets' symbols, by Ensembl ID."""
+        self._all_symbols = all_symbols
+        self._pathways = pathways
         self._mechanisms: dict[str, dict[int, JSON]] = {}
 
     def item(self, item: JSON, update: JSON) -> EvidenceItem:
@@ -482,6 +555,19 @@ class _Summaries:
         if kind == "warning":
             warning = next(w for w in update["warnings"] if w["evidence_id"] == item["id"])
             return plain.warning_summary(warning["toxicity_class"])
+        if kind == "network_path":
+            route = source_id.split("@")[0].split(">")
+            if len(route) != int(values["hops"]) + 1 or route[0] not in names:
+                raise ValueError(f"network path {source_id} does not start at a drug Target")
+            return plain.network_path([self._all_symbols[gene] for gene in route])
+        if kind == "pathway":
+            genes = self._pathways.genes(source_id)
+            if genes.isdisjoint(names):
+                raise ValueError(f"pathway {source_id} has none of the drug's Targets")
+            return plain.pathway(
+                [symbol for gene, symbol in self._symbols.items() if gene in genes],
+                self._pathways.name(source_id),
+            )
         raise ValueError(f"unknown evidence kind {kind}")
 
     def _mechanism(self, candidate_id: str, mec_id: int) -> JSON:

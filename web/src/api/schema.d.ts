@@ -877,7 +877,7 @@ export interface components {
       source: components["schemas"]["EvidenceSource"];
       /**
        * Source Id
-       * @description The record's own ID in that database.
+       * @description The record's own ID in that database. For a network_path, the route's protein IDs joined by '>', then '@' and the SHA-256 of the network it was found in.
        */
       source_id: string;
       /**
@@ -904,9 +904,16 @@ export interface components {
       };
     };
     /** @enum {string} */
-    EvidenceKind: "target_association" | "mechanism" | "bioactivity" | "approval" | "warning";
+    EvidenceKind:
+      | "target_association"
+      | "mechanism"
+      | "bioactivity"
+      | "approval"
+      | "warning"
+      | "network_path"
+      | "pathway";
     /** @enum {string} */
-    EvidenceSource: "open_targets" | "chembl";
+    EvidenceSource: "open_targets" | "chembl" | "string" | "reactome";
     /**
      * Experiment
      * @description One exploration of one Disease, with everything the 8 steps show.

@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 
-from . import __version__
+from . import __version__, stream_b
 from .deps import Components
 from .errors import install_error_handlers
 from .jobs import JobFactory, Runner, ThreadRunner
@@ -23,7 +24,7 @@ from .services.jury import FixtureJury, JuryBackend
 from .services.live import LiveSource
 from .services.live_jury import StreamAJury
 from .services.molecules import FixtureMolecules, MoleculeSource, PubChemMolecules
-from .services.ranking import EvidenceRanking
+from .services.ranking import EvidenceRanking, NetworkRanking, RankingBackend
 from .services.source import ExperimentSource, FixtureSource
 from .settings import Settings, SnowflakeSettings
 
@@ -96,8 +97,24 @@ def open_source(settings: Settings, docking: DockingBackend) -> ExperimentSource
             structure.target_id in target_ids for structure in structures
         )
 
-    # Stream B's network ranking is not merged: plan.md section 4.4's evidence ranking.
-    return LiveSource(settings.data_dir, EvidenceRanking(), dockable=dockable)
+    return LiveSource(settings.data_dir, open_ranking(settings), dockable=dockable)
+
+
+def open_ranking(settings: Settings) -> RankingBackend:
+    """Stream B's network ranking when its bundle is prepared, else plan.md section 4.4's
+    evidence ranking. The network loads on a background thread, off the request path."""
+    bundle = settings.network_dir
+    if not stream_b.bundle_ready(bundle):
+        log.warning(
+            "No protein network in %s, so live Experiments use the evidence ranking. "
+            "Run `uv run python -m oxhack_api.prepare` to build it.",
+            bundle,
+        )
+        return EvidenceRanking()
+    ranking = NetworkRanking(bundle, settings.data_dir / "drug_targets.json")
+    threading.Thread(target=ranking.warm, name="network-warm", daemon=True).start()
+    log.info("Live Experiments use the network ranking (%s)", bundle)
+    return ranking
 
 
 def open_jury(settings: Settings) -> JuryBackend:

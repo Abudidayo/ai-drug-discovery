@@ -116,32 +116,65 @@ needs_data = pytest.mark.skipif(
 
 @needs_data
 @pytest.mark.network
-def test_live_covid_build_end_to_end() -> None:
-    """A real build over the prepared data (Open Targets is called for the Disease)."""
+@pytest.mark.parametrize("disease_id", ["MONDO_0100096", "MONDO_0009693"])
+def test_live_build_end_to_end(disease_id: str) -> None:
+    """A real build over the prepared data (Open Targets is called for the Disease): the
+    network ranking when its bundle is prepared, else the evidence ranking."""
     from fastapi.testclient import TestClient
 
     from oxhack_api.app import build_components, create_app
+    from oxhack_api.schemas import Experiment
+    from oxhack_api.services.live_jury import jury_packet
     from oxhack_api.settings import Settings
 
     settings = Settings(source="live", jury="mock", fixture_delay_ms=0)
+    network = (settings.network_dir / "manifest.json").is_file()
     experiment: dict[str, Any] = {}
     with TestClient(create_app(components=build_components(settings))) as client:
-        created = client.post("/api/experiments", json={"disease_id": "MONDO_0100096"}).json()
+        created = client.post("/api/experiments", json={"disease_id": disease_id}).json()
         for _ in range(600):
             experiment = client.get(f"/api/experiments/{created['id']}").json()
             if experiment["status"] in {"ready", "failed"}:
                 break
             time.sleep(0.5)
     assert experiment["status"] == "ready", experiment.get("error")
-    assert experiment["ranking_method"] == "evidence_only"
     candidates: list[dict[str, Any]] = experiment["candidates"]
     assert 0 < len(candidates) <= 15
-    banned = ("pChEMBL", "evidence-only", "ChEMBL", "Open Targets", "Black Box")
+    banned = (
+        "pChEMBL", "evidence-only", "ChEMBL", "Open Targets", "Black Box", "STRING",
+        "Reactome", "R-HSA", "ENSG",
+    )  # fmt: skip
+    kinds: set[str] = set()
     for candidate in candidates:
-        assert candidate["network"] is None
-        items: list[dict[str, Any]] = candidate["evidence"]
-        for item in items:
+        for item in candidate["evidence"]:
+            kinds.add(item["kind"])
             assert not any(word in item["summary"] for word in banned), item["summary"]
+    assert "pathway" in kinds
+    # The jury reads the packet the build stored, rebuilt from the Experiment.
+    saved = json.loads((DATA / "experiments" / created["id"] / "evidence_packet.json").read_text())
+    assert jury_packet(Experiment.model_validate(experiment)) == saved
+
+    if not network:
+        assert experiment["ranking_method"] == "evidence_only"
+        assert all(candidate["network"] is None for candidate in candidates)
+        return
+    assert experiment["ranking_method"] == "network"
+    assert "string-12.5" in experiment["data_releases"]
+    assert "network_path" in kinds
+    graph = experiment["network"]
+    drawn = {node["id"] for node in graph["nodes"]}
+    assert 0 < len(drawn) <= 60
+    assert graph["edges"]
+    placed = [c for c in candidates if c["network"] is not None]
+    assert placed
+    for candidate in placed:
+        assert set(candidate["network"]["path"]) <= drawn
+        z = candidate["network"]["degree_matched_z"]
+        assert (z is None) == (candidate["status"] == "distance_only")
+    assert any("network" in c["selected_by"] for c in candidates)
+    assert any("evidence" in c["selected_by"] for c in candidates)
+    retained = [t for t in experiment["targets"] if t["retained"]]
+    assert 0 < len(retained) <= 50
 
 
 def test_snowflake_json_settings_fail_plainly(monkeypatch: pytest.MonkeyPatch) -> None:
