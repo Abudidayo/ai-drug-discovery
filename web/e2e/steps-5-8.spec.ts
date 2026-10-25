@@ -2,16 +2,32 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./console";
 
 /*
- * Steps 5 to 8 against the real API in fixture mode (COVID-19): ask the Model jury and watch
- * each model answer, compare three drugs, show a binding pose in 3D, then archive and restore the
- * Experiment. Wording comes from web/src/copy/en.ts; model names come from the API.
+ * Steps 5 to 8 against the real API in fixture mode (COVID-19). Once an Experiment is built, the
+ * API starts its follow-ups itself: the Model jury, and a binding pose for every drug that can be
+ * docked. So the jury is already at work or done when a student reaches it, and the pose is there
+ * on arrival. Then compare three drugs and archive and restore the Experiment. Wording comes from
+ * web/src/copy/en.ts; model names come from the API.
  */
 
 async function expectStep(page: Page, title: string) {
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
 }
 
-/** Creates a COVID-19 Experiment through the API and waits until it is ready. */
+interface ExperimentState {
+  status: string;
+  jury: { status: string } | null;
+  dock_jobs: { status: string }[];
+}
+
+async function state(page: Page, id: string): Promise<ExperimentState> {
+  const response = await page.request.get(`/api/experiments/${id}`);
+  return (await response.json()) as ExperimentState;
+}
+
+/**
+ * Creates a COVID-19 Experiment through the API and waits until it is ready and its follow-ups
+ * (the jury and the poses) have been started.
+ */
 async function readyExperiment(page: Page): Promise<string> {
   const created = await page.request.post("/api/experiments", {
     data: { disease_id: "MONDO_0100096" },
@@ -21,26 +37,24 @@ async function readyExperiment(page: Page): Promise<string> {
   await expect
     .poll(
       async () => {
-        const response = await page.request.get(`/api/experiments/${id}`);
-        return ((await response.json()) as { status: string }).status;
+        const { status, jury } = await state(page, id);
+        return status === "ready" && jury !== null;
       },
       { timeout: 15_000 },
     )
-    .toBe("ready");
+    .toBe(true);
   return id;
 }
 
-test("a student asks the jury, compares drugs, then archives and restores", async ({ page }) => {
+test("the jury has started on its own; a student compares drugs, then archives and restores", async ({
+  page,
+}) => {
   const id = await readyExperiment(page);
 
-  // Step 5: one button, then each model's progress, then the result.
+  // Step 5: the jury started when the Experiment was built; nothing to ask, just the result.
   await page.goto(`/e/${id}/jury`);
   await expectStep(page, "Model jury");
-  await page.getByRole("button", { name: "Ask the Model jury" }).click();
-  const progress = page.getByRole("list", { name: "Model jury progress" });
-  await expect(progress).toBeVisible();
-  await expect(progress.getByRole("listitem")).toHaveCount(3);
-  await expect(progress).toContainText("Claude Sonnet 5");
+  await expect(page.getByRole("button", { name: "Ask the Model jury" })).toHaveCount(0);
 
   const board = page.getByRole("table", { name: "Each model’s rank and decision for every drug" });
   await expect(board).toBeVisible({ timeout: 20_000 });
@@ -95,7 +109,13 @@ test("a student asks the jury, compares drugs, then archives and restores", asyn
   // The hidden network plus one canvas for every molecule: well within the browser's limit.
   expect(await page.locator("canvas").count()).toBeLessThanOrEqual(3);
 
-  // Step 8: archive the open experiment, then restore it.
+  // Step 8: archive the open experiment, then restore it, once its poses are computed (an
+  // Experiment can't be archived while one is).
+  await expect
+    .poll(async () => (await state(page, id)).dock_jobs.every((job) => job.status === "done"), {
+      timeout: 20_000,
+    })
+    .toBe(true);
   await page.goto(`/e/${id}/history`);
   await expectStep(page, "Saved experiments");
   const list = page.getByRole("list", { name: "Experiments" });
@@ -114,16 +134,6 @@ test("a student asks the jury, compares drugs, then archives and restores", asyn
   await expect(archived).toHaveCount(0);
   await page.getByRole("button", { name: /^Saved/ }).click();
   await expect(list.locator("li[aria-current]")).toContainText("COVID-19");
-});
-
-test("an archived experiment can't ask the jury, and says why", async ({ page }) => {
-  const id = await readyExperiment(page);
-  const archived = await page.request.post(`/api/experiments/${id}/archive`);
-  expect(archived.ok()).toBe(true);
-  await page.goto(`/e/${id}/jury`);
-  const ask = page.getByRole("button", { name: "Ask the Model jury" });
-  await expect(ask).toBeDisabled();
-  await expect(page.getByText(/^This experiment is archived\./)).toHaveCount(1);
 });
 
 /**
@@ -181,8 +191,8 @@ test("a student shows baricitinib's binding pose and checks it against the cryst
     page.getByRole("img", { name: "Protein network in 3D. Drag to rotate." }),
   ).toBeHidden();
 
-  // The cached demo pair comes back at once.
-  await page.getByRole("button", { name: "Show binding pose" }).click();
+  // The pose was computed as a follow-up of the build (here a saved demo pair): no button.
+  await expect(page.getByRole("button", { name: "Show binding pose" })).toHaveCount(0);
   const view = page.getByRole("img", {
     name: "Baricitinib in JAK2, in 3D. Drag to rotate, scroll to zoom.",
   });
