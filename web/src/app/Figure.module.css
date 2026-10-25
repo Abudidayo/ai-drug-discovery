@@ -63,6 +63,12 @@
   grid-template-areas: "molecule evidence";
 }
 
+/* The evaluation: the results table, with what was tested and its limits beside it. */
+.grid[data-layout="evaluation"] {
+  grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+  grid-template-areas: "results tested";
+}
+
 .grid[data-layout="single"] {
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "main";
@@ -132,6 +138,14 @@
 
 .panel[data-area="unsupported"] {
   grid-area: unsupported;
+}
+
+.panel[data-area="results"] {
+  grid-area: results;
+}
+
+.panel[data-area="tested"] {
+  grid-area: tested;
 }
 
 .panel[data-area="main"] {
@@ -273,6 +287,10 @@
 
   .grid[data-layout="pose"] {
     grid-template-areas: "pose" "scores" "unsupported";
+  }
+
+  .grid[data-layout="evaluation"] {
+    grid-template-areas: "results" "tested";
   }
 
   .panel[data-area="pose"] {

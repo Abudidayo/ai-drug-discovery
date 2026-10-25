@@ -478,3 +478,27 @@ def test_experiments_state_a_known_ranking_method(migrated: str) -> None:
             )
     with psycopg.connect(migrated) as conn, pytest.raises(errors.CheckViolation):
         _experiment(conn, ranking_method="guess")
+
+
+# ---------------------------------------------------------------------------
+# 0006: an evaluation result per scope
+# ---------------------------------------------------------------------------
+
+
+def _evaluation_result(conn: psycopg.Connection, scope: str) -> None:
+    conn.execute(
+        """insert into evaluation_results (manifest_hash, experiment, method, scope,
+             data_releases, metrics, coverage)
+           values ('abc', 'retrieval', 'degree_matched_z', %s, '{string-12.5}', '{}', '{}')""",
+        (scope,),
+    )
+
+
+def test_evaluation_results_hold_one_row_per_method_and_scope(migrated: str) -> None:
+    with psycopg.connect(migrated) as conn:
+        _evaluation_result(conn, "full_eligible")
+        _evaluation_result(conn, "common_scorable")
+    with psycopg.connect(migrated) as conn, pytest.raises(errors.UniqueViolation):
+        _evaluation_result(conn, "full_eligible")
+    with psycopg.connect(migrated) as conn, pytest.raises(errors.CheckViolation):
+        _evaluation_result(conn, "everything")

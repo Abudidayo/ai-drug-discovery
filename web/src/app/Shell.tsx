@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
 import { copy, stepCopy, type StepSlug } from "../copy/en";
-import { PageFrame } from "./PageFrame";
+import { PageBody, PageFrame } from "./PageFrame";
 import styles from "./Shell.module.css";
 import { neighbourStep, stepPath } from "./steps";
 import { useStepKeys } from "./useStepKeys";
@@ -105,12 +105,9 @@ export function Shell({ step, experimentId, disease, children }: ShellProps) {
         </>
       }
     >
-      <title>{`${title} - ${copy.product}`}</title>
-      <div className={styles.head}>
-        <h1 className={styles.title}>{title}</h1>
-        <p className={styles.intro}>{intro}</p>
-      </div>
-      <div className={styles.figure}>{children}</div>
+      <PageBody title={title} intro={intro}>
+        {children}
+      </PageBody>
     </PageFrame>
   );
 }

@@ -792,6 +792,11 @@ export interface components {
     /** Evaluation */
     Evaluation: {
       /**
+       * Diseases
+       * @description Every Disease tested, once per scope, including those left out.
+       */
+      diseases: components["schemas"]["EvaluationDisease"][];
+      /**
        * Fixture Note
        * @description Set when the results are fixture data: says the numbers are made up.
        */
@@ -803,15 +808,52 @@ export interface components {
       results: components["schemas"]["EvaluationResult"][];
     };
     /** @enum {string} */
+    EvaluationCaseStatus:
+      | "evaluated"
+      | "missing_labels"
+      | "no_positive_references"
+      | "no_positive_in_scope"
+      | "empty_universe";
+    /**
+     * EvaluationDisease
+     * @description One Disease the evaluation tested, in one scope.
+     */
+    EvaluationDisease: {
+      /**
+       * Candidates
+       * @description Drugs ranked for this Disease in this scope.
+       */
+      candidates: number;
+      /**
+       * Disease Id
+       * @description Open Targets disease ID, with an underscore, e.g. MONDO_0100096.
+       * @example MONDO_0100096
+       */
+      disease_id: string;
+      /**
+       * Known
+       * @description Known drugs among them; null when no known drugs are recorded.
+       */
+      known: number | null;
+      /**
+       * Name
+       * @description Display name; null when unknown.
+       */
+      name: string | null;
+      scope: components["schemas"]["EvaluationScope"];
+      /** @description evaluated: counted in the averages. Otherwise why it was left out: missing_labels (no known drugs recorded), no_positive_references (an empty list recorded), no_positive_in_scope (no known drug among the drugs ranked), empty_universe (no drugs ranked). */
+      status: components["schemas"]["EvaluationCaseStatus"];
+    };
+    /** @enum {string} */
     EvaluationKind: "retrieval" | "reranking";
     /**
      * EvaluationResult
-     * @description Frozen metrics for one method in one evaluation (row of `evaluation_results`).
+     * @description Frozen metrics for one method in one evaluation scope (row of `evaluation_results`).
      */
     EvaluationResult: {
       /**
        * Confidence Intervals
-       * @description Bootstrap intervals by metric name; null when not computed.
+       * @description Bootstrap 95% intervals by metric name; null when too few Diseases.
        */
       confidence_intervals: {
         [key: string]: components["schemas"]["ConfidenceInterval"];
@@ -843,17 +885,21 @@ export interface components {
       manifest_hash: string;
       /**
        * Method
-       * @description The ranking method measured, e.g. network_proximity.
+       * @description The ranking method measured, e.g. degree_matched_z.
        */
       method: string;
       /**
        * Metrics
-       * @description Metric values by name, e.g. recall_at_10.
+       * @description Metric values by name, e.g. recall_at_10. A metric with no value is absent.
        */
       metrics: {
         [key: string]: number;
       };
+      /** @description The drugs ranked. full_eligible: every approved drug; one a method can't score counts as not found. common_scorable: only drugs every method can score. */
+      scope: components["schemas"]["EvaluationScope"];
     };
+    /** @enum {string} */
+    EvaluationScope: "full_eligible" | "common_scorable";
     /**
      * EvidenceItem
      * @description One sourced fact. The same item keeps one ID across all Candidates of an Experiment.

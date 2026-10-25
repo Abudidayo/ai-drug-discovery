@@ -182,6 +182,21 @@ its bytes, so the web app can load them straight into the viewer.
   starts, and refreshes a saved demo job (and the jobs reusing it) whose
   files changed.
 
+### The evaluation file
+
+`GET /evaluation` serves `fixtures/evaluation.json` in every mode. Until the
+frozen evaluation has run it holds example numbers and says so (`fixture_note`).
+To replace it with stream B's frozen Stage 3 results:
+
+```sh
+uv run python scripts/import_evaluation.py <stage3 folder> <stage2 ranking files...>
+```
+
+It checks the folder's manifest against the hash in `results.json` and each
+ranking file against the size and SHA-256 the manifest recorded, then writes
+one result per method and scope (`full_eligible`, `common_scorable`) and one
+line per Disease and scope, including why any Disease was left out.
+
 ### How the fixture files were prepared
 
 Only the precomputed redock control (`6f1d2c1e-...0001`, baricitinib into

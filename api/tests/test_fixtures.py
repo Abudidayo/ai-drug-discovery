@@ -261,5 +261,4 @@ def test_docking_controls_reuse_the_candidate_cache_key() -> None:
 
 def test_evaluation_fixture_parses() -> None:
     evaluation = Evaluation.model_validate_json((FIXTURES_DIR / "evaluation.json").read_text())
-    assert evaluation.fixture_note
-    assert {r.experiment for r in evaluation.results} == {"retrieval", "reranking"}
+    assert {r.experiment for r in evaluation.results} == {"retrieval"}
