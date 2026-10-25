@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import random
 import subprocess
+import sys
 
 import httpx
 import openai
@@ -491,7 +492,7 @@ def test_invalid_timeout(monkeypatch, timeout):
 
 def test_cli_mock(tmp_path):
     out = tmp_path / "new-directory" / "result.json"
-    process = subprocess.run([str(ROOT / ".venv/bin/python"), "-m", "jury",
+    process = subprocess.run([sys.executable, "-m", "jury",
                               "fixtures/evidence_packet.json", "--out", str(out), "--mock"],
                              cwd=ROOT, capture_output=True, text=True)
     assert process.returncode == 0, process.stderr
