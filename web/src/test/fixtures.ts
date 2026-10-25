@@ -108,6 +108,7 @@ export function evidenceOnlyExperiment(id = EXPERIMENT_ID): Experiment {
       randomisations: null,
       seed: null,
       min_bin_size: null,
+      shortlist_method: null,
     },
     network: null,
     targets: experiment.targets.map((target) => ({
@@ -116,6 +117,31 @@ export function evidenceOnlyExperiment(id = EXPERIMENT_ID): Experiment {
       excluded_reason: null,
     })),
     candidates,
+  };
+}
+
+/**
+ * The COVID-19 Experiment as if its network places came from the random walk (shortlist_method
+ * physical_rwr): every placed drug gets a walk rank, in the reverse of its closeness order, so a
+ * test can tell which rank the app shows.
+ */
+export function randomWalkExperiment(id = EXPERIMENT_ID): Experiment {
+  const experiment = covidExperiment("ready", null, id);
+  const placed = experiment.candidates
+    .flatMap((candidate) => (candidate.network ? [candidate.network.rank] : []))
+    .sort((a, b) => b - a);
+  return {
+    ...experiment,
+    ranking_settings: {
+      ...experiment.ranking_settings,
+      shortlist_method: "physical_rwr",
+      restart_probability: 0.3,
+    },
+    candidates: experiment.candidates.map((candidate) => {
+      if (!candidate.network) return candidate;
+      const rank = placed.indexOf(candidate.network.rank) + 1;
+      return { ...candidate, network: { ...candidate.network, rwr: { rank, mass: 0.01 / rank } } };
+    }),
   };
 }
 

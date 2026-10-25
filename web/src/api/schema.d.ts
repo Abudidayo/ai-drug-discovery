@@ -361,11 +361,29 @@ export interface components {
       path: string[];
       /**
        * Rank
-       * @description Position in the network ranking of all eligible drugs. distance_only Candidates come after every scored one.
+       * @description Position in the closeness (z-score) ranking of all eligible drugs. distance_only Candidates come after every scored one.
        */
       rank: number;
+      /** @description The random-walk result; null when the Experiment's shortlist_method is zscore (saved before the random walk ran). */
+      rwr: components["schemas"]["CandidateRwr"] | null;
       /** @description Why the comparison with random sets is unavailable; null when scored. */
       warning: components["schemas"]["NetworkWarning"] | null;
+    };
+    /**
+     * CandidateRwr
+     * @description Random walk with restart result for one Candidate (stream B's physical RWR).
+     */
+    CandidateRwr: {
+      /**
+       * Mass
+       * @description Average share of the walk's time spent on the drug's Targets once it settles. Higher is more connected to the Disease; it is not a probability of success.
+       */
+      mass: number;
+      /**
+       * Rank
+       * @description Position in the random-walk ranking of all eligible drugs; 1 is the most.
+       */
+      rank: number;
     };
     /** @enum {string} */
     CandidateStatus: "scored" | "distance_only" | "not_scorable";
@@ -1436,10 +1454,17 @@ export interface components {
        */
       randomisations: number | null;
       /**
+       * Restart Probability
+       * @description Chance the random walk jumps back to the Disease Targets at each step; null unless shortlist_method is physical_rwr.
+       */
+      restart_probability: number | null;
+      /**
        * Seed
        * @description Random seed, so the same inputs give the same ranking; null when no network ranking ran.
        */
       seed: number | null;
+      /** @description Which network ranking fills the network places: physical_rwr (a random walk from the Disease Targets, stream B's application default) or zscore (closeness compared with random protein sets). Null when no network ranking ran. */
+      shortlist_method: components["schemas"]["ShortlistMethod"] | null;
       /**
        * Top Targets
        * @description How many Disease Targets to use, strongest evidence first.
@@ -1467,6 +1492,8 @@ export interface components {
       | "evidence_fill_after_deduplication"
       | "network_fill_after_deduplication"
       | "evidence_ranking_network_unavailable";
+    /** @enum {string} */
+    ShortlistMethod: "physical_rwr" | "zscore";
     /**
      * Structure
      * @description A prepared human protein structure that Candidates can be docked into.

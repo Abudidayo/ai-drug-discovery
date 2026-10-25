@@ -6,7 +6,14 @@ import { DrugPicker } from "../app/DrugPicker";
 import { Panel } from "../app/Figure";
 import { Marker } from "../charts/Marker";
 import { copy, stepCopy } from "../copy/en";
-import { approvals, defaultPicks, noModelText, warningSentence } from "../lib/candidates";
+import {
+  approvals,
+  defaultPicks,
+  isPlaced,
+  networkRank,
+  noModelText,
+  warningSentence,
+} from "../lib/candidates";
 import { structureFor } from "../lib/docking";
 import { drugName, listOf } from "../lib/format";
 import { decisionsFor } from "../lib/jury";
@@ -127,7 +134,7 @@ export function CompareStep({ experiment }: { experiment: Experiment }) {
   }[] = [
     {
       label: copy.candidates.networkRank,
-      cell: (c) => rank(c.network?.rank),
+      cell: (c) => rank(isPlaced(c) ? networkRank(c) : null),
       whole: networkRanked ? undefined : (
         <span className={styles.quiet}>{copy.candidates.notRanked}</span>
       ),

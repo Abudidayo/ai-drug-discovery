@@ -298,3 +298,63 @@ def test_live_mode_picks_the_network_ranking_only_when_the_bundle_exists(
     fallback = open_ranking(absent)
     assert isinstance(fallback, EvidenceRanking)
     assert fallback.method == "evidence_only"
+
+
+def test_the_random_walk_fills_the_network_places_by_default(data: Path) -> None:
+    network = ranking(data, min_bin_size=1)
+    settings = network.settings()
+    assert settings.shortlist_method == "physical_rwr"
+    assert settings.restart_probability == 0.3
+    result = network.rank(request(), frozenset())
+    placed = [r for r in result.shortlist if r.network is not None]
+    walks = [r.network.rwr for r in placed if r.network]
+    assert all(walk is not None for walk in walks)
+    # Ranked by mass, highest first: G5 is a restart Target, G2 sits next to G1, G10 is far.
+    by_walk = sorted(placed, key=lambda r: r.network.rwr.rank if r.network and r.network.rwr else 0)
+    assert [r.candidate_id for r in by_walk] == ["CHEMBL2", "CHEMBL1", "CHEMBL3"]
+    masses = [r.network.rwr.mass for r in by_walk if r.network and r.network.rwr]
+    assert masses == sorted(masses, reverse=True)
+    assert masses[-1] > 0
+    assert result.full is not None
+    assert result.full["shortlist_selection"]["selection_method"] == "physical_rwr"
+
+
+def test_the_network_places_follow_the_walk_not_closeness(data: Path) -> None:
+    """With one network place, the drug the walk ranks first takes it, whatever its z-score."""
+    network = ranking(data, min_bin_size=1)
+    full = network.rank(request(), frozenset()).full
+    assert full is not None
+    swapped = json.loads(json.dumps(full))
+    for candidate in swapped["candidates"]:
+        walk = candidate["rwr"]["physical"]
+        if candidate["candidate_id"] == "CHEMBL3":  # last by closeness
+            walk["score"] = 1.0
+    swapped.pop("shortlist_selection")
+    swapped.pop("legacy_shortlist_selection")
+    one = stream_b.Settings(network_slots=1, evidence_slots=0)
+    assert stream_b.select(swapped, "physical_rwr", one)["shortlist"] == ["CHEMBL3"]
+    assert stream_b.select(swapped, "zscore", one) is swapped
+
+
+def test_zscore_keeps_the_original_closeness_shortlist(data: Path) -> None:
+    network = ranking(data, min_bin_size=1, shortlist_method="zscore")
+    settings = network.settings()
+    assert (settings.shortlist_method, settings.restart_probability) == ("zscore", None)
+    result = network.rank(request(), frozenset())
+    assert [r.candidate_id for r in result.shortlist][:3] == ["CHEMBL2", "CHEMBL1", "CHEMBL3"]
+    assert all(r.network.rwr is None for r in result.shortlist if r.network)
+    assert result.full is not None
+    assert "shortlist_selection" not in result.full
+
+
+def test_excluding_a_drug_renumbers_the_walk_ranks(data: Path) -> None:
+    network = ranking(data, min_bin_size=1)
+    full = by_id(network.rank(request(), frozenset()).shortlist)
+    without = by_id(network.rank(request(), frozenset({"CHEMBL2"})).shortlist)
+    near, far = without["CHEMBL1"].network, without["CHEMBL3"].network
+    before = full["CHEMBL1"].network
+    walks = [n.rwr if n else None for n in (near, far, before)]
+    assert all(walks)
+    near_walk, far_walk, before_walk = [w for w in walks if w]
+    assert (near_walk.rank, far_walk.rank) == (1, 2)
+    assert near_walk.mass == before_walk.mass

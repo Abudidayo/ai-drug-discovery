@@ -7,7 +7,8 @@ own: the graph build, the network-proximity scoring, the shortlist policy and th
 shortest-path reconstruction are all stream B's.
 
 Stream B documents its inputs and outputs in `ranking/README.md` (the artefact
-bundle), `ranking/STAGE2.md` (ranking) and `ranking/NETWORK_PATHS.md` (paths).
+bundle), `ranking/STAGE2.md` (ranking), `ranking/RWR.md` (random walk with restart),
+`ranking/SHORTLIST_HANDOFF.md` (shortlist methods) and `ranking/NETWORK_PATHS.md` (paths).
 """
 
 # Stream B has no type annotations on most functions; only this module sees its Unknowns.
@@ -24,8 +25,11 @@ from typing import Any, cast
 
 from ranking import artifacts as _artifacts
 from ranking import data as _data
+from ranking import functional_graph as _functional_graph
 from ranking import paths as _paths
+from ranking import rwr as _rwr
 from ranking import scoring as _scoring
+from ranking import shortlist as _shortlist
 
 from .settings import NETWORK_BUNDLE
 
@@ -41,6 +45,15 @@ MIN_EXPERIMENTS = 400
 Settings = _scoring.RankingSettings
 """Stream B's `RankingSettings`: top_targets, randomisations, seed, min_bin_size and the
 10 network + 5 evidence shortlist quotas."""
+
+RwrSettings = _rwr.RWRSettings
+"""Stream B's `RWRSettings`: restart probability 0.3, tolerance 1e-12, at most 1,000
+iterations, top 50 Disease Targets (`ranking/rwr_protocol.json`)."""
+
+SHORTLIST_METHOD = "physical_rwr"
+"""Stream B's application default (`workstream_b/application_shortlist.py`): the random
+walk on the physical network fills the 10 network places. `zscore` is the original
+closeness policy, kept for the frozen replays."""
 
 
 def bundle_ready(directory: Path) -> bool:
@@ -74,6 +87,7 @@ class Bundle:
     """A loaded, checksum-verified artefact bundle; the distance matrix stays memory-mapped."""
 
     def __init__(self, directory: Path) -> None:
+        self.directory = directory
         self._artifacts = _artifacts.load_artifacts(directory)
         self.manifest = cast(JSON, self._artifacts.manifest)
         self.graph_gene_ids = cast(tuple[str, ...], self._artifacts.graph_gene_ids)
@@ -105,8 +119,8 @@ class Bundle:
         row = graph.indices[graph.indptr[index] : graph.indptr[index + 1]]
         return [self.graph_gene_ids[int(i)] for i in row]
 
-    def engine(self, settings: Any) -> Engine:
-        return Engine(self, settings)
+    def engine(self, settings: Any, rwr: Any) -> Engine:
+        return Engine(self, settings, rwr)
 
     def paths(self, disease_target_ids: Sequence[str]) -> Paths:
         return Paths(self, disease_target_ids)
@@ -116,18 +130,30 @@ class Bundle:
 
 
 class Engine:
-    """One `RankingEngine` over a bundle; reuse it for every Disease."""
+    """Stream B's `RankingEngine` and physical `RWREngine` over one bundle; reuse it for
+    every Disease."""
 
-    def __init__(self, bundle: Bundle, settings: Any) -> None:
+    def __init__(self, bundle: Bundle, settings: Any, rwr: Any) -> None:
+        if rwr.top_targets != settings.top_targets:
+            raise ValueError("the random walk and the closeness ranking use different Targets")
         self._engine = _scoring.RankingEngine(bundle._artifacts, settings)  # pyright: ignore[reportPrivateUsage]
+        # Stream B's own loader, which checks the graph again; RWR needs no distances.
+        self._rwr = _rwr.RWREngine(_functional_graph.load_rwr_graph(bundle.directory), rwr)
         self.settings = settings
+        self.rwr_settings = rwr
 
     def rank(self, disease: JSON, drugs: Drugs) -> JSON:
-        """Stream B's full ranking (format v2) of every approved drug for the Disease.
+        """Stream B's full ranking (format v2) of every approved drug for the Disease, with
+        each drug's physical random-walk result under `rwr.physical` (`enrich_ranking`).
 
         `disease` is a stream B Disease file in memory: `disease_id`, `disease_name`,
         `release`, `rule` and `targets` (`target_id`, `evidence_only_score`)."""
-        return cast(JSON, self._engine.rank(_disease(disease), drugs.loaded))
+        loaded = _disease(disease)
+        ranking = self._engine.rank(loaded, drugs.loaded)
+        walk = self._rwr.rank(loaded, drugs.loaded)
+        if walk["convergence"]["status"] != "converged":
+            raise ValueError(f"the random walk did not converge: {walk['convergence']}")
+        return cast(JSON, _rwr.enrich_ranking(ranking, walk, "physical"))
 
 
 class Drugs:
@@ -173,8 +199,10 @@ def rerank(result: JSON, exclude: frozenset[str], settings: Any) -> JSON:
     """The ranking as if the excluded drugs had never been in the universe.
 
     Stream B's scores of a drug do not depend on the other drugs (each degree profile
-    has its own seeded draws), so only the ranks and the shortlist change: they are
-    assigned again with stream B's own `assign_ranks` and `make_shortlist`.
+    has its own seeded draws, and the random walk starts from the Disease Targets
+    only), so only the ranks and the shortlist change: they are assigned again with
+    stream B's own `assign_ranks` and `make_shortlist`, and random-walk ranks in
+    `RWREngine.rank`'s order (higher mass first, then ChEMBL ID).
     """
     kept = deepcopy([c for c in result["candidates"] if c["candidate_id"] not in exclude])
     for candidate in kept:
@@ -188,8 +216,36 @@ def rerank(result: JSON, exclude: frozenset[str], settings: Any) -> JSON:
             shortlist_rank=None,
         )
     _scoring.assign_ranks(kept)
+    walks = [c["rwr"]["physical"] for c in kept if "rwr" in c]
+    scored = sorted(
+        (c for c in kept if "rwr" in c and c["rwr"]["physical"]["score"] is not None),
+        key=lambda c: (-c["rwr"]["physical"]["score"], c["candidate_id"]),
+    )
+    for walk in walks:
+        walk["rank"] = None
+    for rank, candidate in enumerate(scored, 1):
+        candidate["rwr"]["physical"]["rank"] = rank
     shortlist = cast(list[str], _scoring.make_shortlist(kept, settings))
     return {**result, "candidates": kept, "shortlist": shortlist}
+
+
+def select(result: JSON, method: str, settings: Any) -> JSON:
+    """The ranking with its shortlist chosen by `method` (stream B's `project_shortlist`):
+    physical_rwr fills the network places from the random walk, zscore keeps stream B's
+    original closeness shortlist. Same quotas, deduplication and fill either way."""
+    if method == "zscore":
+        return result
+    return cast(
+        JSON,
+        _shortlist.project_shortlist(
+            result,
+            _shortlist.ShortlistSettings(
+                method=method,
+                network_slots=settings.network_slots,
+                evidence_slots=settings.evidence_slots,
+            ),
+        ),
+    )
 
 
 class Paths:

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Experiment } from "../api/types";
 import { copy, networkWarningText, unscorableReasonText } from "../copy/en";
-import { covidExperiment, EXPERIMENT_ID } from "../test/fixtures";
+import { covidExperiment, EXPERIMENT_ID, randomWalkExperiment } from "../test/fixtures";
 import { renderApp } from "../test/render";
 import { http, serveExperiment, server } from "../test/server";
 
@@ -192,6 +192,34 @@ describe("Step 3, Candidate drugs", () => {
     ).toBeInTheDocument();
     expect(screen.queryAllByTestId(/^slope-row-/)).toHaveLength(0);
     expectOnce("Baricitinib, Ruxolitinib, Tofacitinib, Upadacitinib and Fedratinib");
+  });
+});
+
+describe("Step 3 with a random-walk shortlist", () => {
+  it("orders drugs by their walk rank and says once how that rank was made", async () => {
+    const experiment = randomWalkExperiment();
+    serveExperiment(experiment);
+    renderApp(`${E}/candidates`);
+    await ready();
+    expectOnce(copy.candidates.randomWalkHelp, copy.candidates.evidenceRankHelp);
+    const first = experiment.candidates.find((candidate) => candidate.network?.rwr?.rank === 1);
+    expect(first).toBeDefined();
+    const rows = screen.getAllByTestId(/^slope-row-/);
+    expect(rows[0]).toHaveAttribute("data-testid", `slope-row-${first?.candidate_id ?? ""}`);
+    // The notes keep column order: closeness 1, network rank 2, evidence rank 3.
+    const note = screen.getByText(copy.candidates.randomWalkHelp).closest("p");
+    expect(note).toHaveTextContent(/^2/);
+    expect(screen.getByText(copy.candidates.evidenceRankHelp).closest("p")).toHaveTextContent(/^3/);
+  });
+
+  it("keeps the closeness ranking, and no walk note, for a z-score shortlist", async () => {
+    renderApp(`${E}/candidates`);
+    await ready();
+    expect(screen.queryByText(copy.candidates.randomWalkHelp)).not.toBeInTheDocument();
+    expect(screen.getAllByTestId(/^slope-row-/)[0]).toHaveAttribute(
+      "data-testid",
+      "slope-row-CHEMBL2105759",
+    );
   });
 });
 

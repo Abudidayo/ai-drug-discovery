@@ -4,8 +4,8 @@
 evidence-only score and the approved drug universe, and gets back the shortlist
 in order, with why each drug was selected.
 
-- `NetworkRanking` is stream B's network-proximity ranking (Zaid's
-  `ranking.scoring.RankingEngine`) over the protein network bundle that
+- `NetworkRanking` is stream B's network ranking (Zaid's `ranking.scoring.RankingEngine`
+  and `ranking.rwr.RWREngine`) over the protein network bundle that
   `python -m oxhack_api.prepare` builds. Live mode uses it whenever that bundle
   exists.
 - `EvidenceRanking` is plan.md section 4.4's transparent fallback: stream A's
@@ -32,6 +32,7 @@ from .. import stream_b
 from ..schemas import (
     SHORTLIST_MAX,
     CandidateNetwork,
+    CandidateRwr,
     CandidateStatus,
     DataRelease,
     NetworkEdge,
@@ -43,6 +44,7 @@ from ..schemas import (
     RankingSettings,
     SelectedBy,
     SelectionReason,
+    ShortlistMethod,
     TargetExcludedReason,
     UnscorableReason,
 )
@@ -152,6 +154,8 @@ class EvidenceRanking:
             randomisations=None,
             seed=None,
             min_bin_size=None,
+            shortlist_method=None,
+            restart_probability=None,
             network_slots=0,
             evidence_slots=SHORTLIST_MAX,
         )
@@ -175,7 +179,8 @@ class EvidenceRanking:
 
 
 class NetworkRanking:
-    """Stream B's network-proximity ranking (Zaid's `ranking.scoring.RankingEngine`).
+    """Stream B's network ranking (Zaid's `ranking.scoring.RankingEngine` for closeness and
+    `ranking.rwr.RWREngine` for the random walk with restart).
 
     Reads the artefact bundle `python -m oxhack_api.prepare` builds (stream B's
     `ranking/README.md`: the STRING 12.5 physical network and its distance matrix) and
@@ -190,7 +195,11 @@ class NetworkRanking:
       reasons pass through unchanged; each placed drug's `path` is its shortest route
       (stream B's first representative path);
     - the shortlist is stream B's: 10 network + 5 evidence, deduplicated, then filled
-      from the next supported evidence and then network results, with each reason;
+      from the next supported evidence and then network results, with each reason. The
+      network places come from the random walk on the physical network (stream B's
+      application default, `physical_rwr`) unless `shortlist_method` is `zscore`;
+    - every placed drug carries both network results: its closeness (`network`) and,
+      with physical_rwr, its random-walk rank and mass (`network.rwr`);
     - `direct_evidence_rank` is stream B's evidence rank of drugs with direct support;
       a drug with none gets null, not the rank of an arbitrary tie at zero;
     - Disease Targets outside the network or its largest component are
@@ -210,10 +219,12 @@ class NetworkRanking:
         drugs_path: Path,
         *,
         min_bin_size: int | None = None,
+        shortlist_method: ShortlistMethod = stream_b.SHORTLIST_METHOD,
         cache_size: int = 4,
     ) -> None:
         """`min_bin_size` overrides stream B's 100 proteins per degree group; tests on tiny
-        graphs need fewer. Everything else is stream B's default."""
+        graphs need fewer. `shortlist_method` zscore restores the original closeness
+        shortlist. Everything else is stream B's default."""
         if not stream_b.bundle_ready(bundle_dir):
             raise FileNotFoundError(f"No protein network bundle in {bundle_dir}")
         self.releases: list[DataRelease] = [stream_b.GRAPH_VERSION]
@@ -224,6 +235,8 @@ class NetworkRanking:
             if min_bin_size is None
             else stream_b.Settings(min_bin_size=min_bin_size)
         )
+        self._method: ShortlistMethod = shortlist_method
+        self._rwr_settings = stream_b.RwrSettings(top_targets=self._settings.top_targets)
         self._lock = threading.Lock()
         self._loaded: tuple[stream_b.Bundle, stream_b.Engine, stream_b.Drugs] | None = None
         self._results: OrderedDict[str, JSON] = OrderedDict()
@@ -236,6 +249,10 @@ class NetworkRanking:
             randomisations=settings.randomisations,
             seed=settings.seed,
             min_bin_size=settings.min_bin_size,
+            shortlist_method=self._method,
+            restart_probability=self._rwr_settings.restart_probability
+            if self._method == "physical_rwr"
+            else None,
             network_slots=settings.network_slots,
             evidence_slots=settings.evidence_slots,
         )
@@ -250,7 +267,7 @@ class NetworkRanking:
                 bundle = stream_b.Bundle(self._bundle_dir)
                 self._loaded = (
                     bundle,
-                    bundle.engine(self._settings),
+                    bundle.engine(self._settings, self._rwr_settings),
                     stream_b.Drugs(self._drugs_path),
                 )
                 log.info("protein network loaded from %s", self._bundle_dir)
@@ -265,13 +282,19 @@ class NetworkRanking:
         selected = cast(list[str], full["disease"]["selected_target_ids"])
         if selected != list(request.target_ids):
             raise ValueError("the network ranking selected different Disease Targets")
-        result = stream_b.rerank(full, exclude, self._settings) if exclude else full
+        result = stream_b.select(
+            stream_b.rerank(full, exclude, self._settings) if exclude else full,
+            self._method,
+            self._settings,
+        )
         candidates = {c["candidate_id"]: c for c in result["candidates"]}
         coverage = full["disease"]["coverage"]
         retained = cast(list[str], coverage["retained_target_ids"])
         paths = bundle.paths(retained)
+        walked = self._method == "physical_rwr"
         shortlist = [
-            _ranked(candidates[cid], paths) for cid in cast(list[str], result["shortlist"])
+            _ranked(candidates[cid], paths, walked=walked)
+            for cid in cast(list[str], result["shortlist"])
         ]
         return Ranking(
             shortlist=shortlist,
@@ -315,11 +338,17 @@ class NetworkRanking:
         return result
 
 
-def _ranked(candidate: JSON, paths: stream_b.Paths) -> Ranked:
-    """One of stream B's shortlisted Candidates, in the contract's terms."""
+def _ranked(candidate: JSON, paths: stream_b.Paths, *, walked: bool) -> Ranked:
+    """One of stream B's shortlisted Candidates, in the contract's terms. `walked`: the
+    Experiment shows the random walk (`physical_rwr`)."""
     network: CandidateNetwork | None = None
     routes: list[JSON] = []
     result = cast(JSON | None, candidate["network"])
+    walk = cast(JSON, candidate["rwr"]["physical"])
+    # Both rankings keep the drug Targets in the same largest component, so a drug the
+    # walk reaches always has a closeness result too, and the other way round.
+    if (walk["status"] == "scored") != (result is not None):
+        raise ValueError(f"{candidate['candidate_id']} is placed by only one network ranking")
     if result is not None:
         retained = cast(list[str], candidate["coverage"]["retained_target_ids"])
         routes = stream_b.representatives(paths.nearest(retained))
@@ -327,6 +356,9 @@ def _ranked(candidate: JSON, paths: stream_b.Paths) -> Ranked:
             raise ValueError(f"{candidate['candidate_id']} has a network result but no route")
         network = CandidateNetwork(
             rank=cast(int, result["rank"]),
+            rwr=CandidateRwr(rank=cast(int, walk["rank"]), mass=cast(float, walk["score"]))
+            if walked
+            else None,
             mean_distance=cast(float, result["mean_distance"]),
             degree_matched_z=cast(float | None, result["degree_matched_z"]),
             graph_version=cast(str, result["graph_version"]),

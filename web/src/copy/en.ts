@@ -156,6 +156,8 @@ export const copy = {
     networkRank: "Network rank",
     evidenceRank: "Evidence rank",
     evidenceRankHelp: "Ranked only by direct links between the drug’s targets and the disease.",
+    randomWalkHelp:
+      "Ranked by a random walk across the protein network that keeps restarting at the disease proteins: drugs whose targets it visits most rank first.",
     closeness: "Closeness",
     closenessHelp:
       "How near a drug’s targets sit to the disease proteins, compared with random proteins. Lower is closer.",

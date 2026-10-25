@@ -231,10 +231,21 @@
             "type": "array"
           },
           "rank": {
-            "description": "Position in the network ranking of all eligible drugs. distance_only Candidates come after every scored one.",
+            "description": "Position in the closeness (z-score) ranking of all eligible drugs. distance_only Candidates come after every scored one.",
             "minimum": 1.0,
             "title": "Rank",
             "type": "integer"
+          },
+          "rwr": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CandidateRwr"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The random-walk result; null when the Experiment's shortlist_method is zscore (saved before the random walk ran)."
           },
           "warning": {
             "anyOf": [
@@ -250,6 +261,7 @@
         },
         "required": [
           "rank",
+          "rwr",
           "mean_distance",
           "degree_matched_z",
           "graph_version",
@@ -257,6 +269,30 @@
           "path"
         ],
         "title": "CandidateNetwork",
+        "type": "object"
+      },
+      "CandidateRwr": {
+        "additionalProperties": false,
+        "description": "Random walk with restart result for one Candidate (stream B's physical RWR).",
+        "properties": {
+          "mass": {
+            "description": "Average share of the walk's time spent on the drug's Targets once it settles. Higher is more connected to the Disease; it is not a probability of success.",
+            "minimum": 0.0,
+            "title": "Mass",
+            "type": "number"
+          },
+          "rank": {
+            "description": "Position in the random-walk ranking of all eligible drugs; 1 is the most.",
+            "minimum": 1.0,
+            "title": "Rank",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rank",
+          "mass"
+        ],
+        "title": "CandidateRwr",
         "type": "object"
       },
       "CandidateStatus": {
@@ -2379,6 +2415,20 @@
             "description": "How many random protein sets the closeness comparison draws; null when no network ranking ran.",
             "title": "Randomisations"
           },
+          "restart_probability": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Chance the random walk jumps back to the Disease Targets at each step; null unless shortlist_method is physical_rwr.",
+            "title": "Restart Probability"
+          },
           "seed": {
             "anyOf": [
               {
@@ -2392,6 +2442,17 @@
             "description": "Random seed, so the same inputs give the same ranking; null when no network ranking ran.",
             "title": "Seed"
           },
+          "shortlist_method": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShortlistMethod"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which network ranking fills the network places: physical_rwr (a random walk from the Disease Targets, stream B's application default) or zscore (closeness compared with random protein sets). Null when no network ranking ran."
+          },
           "top_targets": {
             "description": "How many Disease Targets to use, strongest evidence first.",
             "minimum": 1.0,
@@ -2404,6 +2465,8 @@
           "randomisations",
           "seed",
           "min_bin_size",
+          "shortlist_method",
+          "restart_probability",
           "network_slots",
           "evidence_slots"
         ],
@@ -2459,6 +2522,13 @@
           "evidence_fill_after_deduplication",
           "network_fill_after_deduplication",
           "evidence_ranking_network_unavailable"
+        ],
+        "type": "string"
+      },
+      "ShortlistMethod": {
+        "enum": [
+          "physical_rwr",
+          "zscore"
         ],
         "type": "string"
       },

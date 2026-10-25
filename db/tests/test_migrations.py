@@ -502,3 +502,52 @@ def test_evaluation_results_hold_one_row_per_method_and_scope(migrated: str) -> 
         _evaluation_result(conn, "full_eligible")
     with psycopg.connect(migrated) as conn, pytest.raises(errors.CheckViolation):
         _evaluation_result(conn, "everything")
+
+
+# ---------------------------------------------------------------------------
+# 0007: which network ranking filled the shortlist
+# ---------------------------------------------------------------------------
+
+
+def test_saved_experiments_are_marked_as_closeness_shortlists(
+    database: str, tmp_path: Path
+) -> None:
+    """Rows saved before 0007 used the z-score shortlist (or no network) and no walk."""
+    before = tmp_path / "migrations"
+    before.mkdir()
+    for path in sorted((DB_DIR / "migrations").glob("*.sql")):
+        if path.name < "0007":
+            shutil.copy(path, before / path.name)
+    migrate(database, directory=before)
+    with psycopg.connect(database) as conn:
+        settings = '{"randomisations": 200, "network_slots": 10}'
+        network_id = _experiment(conn, ranking_settings=settings)
+        _candidate(conn, network_id)
+        conn.execute(
+            """update candidates set payload = '{"network": {"rank": 1}}'
+               where experiment_id = %s""",
+            (network_id,),
+        )
+        evidence_id = _experiment(
+            conn,
+            ranking_method="evidence_only",
+            ranking_settings='{"randomisations": null, "network_slots": 0}',
+        )
+    migrate(database)
+    with psycopg.connect(database) as conn:
+        rows = dict(
+            conn.execute("select id, ranking_settings from experiments").fetchall()
+        )
+        network, payload = conn.execute(
+            "select network, payload from candidates where experiment_id = %s", (network_id,)
+        ).fetchone()
+    assert rows[network_id] == {
+        "randomisations": 200,
+        "network_slots": 10,
+        "shortlist_method": "zscore",
+        "restart_probability": None,
+    }
+    assert rows[evidence_id]["shortlist_method"] is None
+    assert rows[evidence_id]["restart_probability"] is None
+    assert network == {"rank": 1, "rwr": None}
+    assert payload == {"network": {"rank": 1, "rwr": None}}

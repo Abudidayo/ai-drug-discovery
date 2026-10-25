@@ -262,3 +262,28 @@ def test_docking_controls_reuse_the_candidate_cache_key() -> None:
 def test_evaluation_fixture_parses() -> None:
     evaluation = Evaluation.model_validate_json((FIXTURES_DIR / "evaluation.json").read_text())
     assert {r.experiment for r in evaluation.results} == {"retrieval"}
+
+
+def test_the_fixture_is_a_closeness_shortlist(experiment: Experiment) -> None:
+    """Saved before the random walk ran: zscore, and no walk result on any Candidate."""
+    assert experiment.ranking_settings.shortlist_method == "zscore"
+    assert experiment.ranking_settings.restart_probability is None
+    assert all(c.network.rwr is None for c in experiment.candidates if c.network)
+
+
+def test_a_walk_result_goes_with_the_physical_rwr_method(experiment: Experiment) -> None:
+    data = experiment.model_dump(mode="json")
+    walked = json.loads(json.dumps(data))
+    walked["ranking_settings"] |= {"shortlist_method": "physical_rwr", "restart_probability": 0.3}
+    for rank, candidate in enumerate((c for c in walked["candidates"] if c["network"]), 1):
+        candidate["network"]["rwr"] = {"rank": rank, "mass": 0.01 / rank}
+    Experiment.model_validate(walked)
+    with pytest.raises(ValidationError, match="random-walk result exactly for physical_rwr"):
+        Experiment.model_validate(data | {"ranking_settings": walked["ranking_settings"]})
+    with pytest.raises(ValidationError, match="random-walk result exactly for physical_rwr"):
+        Experiment.model_validate(walked | {"ranking_settings": data["ranking_settings"]})
+    with pytest.raises(ValidationError, match="restart_probability is set exactly"):
+        Experiment.model_validate(
+            walked
+            | {"ranking_settings": walked["ranking_settings"] | {"restart_probability": None}}
+        )

@@ -9,9 +9,18 @@ export function isPlaced(candidate: Candidate): candidate is PlacedCandidate {
   return candidate.network !== null;
 }
 
+/**
+ * A placed Candidate's network rank: its random-walk rank when the Experiment's shortlist came
+ * from the random walk (ranking_settings.shortlist_method physical_rwr, the only time `rwr` is
+ * set), else its closeness rank.
+ */
+export function networkRank(candidate: PlacedCandidate): number {
+  return candidate.network.rwr?.rank ?? candidate.network.rank;
+}
+
 /** Placed Candidates in network-rank order; scored ones always rank before distance_only ones. */
 export function byNetworkRank(candidates: readonly Candidate[]): PlacedCandidate[] {
-  return candidates.filter(isPlaced).sort((a, b) => a.network.rank - b.network.rank);
+  return candidates.filter(isPlaced).sort((a, b) => networkRank(a) - networkRank(b));
 }
 
 /**

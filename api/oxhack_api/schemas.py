@@ -99,6 +99,7 @@ ExperimentStatus = TypeAliasType(
 )
 BuildStage = TypeAliasType("BuildStage", Literal["targets", "ranking", "evidence", "saving"])
 RankingMethod = TypeAliasType("RankingMethod", Literal["network", "evidence_only"])
+ShortlistMethod = TypeAliasType("ShortlistMethod", Literal["physical_rwr", "zscore"])
 JuryMode = TypeAliasType("JuryMode", Literal["fixture", "mock", "cortex"])
 CandidateStatus = TypeAliasType(
     "CandidateStatus", Literal["scored", "distance_only", "not_scorable"]
@@ -277,12 +278,35 @@ class RankingSettings(Model):
             "network ranking ran."
         ),
     )
+    shortlist_method: ShortlistMethod | None = Field(
+        description=(
+            "Which network ranking fills the network places: physical_rwr (a random walk from "
+            "the Disease Targets, stream B's application default) or zscore (closeness compared "
+            "with random protein sets). Null when no network ranking ran."
+        )
+    )
+    restart_probability: float | None = Field(
+        gt=0,
+        le=1,
+        description=(
+            "Chance the random walk jumps back to the Disease Targets at each step; null unless "
+            "shortlist_method is physical_rwr."
+        ),
+    )
     network_slots: int = Field(
         ge=0, description="Shortlist places filled first from the network ranking."
     )
     evidence_slots: int = Field(
         ge=0, description="Shortlist places filled first from the direct-evidence ranking."
     )
+
+    @model_validator(mode="after")
+    def _method_settings(self) -> RankingSettings:
+        if (self.shortlist_method is None) != (self.randomisations is None):
+            raise ValueError("shortlist_method is set exactly when a network ranking ran")
+        if (self.shortlist_method == "physical_rwr") != (self.restart_probability is not None):
+            raise ValueError("restart_probability is set exactly for physical_rwr")
+        return self
 
 
 class JuryModel(Model):
@@ -454,15 +478,37 @@ class CandidateTarget(Model):
     )
 
 
+class CandidateRwr(Model):
+    """Random walk with restart result for one Candidate (stream B's physical RWR)."""
+
+    rank: int = Field(
+        ge=1,
+        description="Position in the random-walk ranking of all eligible drugs; 1 is the most.",
+    )
+    mass: float = Field(
+        ge=0,
+        description=(
+            "Average share of the walk's time spent on the drug's Targets once it settles. "
+            "Higher is more connected to the Disease; it is not a probability of success."
+        ),
+    )
+
+
 class CandidateNetwork(Model):
     """Network-proximity result for one Candidate. Null on the Candidate when not scorable."""
 
     rank: int = Field(
         ge=1,
         description=(
-            "Position in the network ranking of all eligible drugs. distance_only Candidates "
-            "come after every scored one."
+            "Position in the closeness (z-score) ranking of all eligible drugs. distance_only "
+            "Candidates come after every scored one."
         ),
+    )
+    rwr: CandidateRwr | None = Field(
+        description=(
+            "The random-walk result; null when the Experiment's shortlist_method is zscore "
+            "(saved before the random walk ran)."
+        )
     )
     mean_distance: float = Field(
         ge=0,
@@ -1025,6 +1071,9 @@ def check_ranking_method(
             raise ValueError("a network Experiment needs its network ranking settings")
         if any(fallback):
             raise ValueError("network_unavailable is only for evidence_only Experiments")
+        walked = settings.shortlist_method == "physical_rwr"
+        if any((c.network.rwr is not None) != walked for c in candidates if c.network):
+            raise ValueError("placed Candidates have a random-walk result exactly for physical_rwr")
 
 
 def check_shortlist(candidates: list[Candidate]) -> None:

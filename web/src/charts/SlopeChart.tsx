@@ -19,6 +19,8 @@ interface SlopeChartProps {
   onHover: (id: string | null) => void;
   /** The known-answer note; shown only when its drug is on the chart. */
   knownAnswerNote: string | null;
+  /** How the network rank was made, as a numbered note; null for no note. */
+  networkRankNote?: string | null;
   /** Shown straight under the rows, before the notes. */
   below?: ReactNode;
 }
@@ -53,7 +55,14 @@ function AxisBreak({ x, y }: { x: number; y: number }) {
  * jump, the axis shows a break. A drug whose closeness can't be measured gets no dot (never a
  * zero): "Not measured", once per reason, with the reason as a numbered note.
  */
-export function SlopeChart({ rows, hovered, onHover, knownAnswerNote, below }: SlopeChartProps) {
+export function SlopeChart({
+  rows,
+  hovered,
+  onHover,
+  knownAnswerNote,
+  networkRankNote = null,
+  below,
+}: SlopeChartProps) {
   const boxRef = useRef<HTMLDivElement>(null);
   const { width } = useElementSize(boxRef);
 
@@ -84,8 +93,12 @@ export function SlopeChart({ rows, hovered, onHover, knownAnswerNote, below }: S
   }));
   const groups = missingGroups(rows);
   const warnings = [...new Set(groups.map((group) => group.warning))];
+  // Notes are numbered in column order: closeness, network rank (when it has a note), evidence
+  // rank, then each missing-closeness reason.
+  const rankNote = networkRankNote === null ? null : 2;
+  const evidenceNote = rankNote === null ? 2 : 3;
   const marker = (warning: SlopeRow["warning"]) =>
-    warning === null ? 0 : 3 + warnings.indexOf(warning);
+    warning === null ? 0 : evidenceNote + 1 + warnings.indexOf(warning);
   const showKnownAnswer = knownAnswerNote !== null && rows.some((row) => row.emphasis);
   const axisY = HEAD + count * pitch + 6;
 
@@ -116,11 +129,16 @@ export function SlopeChart({ rows, hovered, onHover, knownAnswerNote, below }: S
               textAnchor={narrow ? "end" : "middle"}
             >
               {copy.candidates.networkRank}
+              {rankNote !== null && (
+                <tspan className={styles.sup} dx={2} dy={-6}>
+                  {rankNote}
+                </tspan>
+              )}
             </text>
             <text className={styles.head} x={width} y={16} textAnchor="end">
               {copy.candidates.evidenceRank}
               <tspan className={styles.sup} dx={2} dy={-6}>
-                2
+                {evidenceNote}
               </tspan>
             </text>
 
@@ -281,8 +299,14 @@ export function SlopeChart({ rows, hovered, onHover, knownAnswerNote, below }: S
           <sup>1</sup>
           <span>{copy.candidates.closenessHelp}</span>
         </p>
+        {rankNote !== null && (
+          <p className={styles.note}>
+            <sup>{rankNote}</sup>
+            <span>{networkRankNote}</span>
+          </p>
+        )}
         <p className={styles.note}>
-          <sup>2</sup>
+          <sup>{evidenceNote}</sup>
           <span>{copy.candidates.evidenceRankHelp}</span>
         </p>
         {warnings.map((warning) => (

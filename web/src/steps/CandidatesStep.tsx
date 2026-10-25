@@ -5,7 +5,7 @@ import { useNetworkHover } from "../app/networkHover";
 import { candidateHover } from "../app/networkView";
 import { SlopeChart, type SlopeRow } from "../charts/SlopeChart";
 import { copy, unscorableReasonText, type UnscorableReason } from "../copy/en";
-import { byEvidenceRank, byNetworkRank, isPlaced } from "../lib/candidates";
+import { byEvidenceRank, byNetworkRank, isPlaced, networkRank } from "../lib/candidates";
 import { drugName, listOf } from "../lib/format";
 import styles from "./CandidatesStep.module.css";
 
@@ -16,7 +16,7 @@ function toRow(candidate: Candidate & { network: NonNullable<Candidate["network"
   return {
     id: candidate.candidate_id,
     name: drugName(candidate.name),
-    networkRank: candidate.network.rank,
+    networkRank: networkRank(candidate),
     closeness: candidate.network.degree_matched_z,
     warning: candidate.network.warning,
     evidenceRank: candidate.direct_evidence_rank,
@@ -159,6 +159,11 @@ function NetworkRanking({ experiment }: { experiment: Experiment }) {
           knownAnswerNote={
             knownAnswer
               ? copy.candidates.knownAnswer(drugName(knownAnswer.name), experiment.disease.name)
+              : null
+          }
+          networkRankNote={
+            experiment.ranking_settings.shortlist_method === "physical_rwr"
+              ? copy.candidates.randomWalkHelp
               : null
           }
           below={unplacedList}

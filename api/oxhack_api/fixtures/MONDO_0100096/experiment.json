@@ -34,6 +34,8 @@
     "randomisations": 200,
     "seed": 0,
     "min_bin_size": 100,
+    "shortlist_method": "zscore",
+    "restart_probability": null,
     "network_slots": 10,
     "evidence_slots": 5
   },
@@ -576,6 +578,7 @@
       ],
       "network": {
         "rank": 1,
+        "rwr": null,
         "mean_distance": 1.25,
         "degree_matched_z": -3.1,
         "graph_version": "string-12.5",
@@ -774,6 +777,7 @@
       ],
       "network": {
         "rank": 2,
+        "rwr": null,
         "mean_distance": 1.0,
         "degree_matched_z": -2.8,
         "graph_version": "string-12.5",
@@ -873,6 +877,7 @@
       ],
       "network": {
         "rank": 3,
+        "rwr": null,
         "mean_distance": 0.75,
         "degree_matched_z": -2.5,
         "graph_version": "string-12.5",
@@ -1017,6 +1022,7 @@
       ],
       "network": {
         "rank": 4,
+        "rwr": null,
         "mean_distance": 0.75,
         "degree_matched_z": -2.5,
         "graph_version": "string-12.5",
@@ -1175,6 +1181,7 @@
       ],
       "network": {
         "rank": 5,
+        "rwr": null,
         "mean_distance": 1.5,
         "degree_matched_z": -2.2,
         "graph_version": "string-12.5",
@@ -1272,6 +1279,7 @@
       ],
       "network": {
         "rank": 6,
+        "rwr": null,
         "mean_distance": 1.0,
         "degree_matched_z": -1.9,
         "graph_version": "string-12.5",
@@ -1335,6 +1343,7 @@
       ],
       "network": {
         "rank": 7,
+        "rwr": null,
         "mean_distance": 2.0,
         "degree_matched_z": -1.7,
         "graph_version": "string-12.5",
@@ -1399,6 +1408,7 @@
       ],
       "network": {
         "rank": 8,
+        "rwr": null,
         "mean_distance": 1.5,
         "degree_matched_z": -1.5,
         "graph_version": "string-12.5",
@@ -1510,6 +1520,7 @@
       ],
       "network": {
         "rank": 9,
+        "rwr": null,
         "mean_distance": 1.0,
         "degree_matched_z": -1.4,
         "graph_version": "string-12.5",
@@ -1573,6 +1584,7 @@
       ],
       "network": {
         "rank": 10,
+        "rwr": null,
         "mean_distance": 1.0,
         "degree_matched_z": -1.3,
         "graph_version": "string-12.5",
@@ -1636,6 +1648,7 @@
       ],
       "network": {
         "rank": 1308,
+        "rwr": null,
         "mean_distance": 0.0,
         "degree_matched_z": null,
         "graph_version": "string-12.5",
@@ -1746,6 +1759,7 @@
       ],
       "network": {
         "rank": 1309,
+        "rwr": null,
         "mean_distance": 0.0,
         "degree_matched_z": null,
         "graph_version": "string-12.5",
@@ -1915,6 +1929,7 @@
       ],
       "network": {
         "rank": 11,
+        "rwr": null,
         "mean_distance": 3.0,
         "degree_matched_z": -1.2,
         "graph_version": "string-12.5",
@@ -2050,6 +2065,7 @@
       ],
       "network": {
         "rank": 12,
+        "rwr": null,
         "mean_distance": 3.0,
         "degree_matched_z": -1.1,
         "graph_version": "string-12.5",
