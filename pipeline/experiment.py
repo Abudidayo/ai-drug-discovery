@@ -220,8 +220,8 @@ def run_experiment(disease_id, out, *, jury="mock", data_dir=ROOT / "data", offl
         result = run_jury(packet, config, mock_model, max_calls=jury_max_calls)
     else:
         raise ValueError("jury must be mock or live")
-    # A5 exposes usage beyond A0's contract; retain it in a separate artifact.
-    usage = {j["model"]: j.pop("token_usage", []) for j in result["jurors"]}
+    # Retain per-attempt usage in the shared result and the existing sidecar.
+    usage = {j["model"]: j["token_usage"] for j in result["jurors"]}
     write_json(out / "jury_usage.json", usage)
     write_json(out / "jury_result.json", result)
     statuses = dict(Counter(j["status"] for j in result["jurors"]))

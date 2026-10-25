@@ -131,6 +131,15 @@ def test_cross_file_references_and_values():
                 if key in {"id", "target_id"} and isinstance(value, str) and value.startswith("ENSG"):
                     assert value in target_ids
     for candidate in candidates:
+        assert candidate["status"] in {"scored", "distance_only", "not_scorable"}
+        if candidate["status"] == "not_scorable":
+            assert candidate["network"] is None and candidate["unscorable_reason"]
+        else:
+            assert candidate["network"] is not None
+            assert candidate.get("unscorable_reason") is None
+            if candidate["status"] == "distance_only":
+                assert candidate["network"]["mean_distance"] is not None
+                assert candidate["network"]["degree_matched_z"] is None
         drug = drugs[candidate["candidate_id"]]
         assert candidate["targets"] == [
             {"id": t["target_id"], "name": t["name"], "mechanism": t["action_type"]}
@@ -309,11 +318,21 @@ def test_jury_validation_and_consensus():
     n, m = len(panel), len(valid)
     assert len(result["jurors"]) == 3 and m == 2
     assert result["jury"]["models"] == [j["model"] for j in result["jurors"]]
+    assert set(result["jury"]) == {"models", "prompt_version", "temperature",
+                                   "max_attempts", "shuffle_seed", "reasoning_effort"}
+    assert set(result["jury"]["reasoning_effort"]) == set(result["jury"]["models"])
+    assert all(v is None or isinstance(v, str) and v for v in result["jury"]["reasoning_effort"].values())
     assert len({tuple(j["presented_order"]) for j in valid}) == m
     checks = ["schema", "unique_ranks", "evidence_ids_exist", "numbers_match"]
     for juror in result["jurors"]:
         assert juror["status"] in {"valid", "invalid", "failed"}
         assert 1 <= juror["attempts"] <= result["jury"]["max_attempts"]
+        assert len(juror["token_usage"]) == juror["attempts"]
+        for attempt, usage in enumerate(juror["token_usage"], 1):
+            assert set(usage) == {"attempt", "input_tokens", "output_tokens"}
+            assert usage["attempt"] == attempt
+            assert all(v is None or type(v) is int and v >= 0
+                       for k, v in usage.items() if k != "attempt")
         assert len(juror["presented_order"]) == n
         assert set(juror["presented_order"]) == panel.keys()
         if juror["status"] != "valid":

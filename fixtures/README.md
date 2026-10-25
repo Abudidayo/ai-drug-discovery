@@ -55,7 +55,11 @@ numbers remain fictional. A bioactivity item's `source_id` identifies the
 molecule/ChEMBL-target pair, and its URL queries activities for that pair
 with non-null pChEMBL values.
 
-Enums: Candidate `status` is `scored` or `not_scorable`; `selected_by` contains
+Enums: Candidate `status` is `scored`, `distance_only` or `not_scorable`.
+`distance_only` has a network distance but a null `degree_matched_z` because
+the degree-matched null has no spread; its `network` stays populated.
+`not_scorable` has null `network` and a nonempty `unscorable_reason`.
+`selected_by` contains
 `network` and/or `evidence`; Target `support` contains `mechanism` and/or
 `bioactivity`. Mapping `status` is `mapped`, `unmapped` or `ambiguous`, with a
 reason for either non-mapped status. Evidence `source` is `open_targets` or
@@ -64,6 +68,24 @@ or `warning`. Safety is `warnings_recorded` or `unknown`, never safe.
 Juror `status` is `valid`, `invalid` or `failed`; `decision` is `investigate`,
 `watch` or `deprioritise`; `direction` is `supported`, `contradicted` or `unknown`.
 The live mechanism action type here is `INHIBITOR`.
+
+The saved `jury` object is the database's `jury_config`: `models`,
+`prompt_version`, `temperature`, `max_attempts`, `shuffle_seed` and
+`reasoning_effort`. The existing keys keep their types and meanings.
+`reasoning_effort` maps every configured model ID to its explicit provider
+setting (for example `{"kimi-k3": "low"}`) or null when no override was sent.
+Null means the provider default, not an inferred effort level. The live CLI
+accepts `SNOWFLAKE_REASONING_EFFORT` as an override of the config file and
+saves the effective settings. Older input configs may omit this mapping.
+
+Each juror's `token_usage` is an array with one object per attempt, including
+failed and invalid attempts: `{"attempt": 1, "input_tokens": 3475,
+"output_tokens": 1977}`. Counts are nonnegative integers or null when the
+provider supplied none (including failures and mock replies), never estimated
+zeros. Sum all attempts for usage; any missing count makes the full cost
+unknown. Anthropic attempts may also record `max_output_tokens` and
+`stop_reason` when supplied by the adapter. The illustrative fixture uses
+null counts because it contains no model calls.
 
 Jurors see only `disease.name`; each Candidate's `label`, `name`, Target
 `name` and `mechanism`, `evidence_ids` and `safety_status`; and each evidence
