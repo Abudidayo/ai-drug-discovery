@@ -566,7 +566,7 @@ class CortexModel:
             # per complete review (prose, citations and safety), minimum 4096.
             packet_json = prompt.partition("Evidence packet:\n")[2]
             count = len(json.loads(packet_json)["candidates"]) if packet_json else 0
-            max_tokens = max(4096, 1024 * count)
+            max_tokens = min(32768, max(4096, 1024 * count))
             response = self.client.post("/messages", cast_to=dict, body={
                 "model": model, "max_tokens": max_tokens,
                 "messages": [{"role": "user", "content": prompt}],
@@ -587,7 +587,7 @@ class CortexModel:
             "temperature": temperature}
         response = self.client.chat.completions.create(
             model=model, messages=[{"role": "user", "content": prompt}], **sampling,
-            response_format=RESPONSE_FORMAT,
+            response_format=RESPONSE_FORMAT, max_completion_tokens=32768,
             **({"reasoning_effort": effort} if effort is not None else {}))
         return ModelReply(response.choices[0].message.content,
                           getattr(response.usage, "prompt_tokens", None),

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+from ..limits import MemoryLimits
 from ..schemas import (
     BuildStage,
     Candidate,
@@ -42,6 +43,8 @@ class MemoryRepo:
         self._experiments: dict[UUID, Experiment] = {}
         self._jury: dict[UUID, JuryRun] = {}
         self._dock: dict[UUID, _DockRow] = {}
+        self._owners: dict[UUID, str | None] = {}
+        self._limits = MemoryLimits()
 
     @contextmanager
     def transaction(self) -> Generator[None]:
@@ -58,12 +61,20 @@ class MemoryRepo:
 
     # Experiments ------------------------------------------------------------
 
-    def add_experiment(self, experiment: Experiment) -> None:
+    def consume_quota(self, key: str, limit: int, seconds: int) -> None:
+        self._limits.consume(key, limit, seconds)
+
+    def owns_experiment(self, experiment_id: UUID, owner_session: str) -> bool:
+        with self._lock:
+            return self._owners.get(experiment_id) == owner_session
+
+    def add_experiment(self, experiment: Experiment, *, owner_session: str | None = None) -> None:
         with self._lock:
             if experiment.id in self._experiments:
                 raise AlreadyExists(f"Experiment {experiment.id}")
             stored = experiment.model_copy(deep=True, update={"jury": None, "dock_jobs": []})
             self._experiments[experiment.id] = stored
+            self._owners[experiment.id] = owner_session
 
     def get_experiment(self, experiment_id: UUID) -> Experiment | None:
         with self._lock:
@@ -80,11 +91,13 @@ class MemoryRepo:
             )
 
     def list_experiments(
-        self, *, archived: bool, include_building: bool
+        self, *, archived: bool, include_building: bool, owner_session: str | None = None
     ) -> list[ExperimentSummary]:
         with self._lock:
             rows: list[ExperimentSummary] = []
             for stored in self._experiments.values():
+                if owner_session is not None and self._owners.get(stored.id) != owner_session:
+                    continue
                 if (stored.archived_at is not None) != archived:
                     continue
                 if stored.status != "ready" and not include_building:

@@ -22,6 +22,8 @@ Every method runs in the caller's transaction when there is one (inside
 
 from __future__ import annotations
 
+import math
+import time
 from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -34,7 +36,7 @@ from psycopg.rows import DictRow, dict_row
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
-from ..errors import Conflict
+from ..errors import Conflict, TooManyRequests
 from ..schemas import (
     BuildStage,
     Candidate,
@@ -51,7 +53,7 @@ from ..schemas import (
 )
 from .base import AlreadyExists, DockInputs, DuplicateComputation
 
-SCHEMA_VERSION = "0008"
+SCHEMA_VERSION = "0009"
 """The newest file in `db/migrations/` this code needs applied."""
 
 Conn = Connection[DictRow]
@@ -79,6 +81,8 @@ def _json(value: Any) -> Jsonb | None:
 def _configure(conn: Conn) -> None:
     # Timestamps come back in UTC, as the API writes them.
     conn.execute("set time zone 'UTC'")
+    conn.execute("set statement_timeout = '15s'")
+    conn.execute("set lock_timeout = '5s'")
     conn.commit()
 
 
@@ -108,6 +112,8 @@ class PostgresRepo:
             kwargs={"row_factory": dict_row},
             min_size=1,
             max_size=max_connections,
+            timeout=5,
+            max_waiting=32,
             configure=_configure,
             check=_check,
             open=False,
@@ -185,7 +191,37 @@ class PostgresRepo:
 
     # Experiments ------------------------------------------------------------
 
-    def add_experiment(self, experiment: Experiment) -> None:
+    def consume_quota(self, key: str, limit: int, seconds: int) -> None:
+        now = time.time()
+        expires = (int(now) // seconds + 1) * seconds
+        with self.connection() as conn:
+            conn.execute("delete from request_quotas where expires_at <= %s", (int(now),))
+            row = conn.execute(
+                """
+                insert into request_quotas (key, expires_at, used) values (%s, %s, 1)
+                on conflict (key) do update set
+                  used = case when request_quotas.expires_at = excluded.expires_at
+                    then request_quotas.used + 1 else 1 end,
+                  expires_at = excluded.expires_at
+                returning used
+                """,
+                (key, expires),
+            ).fetchone()
+            assert row is not None
+            if row["used"] > limit:
+                raise TooManyRequests(max(1, math.ceil(expires - now)))
+
+    def owns_experiment(self, experiment_id: UUID, owner_session: str) -> bool:
+        with self.connection() as conn:
+            return (
+                conn.execute(
+                    "select 1 from experiments where id = %s and owner_session = %s",
+                    (experiment_id, owner_session),
+                ).fetchone()
+                is not None
+            )
+
+    def add_experiment(self, experiment: Experiment, *, owner_session: str | None = None) -> None:
         network = experiment.network.model_dump(mode="json") if experiment.network else None
         with self.connection() as conn:
             try:
@@ -195,8 +231,8 @@ class PostgresRepo:
                         insert into experiments (
                           id, disease_id, disease_name, data_releases, jury_config,
                           ranking_method, ranking_settings, status, stage, error, network,
-                          fixture_note, created_at, archived_at
-                        ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                          fixture_note, created_at, archived_at, owner_session
+                        ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """,
                         (
                             experiment.id,
@@ -213,6 +249,7 @@ class PostgresRepo:
                             experiment.fixture_note,
                             experiment.created_at,
                             experiment.archived_at,
+                            owner_session,
                         ),
                     )
             except errors.UniqueViolation as exc:
@@ -280,12 +317,14 @@ class PostgresRepo:
         )
 
     def list_experiments(
-        self, *, archived: bool, include_building: bool
+        self, *, archived: bool, include_building: bool, owner_session: str | None = None
     ) -> list[ExperimentSummary]:
         # Literal predicates, so the partial history index applies.
         where = [sql.SQL("e.archived_at is not null" if archived else "e.archived_at is null")]
         if not include_building:
             where.append(sql.SQL("e.status = 'ready'"))
+        if owner_session is not None:
+            where.append(sql.SQL("e.owner_session = %s"))
         query = sql.SQL(
             """
             select e.id, e.status, e.disease_id, e.disease_name, e.data_releases,
@@ -303,7 +342,9 @@ class PostgresRepo:
             """
         ).format(where=sql.SQL(" and ").join(where))
         with self.connection() as conn:
-            rows = conn.execute(query).fetchall()
+            rows = conn.execute(
+                query, (owner_session,) if owner_session is not None else ()
+            ).fetchall()
         return [
             ExperimentSummary(
                 id=row["id"],

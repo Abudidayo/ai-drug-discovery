@@ -131,6 +131,7 @@ describe("Landing page", () => {
     const router = renderAt("/");
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(`${E}/disease`);
+      expect(screen.getByRole("button", { name: copy.next })).toBeEnabled();
     });
     expectOnStep("disease");
     expect(screen.getByRole("button", { name: copy.next })).toBeEnabled();

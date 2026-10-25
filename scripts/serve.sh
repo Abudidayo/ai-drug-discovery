@@ -47,8 +47,11 @@ fi
 export OXHACK_REPO=postgres
 export OXHACK_INPROCESS_WORKER=0 # the pipeline worker below runs the jobs
 export OXHACK_DOCKING=$docking
+# Codespaces serves HTTPS; local development uses HTTP unless configured otherwise.
+secure_cookie=$(setting OXHACK_SESSION_COOKIE_SECURE)
+export OXHACK_SESSION_COOKIE_SECURE=${secure_cookie:-${CODESPACES:-false}}
 
-uv sync --all-packages --quiet
+uv sync --all-packages --frozen --quiet
 
 pids=()
 stop() {
@@ -61,7 +64,9 @@ trap stop EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-"${run[@]}" uvicorn oxhack_api.app:app --host "${HOST:-0.0.0.0}" --port "${PORT:-8000}" &
+"${run[@]}" uvicorn oxhack_api.app:app --host "${HOST:-0.0.0.0}" --port "${PORT:-8000}" \
+  --limit-concurrency 64 --backlog 128 --timeout-keep-alive 5 \
+  --timeout-graceful-shutdown 15 --forwarded-allow-ips 127.0.0.1 &
 pids+=($!)
 "${run[@]}" python -m oxhack_api.worker &
 pids+=($!)

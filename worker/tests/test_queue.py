@@ -229,7 +229,11 @@ def test_a_docking_request_runs_end_to_end(stack: Stack) -> None:
         again = client.post("/api/dock", json=body).json()
         assert again["status"] == "done", "an identical request reuses the result at once"
         assert again["cached_from"] == job["id"]
-        assert again["files"] == job["files"]
+        assert {name: item["sha256"] for name, item in again["files"].items()} == {
+            name: item["sha256"] for name, item in job["files"].items()
+        }
+        assert again["files"]["poses"]["url"] == f"/api/files/{again['id']}/poses.sdf"
+        assert client.get(again["files"]["poses"]["url"]).text == poses.text
 
 
 def test_the_worker_docks_the_smiles_the_request_was_queued_with(stack: Stack) -> None:

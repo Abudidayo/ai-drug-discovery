@@ -45,13 +45,16 @@ def get_components(request: Request) -> Components:
 ComponentsDep = Annotated[Components, Depends(get_components)]
 
 
-def get_service(components: ComponentsDep) -> ExperimentService:
+def get_service(components: ComponentsDep, request: Request) -> ExperimentService:
     return ExperimentService(
         repo=components.repo,
         source=components.source,
         jury=components.jury,
         docking=components.docking,
         runner=components.runner,
+        session_id=request.state.session_id,
+        client_id=request.state.client_id,
+        settings=components.settings,
     )
 
 

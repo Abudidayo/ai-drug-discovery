@@ -54,15 +54,27 @@ describe("Choosing a disease", () => {
   });
 
   it("shows the build on step 2 while it runs", async () => {
+    // Hold the build until its progress is observed, independently of polling or CPU speed.
+    let finished = false;
+    server.use(
+      http.untyped.get("*/api/experiments/:id", ({ params }) =>
+        HttpResponse.json(
+          covidExperiment(
+            finished ? "ready" : "building",
+            finished ? null : "ranking",
+            String(params.id),
+          ),
+        ),
+      ),
+    );
     const user = userEvent.setup();
     const { router } = renderApp("/");
     await waitFor(() => {
       expect(router.state.location.pathname).toMatch(/^\/e\/[0-9a-f-]+\/disease$/);
     });
-    // Keep it building for a few polls, so the stages can be read on step 2.
-    const id = router.state.location.pathname.split("/")[2] ?? "";
-    const building = covidExperiment("building", "ranking", id);
-    fakeApi.experiments.set(id, [building, building, covidExperiment("ready", null, id)]);
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: copy.next })).toBeEnabled();
+    });
     await user.click(screen.getByRole("button", { name: copy.next }));
 
     // Queued, then building (polled each second): the stages in plain words, the current one
@@ -83,6 +95,7 @@ describe("Choosing a disease", () => {
     expect(within(screen.getByRole("banner")).getByText("COVID-19")).toBeInTheDocument();
 
     // Polling picks up the finished build.
+    finished = true;
     expect(
       await screen.findByRole("list", { name: copy.biology.targetsLabel }, { timeout: 3000 }),
     ).toBeInTheDocument();
