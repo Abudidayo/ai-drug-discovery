@@ -72,14 +72,14 @@ For each disease, each method picks 15 drugs out of 1,956. We count how many of 
 
 The two methods: **z-score** ranks a drug by how close its target proteins are to the disease's proteins (shortest path), compared with random protein sets of the same connectivity. **Random walk** is explained above.
 
-Higher is better for every number below.
+Higher is better for every number below. The random-choice column is calculated, not run: it's what picking 15 drugs at random would get on average.
 
-| Metric | What it means | Z-score | Random walk |
-|---|---|---:|---:|
-| Known pairs retrieved | Approved drug–disease pairs that made the top 15, out of 293 | 11 / 293 | **15 / 293** |
-| Micro Recall@15 | The same, as a percentage of all 293 pairs | 3.75% | **5.12%** |
-| Macro Recall@15 | The share found for each disease, averaged over the 14 diseases, so every disease counts equally | 5.05% | **6.89%** |
-| Diseases with at least one hit | Diseases where at least one approved drug made the 15 | 8 / 14 | 8 / 14 |
+| Metric | What it means | Random choice | Z-score | Random walk |
+|---|---|---:|---:|---:|
+| Known pairs retrieved | Approved drug–disease pairs that made the top 15, out of 293 | about 2 / 293 | 11 / 293 | **15 / 293** |
+| Micro Recall@15 | The same, as a percentage of all 293 pairs | 0.77% | 3.75% | **5.12%** |
+| Macro Recall@15 | The share found for each disease, averaged over the 14 diseases, so every disease counts equally | 0.77% | 5.05% | **6.89%** |
+| Diseases with at least one hit | Diseases where at least one approved drug made the 15 | — | 8 / 14 | 8 / 14 |
 
 **What this shows:** both methods find far more approved drugs than random choice (about 2), and random walk found a few more than the z-score (15 vs 11). But it won on only 4 diseases, lost on 2 and tied on 8. The 95% confidence interval for the gain runs from −0.61 to +4.40 points: since it includes zero, the gain could be luck. We made random walk the default as a product choice, not a proven improvement.
 
