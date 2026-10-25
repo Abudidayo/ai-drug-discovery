@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Decision } from "../api/types";
 import { copy } from "../copy/en";
-import { markerNudges, rankPosition, rankTicks } from "./dotPlotLayout";
+import { markerNudges, rankPosition, rankTicks, rowMinHeight } from "./dotPlotLayout";
 import styles from "./DotPlot.module.css";
 import { Marker } from "./Marker";
 
@@ -31,7 +31,7 @@ interface DotPlotProps {
   onHover: (id: string | null) => void;
 }
 
-const ROW = "minmax(26px, 1fr)";
+const ROW_HEIGHT = 26;
 const CONTESTED_ROW = "minmax(72px, 2.4fr)";
 
 /**
@@ -40,12 +40,18 @@ const CONTESTED_ROW = "minmax(72px, 2.4fr)";
  * Where the models agree on the decision it reads as one row; a split decision is drawn once,
  * in the contested colour, with each model on its own line so the split is plain.
  */
+/** A row's grid track: a split decision gets a line per model; ties get room to fan out. */
+function rowTrack(row: DotPlotRow): string {
+  if (row.contested) return CONTESTED_ROW;
+  return `minmax(${String(rowMinHeight(row.ranks, ROW_HEIGHT))}px, 1fr)`;
+}
+
 export function DotPlot({ models, rows, maxRank, hovered, onHover }: DotPlotProps) {
   const style: CSSProperties = {
     // Model names wrap rather than widen their column, so long names ("Practice reviewer A",
     // "Claude Opus 5.5") never push the table past its panel.
     gridTemplateColumns: `max-content minmax(120px, 2.2fr) repeat(${String(models.length)}, minmax(6.5em, 1fr))`,
-    gridTemplateRows: `auto ${rows.map((row) => (row.contested ? CONTESTED_ROW : ROW)).join(" ")} auto`,
+    gridTemplateRows: `auto ${rows.map(rowTrack).join(" ")} auto`,
   };
   const contestedCount = rows.filter((row) => row.contested).length;
   const anyContested = contestedCount > 0;

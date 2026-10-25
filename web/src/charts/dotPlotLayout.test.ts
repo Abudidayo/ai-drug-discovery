@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { markerNudges, rankPosition, rankTicks } from "./dotPlotLayout";
+import { markerNudges, rankPosition, rankTicks, rowMinHeight } from "./dotPlotLayout";
 
 describe("rankPosition", () => {
   it("centres each rank in an equal slot", () => {
@@ -22,5 +22,14 @@ describe("markerNudges", () => {
     expect(markerNudges([1, 1, 2])).toEqual([-4.5, 4.5, 0]);
     expect(markerNudges([4, 4, 4])).toEqual([-9, 0, 9]);
     expect(markerNudges([3, null, 7])).toEqual([0, 0, 0]);
+  });
+});
+
+describe("rowMinHeight", () => {
+  it("keeps the usual height unless three models share a rank", () => {
+    expect(rowMinHeight([3, 5, 9], 26)).toBe(26);
+    expect(rowMinHeight([4, 4, 9], 26)).toBe(26);
+    expect(rowMinHeight([1, 1, 1], 26)).toBe(34);
+    expect(rowMinHeight([null, null, null], 26)).toBe(26);
   });
 });
