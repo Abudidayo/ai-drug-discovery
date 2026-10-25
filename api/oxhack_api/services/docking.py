@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -140,6 +140,18 @@ def cache_key(structure: Structure, smiles: str, settings: DockSettings) -> str:
         "seed": settings.seed,
     }
     return hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()
+
+
+def structure_for(candidate: Candidate, structures: Sequence[Structure]) -> Structure | None:
+    """The structure a Candidate is docked into: its own co-crystal structure when there is
+    one, else the first prepared structure of one of its targets; None when it can't be
+    docked. The binding-pose step opens on the same pair (web/src/lib/docking.ts)."""
+    if not candidate.dockable:
+        return None
+    targets = {target.id for target in candidate.targets}
+    usable = [structure for structure in structures if structure.target_id in targets]
+    own = (s for s in usable if s.ligand.candidate_id == candidate.candidate_id)
+    return next(own, usable[0] if usable else None)
 
 
 def unsupported_reason(

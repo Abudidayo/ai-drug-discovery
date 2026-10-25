@@ -5,7 +5,11 @@
 - Jury and docking requests are refused while an Experiment is archived.
 - Archiving is refused while the Experiment is building or a docking job is live.
 - An identical docking computation is reused instead of run twice, and an
-  Experiment has at most `MAX_LIVE_DOCK_JOBS` computations waiting or running.
+  Experiment has at most `MAX_LIVE_DOCK_JOBS` computations waiting or running
+  that a reader asked for.
+- Once an Experiment is built, its follow-ups start on their own
+  (`start_follow_ups`): the jury's review and a binding pose for every drug that
+  can be docked, so the later steps are ready sooner.
 
 Each change and the job it needs are made in one `repo.locked()` block, so the
 Postgres repo checks the rule, writes the change and queues the job in one
@@ -14,6 +18,7 @@ transaction.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -31,9 +36,11 @@ from ..schemas import (
     ExperimentSummary,
     JuryRun,
 )
-from .docking import DockingBackend, cache_key, unsupported_reason
+from .docking import DockingBackend, cache_key, structure_for, unsupported_reason
 from .jury import JuryBackend, JuryUnavailable
 from .source import ExperimentSource, SourceError
+
+log = logging.getLogger(__name__)
 
 LIVE_DOCK_STATUSES = ("queued", "running")
 MAX_LIVE_DOCK_JOBS = 3
@@ -179,84 +186,121 @@ class ExperimentService:
                 ) from None
         return run
 
+    # Follow-ups ---------------------------------------------------------------
+
+    def start_follow_ups(self, experiment_id: UUID) -> None:
+        """Start what a reader asks for next as soon as the Experiment is built, so the later
+        steps wait less: the Model jury's review, and a binding pose for each drug that can be
+        docked (the known-answer drug first, then shortlist order), each into the structure
+        the binding-pose step opens on. Anything already asked for is left alone, and one
+        follow-up that can't start never stops the others."""
+        experiment = self.get(experiment_id)
+        if experiment.status != "ready" or experiment.archived_at is not None:
+            return
+        if experiment.jury is None:
+            try:
+                self.ask_jury(experiment_id)
+            except (Conflict, Unavailable) as exc:
+                log.warning("Experiment %s: the jury did not start: %s", experiment_id, exc)
+        structures = self.docking.structures()
+        asked = {(job.candidate_id, job.structure_id) for job in experiment.dock_jobs}
+        for candidate in sorted(experiment.candidates, key=lambda c: not c.known_answer):
+            structure = structure_for(candidate, structures)
+            if structure is None or (candidate.candidate_id, structure.id) in asked:
+                continue
+            request = DockRequest(
+                experiment_id=experiment_id,
+                candidate_id=candidate.candidate_id,
+                structure_id=structure.id,
+            )
+            try:
+                with self.repo.locked(experiment_id):
+                    self._dock(request, capped=False)
+            except (Conflict, Unprocessable) as exc:
+                log.warning(
+                    "Experiment %s: no pose for %s: %s", experiment_id, candidate.candidate_id, exc
+                )
+
     # Docking ----------------------------------------------------------------
 
     def request_dock(self, request: DockRequest) -> DockJob:
         with self.repo.locked(request.experiment_id):
-            experiment = self.get(request.experiment_id)
-            self._require_active_and_ready(experiment, "compute a binding pose")
-            candidate = next(
-                (c for c in experiment.candidates if c.candidate_id == request.candidate_id), None
-            )
-            if candidate is None:
-                raise Unprocessable(
-                    f"{request.candidate_id} is not on this Experiment's shortlist."
+            return self._dock(request, capped=True)
+
+    def _dock(self, request: DockRequest, *, capped: bool) -> DockJob:
+        """Queue or reuse one binding pose; the caller holds the Experiment's lock. `capped`
+        applies `MAX_LIVE_DOCK_JOBS`, which limits what a reader may queue at once; the
+        follow-ups queue each dockable drug once, so they need no cap."""
+        experiment = self.get(request.experiment_id)
+        self._require_active_and_ready(experiment, "compute a binding pose")
+        candidate = next(
+            (c for c in experiment.candidates if c.candidate_id == request.candidate_id), None
+        )
+        if candidate is None:
+            raise Unprocessable(f"{request.candidate_id} is not on this Experiment's shortlist.")
+        structure = self.docking.structure(request.structure_id)
+        if structure is None:
+            raise Unprocessable(f"{request.structure_id} is not one of the prepared structures.")
+        smiles = self.docking.ligand_smiles(candidate.candidate_id)
+        reason = unsupported_reason(candidate, structure, smiles)
+        if reason is not None:
+            raise Unprocessable(reason)
+        assert smiles is not None  # unsupported_reason refuses a drug without SMILES
+        settings = self.docking.settings_for(structure)
+        inputs = DockInputs(cache_key(structure, smiles, settings), smiles)
+        job = DockJob(
+            id=uuid4(),
+            kind="candidate",
+            status="queued",
+            experiment_id=experiment.id,
+            candidate_id=candidate.candidate_id,
+            target_id=structure.target_id,
+            structure_id=structure.id,
+            settings=settings,
+            scores=None,
+            files=None,
+            control_rmsd=None,
+            error=None,
+            cached_from=None,
+            fixture=self.docking.fixture,
+            created_at=utcnow(),
+            started_at=None,
+            finished_at=None,
+        )
+        reused = self.repo.find_reusable_dock_job(inputs.cache_key, job.fixture)
+        if reused is None:
+            computing = [
+                j
+                for j in experiment.dock_jobs
+                if j.status in LIVE_DOCK_STATUSES and j.cached_from is None
+            ]
+            if capped and len(computing) >= MAX_LIVE_DOCK_JOBS:
+                raise Conflict(
+                    f"This Experiment already has {len(computing)} binding poses waiting "
+                    "or being computed. Request another once one has finished."
                 )
-            structure = self.docking.structure(request.structure_id)
-            if structure is None:
-                raise Unprocessable(
-                    f"{request.structure_id} is not one of the prepared structures."
-                )
-            smiles = self.docking.ligand_smiles(candidate.candidate_id)
-            reason = unsupported_reason(candidate, structure, smiles)
-            if reason is not None:
-                raise Unprocessable(reason)
-            assert smiles is not None  # unsupported_reason refuses a drug without SMILES
-            settings = self.docking.settings_for(structure)
-            inputs = DockInputs(cache_key(structure, smiles, settings), smiles)
-            job = DockJob(
-                id=uuid4(),
-                kind="candidate",
-                status="queued",
-                experiment_id=experiment.id,
-                candidate_id=candidate.candidate_id,
-                target_id=structure.target_id,
-                structure_id=structure.id,
-                settings=settings,
-                scores=None,
-                files=None,
-                control_rmsd=None,
-                error=None,
-                cached_from=None,
-                fixture=self.docking.fixture,
-                created_at=utcnow(),
-                started_at=None,
-                finished_at=None,
-            )
-            reused = self.repo.find_reusable_dock_job(inputs.cache_key, job.fixture)
-            if reused is None:
-                computing = [
-                    j
-                    for j in experiment.dock_jobs
-                    if j.status in LIVE_DOCK_STATUSES and j.cached_from is None
-                ]
-                if len(computing) >= MAX_LIVE_DOCK_JOBS:
-                    raise Conflict(
-                        f"This Experiment already has {len(computing)} binding poses waiting "
-                        "or being computed. Request another once one has finished."
-                    )
-                try:
-                    self.repo.add_dock_job(job, inputs)
-                    self.runner.submit(JobRef("dock", job.id))
-                    return job
-                except DuplicateComputation:
-                    # Another request started the same computation since we looked.
-                    reused = self.repo.find_reusable_dock_job(inputs.cache_key, job.fixture)
-                    if reused is None:
-                        raise
-            # Identical inputs: reuse the result (or the live run) instead of docking again.
-            job = job.model_copy(
-                update={
-                    "status": reused.status,
-                    "scores": reused.scores,
-                    "files": reused.files,
-                    "fixture": reused.fixture,
-                    "cached_from": reused.id,
-                    "started_at": reused.started_at,
-                    "finished_at": job.created_at if reused.status == "done" else None,
-                }
-            )
-            self.repo.add_dock_job(job, inputs)
+            try:
+                self.repo.add_dock_job(job, inputs)
+                self.runner.submit(JobRef("dock", job.id))
+                return job
+            except DuplicateComputation:
+                # Another request started the same computation since we looked.
+                reused = self.repo.find_reusable_dock_job(inputs.cache_key, job.fixture)
+                if reused is None:
+                    raise
+        # Identical inputs: reuse the result (or the live run) instead of docking again.
+        job = job.model_copy(
+            update={
+                "status": reused.status,
+                "scores": reused.scores,
+                "files": reused.files,
+                "fixture": reused.fixture,
+                "cached_from": reused.id,
+                "started_at": reused.started_at,
+                "finished_at": job.created_at if reused.status == "done" else None,
+            }
+        )
+        self.repo.add_dock_job(job, inputs)
         return job
 
     def get_dock_job(self, job_id: UUID) -> DockJob:
