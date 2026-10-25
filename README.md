@@ -29,7 +29,7 @@ flowchart TD
 4. **Shortlist.** The top 10 by network plus the top 5 by direct evidence make 15 Candidates.
 5. **Explanation.** Each Candidate shows the protein paths that link it to the disease.
 6. **Model jury.** Three AI models (GPT-5.4, GLM-5.3 and Kimi K3, via Snowflake Cortex) review the same cited evidence without seeing the scores. Every claim must cite real evidence.
-7. **Docking (optional).** AutoDock Vina predicts how a drug might sit in its protein.
+7. **Docking (on request).** For a chosen drug and protein with a known 3D structure, AutoDock Vina predicts how the drug might sit in the protein. It shows a possible fit, not that the drug works, and it doesn't change the ranking.
 
 ## The ranking engine: random walk with restart
 
