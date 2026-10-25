@@ -3,10 +3,23 @@ from copy import deepcopy
 import json
 from pathlib import Path
 
+import pytest
+
 from jury import pilot
 from jury.client import ModelReply, mock_model
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture
+def scorer_checkout(tmp_path, monkeypatch):
+    root = tmp_path / 'scorer-checkout'
+    ranking = root / 'ranking'
+    ranking.mkdir(parents=True)
+    for name in ['scoring.py', 'network.py', 'proximity.py', 'data.py', 'artifacts.py']:
+        (ranking / name).write_text('# synthetic source for offline freeze tests\n')
+    monkeypatch.setenv('RANKING_ROOT', str(root))
+    return root
 
 
 def test_b_budget_reserves_before_dispatch_and_caps_retries(tmp_path, monkeypatch):
@@ -73,7 +86,7 @@ def test_b_refuses_incomplete_cohort_before_loading_prompts(tmp_path):
         pilot.b_jobs(tmp_path)
 
 
-def test_b_freezes_protocol_before_dispatch_and_detects_changes(tmp_path, monkeypatch):
+def test_b_freezes_protocol_before_dispatch_and_detects_changes(tmp_path, monkeypatch, scorer_checkout):
     import pytest
     output,report=tmp_path/'data',tmp_path/'report'
     output.mkdir();report.mkdir()
@@ -82,16 +95,29 @@ def test_b_freezes_protocol_before_dispatch_and_detects_changes(tmp_path, monkey
            'presented_order':['C1'],'prompt':f'Frozen prompt {i}',
            'path':str(output/'runs'/f'{i}.json')} for i in range(42)]
     monkeypatch.setattr(pilot,'b_jobs',lambda *a:deepcopy(jobs))
+    monkeypatch.chdir(tmp_path)
     first=pilot.freeze_b(output,report)
     assert pilot.freeze_b(output,report)==first
+    scorer_hashes = {name: digest for name, digest in first['source_sha256'].items()
+                     if Path(name).parent == scorer_checkout / 'ranking'}
+    assert len(scorer_hashes) == 5
+    from hashlib import sha256
+    assert scorer_hashes == {str(p): sha256(p.read_bytes()).hexdigest()
+                             for p in (scorer_checkout / 'ranking').glob('*.py')}
     assert first['protocol_sha256'] in (report/'results.md').read_text()
     assert not (output/'runs').exists()
+    scorer = scorer_checkout / 'ranking/scoring.py'
+    original = scorer.read_bytes()
+    scorer.write_text('# changed scorer')
+    with pytest.raises(ValueError, match='changed'):
+        pilot.freeze_b(output, report)
+    scorer.write_bytes(original)
     protocol.write_text('Changed after sealing')
     with pytest.raises(ValueError,match='changed'):
         pilot.freeze_b(output,report)
 
 
-def test_amended_experiment_scores_all_methods_and_paired_panels_offline(tmp_path, monkeypatch):
+def test_amended_experiment_scores_all_methods_and_paired_panels_offline(tmp_path, monkeypatch, scorer_checkout):
     # Synthetic contract records exercise the whole runner/report path; no scientific claims.
     from pipeline.panels import B_DISEASES
     from jury.client import ModelReply
@@ -132,3 +158,45 @@ def test_amended_experiment_scores_all_methods_and_paired_panels_offline(tmp_pat
     assert result['protocol_sha256'] in (report/'results.md').read_text()
     assert 'Plausible decoys' in (report/'results.md').read_text()
     assert all(result['validity'][model]['pathways']==11 for model in pilot.B_MODELS)
+
+
+def test_b_provider_refusal_never_parses_a_complete_ballot(tmp_path, monkeypatch):
+    from jury.client import build_prompt
+    packet = json.loads((ROOT / 'fixtures/evidence_packet.json').read_text())
+    prompt = build_prompt(packet, [c['label'] for c in packet['candidates']])
+    raw = mock_model('offline', prompt, 0)
+    path = tmp_path / 'run.json'
+    pilot.write_json(path, {'attempts': [{'status': 'reserved', 'attempt': 1}]})
+    job = {'path': str(path), 'packet': packet, 'prompt': prompt, 'name_aliases': [],
+           'model': 'offline', 'condition': 'pathways', 'disease_id': packet['disease']['id']}
+    def must_not_parse(*args, **kwargs):
+        pytest.fail('Provider refusals must be rejected before ballot parsing')
+    monkeypatch.setattr('jury.client.json.JSONDecoder', must_not_parse)
+    result = pilot.b_live_attempt(job, lambda m, p: ModelReply(raw, 10, 20, stop_reason='refusal'))
+    saved = json.loads(path.read_text())['attempts'][0]
+    assert result['status'] == saved['status'] == 'invalid'
+    assert saved['reviews'] is None
+    assert saved['stop_reason'] == 'refusal' and saved['raw_output'] == raw
+    assert saved['input_tokens'] == 10 and saved['output_tokens'] == 20
+    assert 'refus' in ' '.join(saved['validation']['errors']).lower()
+    assert pilot.final_attempt({'attempts': [saved]}) is None
+
+
+@pytest.mark.parametrize('missing', ['all', 'scoring.py', 'network.py', 'proximity.py', 'data.py', 'artifacts.py'])
+def test_b_freeze_requires_scorer_sources_before_sealing(tmp_path, monkeypatch, missing):
+    output, report, ranking = tmp_path / 'data', tmp_path / 'report', tmp_path / 'external' / 'ranking'
+    output.mkdir(); report.mkdir(); ranking.mkdir(parents=True)
+    (report / 'protocol.md').write_text('Offline protocol')
+    for name in ['scoring.py', 'network.py', 'proximity.py', 'data.py', 'artifacts.py']:
+        if missing not in ('all', name):
+            (ranking / name).write_text('# offline scorer source')
+    monkeypatch.setenv('RANKING_ROOT', str(ranking.parent))
+    monkeypatch.setattr(pilot, 'b_jobs', lambda *a, **kw: [
+        {'disease_id': f'MONDO_{i}', 'model': 'offline', 'condition': 'pathways',
+         'presented_order': [], 'prompt': 'Frozen', 'path': str(output / 'runs' / f'{i}.json')}
+        for i in range(42)])
+    with pytest.raises(FileNotFoundError, match='ranking'):
+        pilot.freeze_b(output, report)
+    assert not (output / 'preregistered.json').exists()
+    assert not (report / 'preregistered.json').exists()
+    assert not (output / 'prompts').exists()

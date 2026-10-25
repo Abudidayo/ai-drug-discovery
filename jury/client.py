@@ -382,10 +382,13 @@ def _unique_object(pairs):
     return value
 
 
-def validate_reply(raw, packet, *, name_aliases=()):
+def validate_reply(raw, packet, *, name_aliases=(), stop_reason=None):
     """Return enriched reviews or no vote, with fixture-shaped validation flags."""
     validation = dict(schema=False, unique_ranks=None, evidence_ids_exist=None,
                       numbers_match=None, errors=[])
+    if stop_reason == "refusal":
+        validation.update(schema=None, errors=["refused (provider stop_reason=refusal)"])
+        return None, validation
     try:
         # Decode the first object only; never salvage nested or competing objects.
         if not isinstance(raw, str):

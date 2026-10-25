@@ -230,7 +230,8 @@ def test_current_jury_contract_accepts_null_consensus_with_refusal_metadata():
     assert result["consensus_status"]["reason"] == "fewer_than_two_valid_jurors"
 
 
-def test_recorded_end_to_end(tmp_path, monkeypatch):
+@pytest.mark.parametrize("jury_failure", [None, "refusal", "call_failure"])
+def test_recorded_end_to_end(tmp_path, monkeypatch, jury_failure):
     # Reuse the existing <200 KB recorded A4 samples; no new test-data files.
     input_dir = tmp_path / "input"
     input_dir.mkdir()
@@ -280,12 +281,27 @@ def test_recorded_end_to_end(tmp_path, monkeypatch):
     monkeypatch.setattr(a1, "DISEASE_CACHE", disease_cache)
     monkeypatch.setattr(a1, "load_diseases", lambda _: [("MONDO_0009693", "plasma cell myeloma", [])])
     out = tmp_path / "output"
+    if jury_failure:
+        def unavailable(model, prompt, temperature):
+            if jury_failure == "call_failure":
+                raise RuntimeError("Offline provider failure")
+            return ModelReply("Provider declined", stop_reason="refusal")
+        monkeypatch.setattr("pipeline.experiment.mock_model", unavailable)
     run_experiment("MONDO_0009693", out, data_dir=input_dir, offline=True)
     saved_jury = read_json(out / "jury_result.json")
     assert {j["model"]: j["token_usage"] for j in saved_jury["jurors"]} == read_json(out / "jury_usage.json")
     files = assert_outputs(out, drugs, string_map)
     assert len(files["candidates"]["candidates"]) == 1
-    assert all(j["status"] == "valid" for j in files["jury_result"]["jurors"])
+    if jury_failure:
+        assert saved_jury["consensus"] is None
+        assert saved_jury["consensus_status"]["jurors_counted"] == 0
+        assert all(j["reviews"] is None for j in saved_jury["jurors"])
+        report = (out / "run.md").read_text()
+        assert "0 votes counted" in report
+        assert "consensus unavailable" in report.lower()
+        assert saved_jury["consensus_status"]["reason"] in report
+    else:
+        assert all(j["status"] == "valid" for j in files["jury_result"]["jurors"])
     assert "mock jury" in (out / "run.md").read_text()
     rejected = read_json(out / "coverage.json")["packet_mapping"]["unmapped"]
     assert {r["reason"] for r in rejected} == {"upstream_parent_contract_conflict", "regulator_approval_not_confirmed"}

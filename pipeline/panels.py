@@ -5,6 +5,7 @@ from copy import deepcopy
 from collections import Counter
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import random
 import re
@@ -24,6 +25,21 @@ DISEASES = [
     {"id": "MONDO_0005180", "area": "neurological"},
 ]
 REGULATORS = {"FDA", "EMA Human Drugs", "PMDA", "DailyMed"}
+
+
+def resolve_ranking_root(root=None):
+    """RANKING_ROOT names the scorer checkout; default to this repository."""
+    return Path(root or os.environ.get("RANKING_ROOT") or Path(__file__).resolve().parents[1]).resolve()
+
+
+def ranking_source_paths(root=None):
+    ranking = resolve_ranking_root(root) / "ranking"
+    required = [ranking / name for name in
+                ("scoring.py", "network.py", "proximity.py", "data.py", "artifacts.py")]
+    missing = [str(path) for path in required if not path.is_file()]
+    if missing:
+        raise FileNotFoundError("Missing ranking scorer sources: " + ", ".join(missing))
+    return sorted(ranking.glob("*.py"))
 
 
 def build_panels(universe, diseases, *, clinical_records, seed=SEED):
@@ -656,7 +672,7 @@ def unblindable_candidates(packet, aliases, target_symbols):
 
 
 def prepare_experiment_b(data_dir='data', output='data/experiment_b', *,
-                         ranking_root='/Users/jessicamak/oxhack-workers/zaid-ro', offline=False, diseases=None):
+                         ranking_root=None, offline=False, diseases=None):
     """Reuse v2 selection, enrichment and blinding; Zaid's modules stay read-only."""
     import shutil
     import httpx
@@ -666,7 +682,7 @@ def prepare_experiment_b(data_dir='data', output='data/experiment_b', *,
     from ranking.data import load_disease, load_drugs
     from ranking.paths import PathReconstructor, representatives
     from ranking.scoring import RankingEngine, RankingSettings
-    data_dir, output, ranking_root = Path(data_dir), Path(output), Path(ranking_root)
+    data_dir, output, ranking_root = Path(data_dir), Path(output), resolve_ranking_root(ranking_root)
     if (output / 'preregistered.json').exists():
         raise ValueError('Experiment B is frozen; do not rebuild its inputs')
     output.mkdir(parents=True, exist_ok=True)
@@ -791,8 +807,10 @@ def replication_protocol(report_dir='results/experiment_b_replication'):
 
 
 def select_replication(data_dir='data', output='data/experiment_b_replication',
-                       report_dir='results/experiment_b_replication', *, offline=False):
+                       report_dir='results/experiment_b_replication', *, offline=False, ranking_root=None):
     """First fourteen suitable names; no ranking engine is used for this gate."""
+    protocol_path = resolve_ranking_root(ranking_root) / 'ranking/cohort_protocol.json'
+    protocol = json.loads(protocol_path.read_text())
     import httpx
     import shutil
     from ranking.cohort import (resolve_name, alias_index, extract_labels,
@@ -806,8 +824,6 @@ def select_replication(data_dir='data', output='data/experiment_b_replication',
     for cache in ['pilot/v2/packets', 'experiment_b/packets']:
         shutil.copytree(data_dir / cache, output / 'packets', dirs_exist_ok=True)
     specs = json.loads((Path(report_dir) / 'candidates.json').read_text())
-    protocol_path = Path('/Users/jessicamak/oxhack-workers/zaid-ro/ranking/cohort_protocol.json')
-    protocol = json.loads(protocol_path.read_text())
     drugs = load_drugs(data_dir / 'drug_targets.json').drugs
     by_id, aliases = {d.id: d for d in drugs}, alias_index(drugs)
     index = json.loads((data_dir / 'a6/stage1/index.json').read_text())

@@ -110,6 +110,11 @@ def test_replication_full_frozen_run_and_pooled_report_offline(tmp_path, monkeyp
     # no ignored production data, API, graph artifact or credentials are required.
     monkeypatch.setattr(pilot,'replication_input_paths',lambda o,r:[
         r/'candidates.json',r/'protocol_frozen.json',Path('results/experiment_b/results.json')])
+    ranking = tmp_path / 'scorer-checkout/ranking'
+    ranking.mkdir(parents=True)
+    for name in ['scoring.py', 'network.py', 'proximity.py', 'data.py', 'artifacts.py']:
+        (ranking / name).write_text('# synthetic source for offline freeze test\n')
+    monkeypatch.setenv('RANKING_ROOT', str(ranking.parent))
     declaration=pilot.freeze_b(output,report,replication=True)
     assert declaration['max_live_calls']==60
     assert not (output/'runs').exists()
@@ -130,3 +135,13 @@ def test_replication_full_frozen_run_and_pooled_report_offline(tmp_path, monkeyp
     (output/'panels.json').write_text('{}')
     with pytest.raises(ValueError,match='bytes changed'):
         pilot.score_b(output,report,replication=True)
+
+
+
+@pytest.mark.parametrize('study,group', [('experiment_b', None),
+    ('experiment_b_replication', 'primary'), ('experiment_b_replication', 'secondary')])
+def test_all_published_statistics_recompute(study, group):
+    root = Path(__file__).resolve().parents[2]
+    published = json.loads((root / 'results' / study / 'results.json').read_text())
+    methods = (published[group] if group else published)['methods']
+    assert pilot.replication_statistics({m: v['per_panel'] for m, v in methods.items()}) == methods
