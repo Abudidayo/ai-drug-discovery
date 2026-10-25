@@ -58,14 +58,19 @@ def test_fixed_cap_order_unique_gene_counts_and_no_symbol_joins(tmp_path):
     assert [pid for pid,_ in memberships({'R-HSA-8':ps['R-HSA-8'], 'R-HSA-9':ps['R-HSA-9']}, {'ENSG00000000000'}, {'ENSG00000000001'})] == ['R-HSA-8']
 
 
-def test_download_manifest_is_numbered_human_and_hashed(tmp_path):
-    rows = SAMPLE.read_bytes()
+@pytest.mark.parametrize('newline', [b'\n', b'\r\n'], ids=['lf', 'crlf'])
+def test_download_manifest_is_numbered_human_and_hashed(tmp_path, newline):
+    rows = SAMPLE.read_bytes().replace(b'\r\n', b'\n').replace(b'\n', newline)
     other = b'ENSMUSG00000000001\tR-MMU-1\thttps://reactome.org/content/detail/R-MMU-1\tMouse\tIEA\tMus musculus\n'
     def handle(request):
         return httpx.Response(200, text='97') if str(request.url).endswith('/version') else httpx.Response(200, content=rows+other)
     with httpx.Client(transport=httpx.MockTransport(handle)) as client:
         path, manifest = download(tmp_path, client=client)
-        assert path.read_bytes() == rows
+        # The downloader canonicalizes retained rows to LF; source hashes cover original bytes.
+        assert path.read_bytes() == rows.replace(b'\r\n', b'\n')
+        from hashlib import sha256
+        assert manifest['sha256'] == sha256(path.read_bytes()).hexdigest()
+        assert manifest['download_sha256'] == sha256(rows + other).hexdigest()
         assert manifest['release'] == 'reactome-97'
         assert manifest['url'].endswith('/97/Ensembl2Reactome.txt')
         assert manifest['licence']['name'] == 'CC0-1.0'
