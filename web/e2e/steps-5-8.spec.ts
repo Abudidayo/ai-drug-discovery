@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import type { GLViewer } from "3dmol";
 import { expect, test } from "./console";
 
 /*
@@ -295,6 +296,17 @@ test("a student shows baricitinib's binding pose and checks it against the cryst
   expect(await page.locator("canvas").count()).toBeLessThanOrEqual(3);
   expect(await liveContexts(page)).toBe(2);
 
+  await view.locator("canvas").evaluate((canvas) => {
+    const viewer = (canvas as HTMLCanvasElement & { _3dmol_viewer: GLViewer })._3dmol_viewer;
+    const gl = viewer.getRenderer().getContext();
+    const clear = viewer.clear.bind(viewer);
+    Object.assign(window, { poseClearedWhileLive: false });
+    viewer.clear = () => {
+      if (!gl.isContextLost()) Object.assign(window, { poseClearedWhileLive: true });
+      return clear();
+    };
+  });
+
   // Leaving the step releases the pose's context, once the step's transition has played.
   await page.getByRole("link", { name: "History", exact: true }).click();
   await expectStep(page, "History");
@@ -311,4 +323,10 @@ test("a student shows baricitinib's binding pose and checks it against the cryst
     });
     throw error;
   }
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { poseClearedWhileLive: boolean }).poseClearedWhileLive,
+    ),
+    "3Dmol clearing must not render a final protein frame during navigation",
+  ).toBe(false);
 });
