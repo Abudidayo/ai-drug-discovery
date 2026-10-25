@@ -87,15 +87,16 @@ def prepare_ligand(smiles: str, seed: int) -> tuple[Any, str]:
     """A 3D conformer of the SMILES (RDKit ETKDG, then MMFF) and its Meeko PDBQT."""
     from meeko import MoleculePreparation, PDBQTWriterLegacy
     from rdkit import Chem
-    from rdkit.Chem import AllChem
+    from rdkit.Chem.rdDistGeom import EmbedMolecule
+    from rdkit.Chem.rdForceFieldHelpers import MMFFOptimizeMolecule
 
     parsed = Chem.MolFromSmiles(smiles)
     if parsed is None:
         raise ValueError(f"RDKit cannot parse the ligand SMILES {smiles!r}")
     mol = Chem.AddHs(parsed)
-    if AllChem.EmbedMolecule(mol, randomSeed=seed) != 0:
+    if EmbedMolecule(mol, randomSeed=seed) != 0:
         raise ValueError("RDKit could not embed a 3D conformer of the ligand")
-    AllChem.MMFFOptimizeMolecule(mol)
+    MMFFOptimizeMolecule(mol)
     setups = MoleculePreparation().prepare(mol)
     if len(setups) != 1:
         raise ValueError(f"Meeko split the ligand into {len(setups)} parts; expected one")
@@ -319,7 +320,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if list(argv) == ["--toolchain"]:
         print(json.dumps(toolchain()))
         return 0
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
     parser.add_argument("--structure", type=Path, required=True, help="A prepared structure.")
     parser.add_argument("--smiles", required=True, help="The ligand to dock.")
     parser.add_argument("--out", type=Path, required=True, help="Folder for the result files.")

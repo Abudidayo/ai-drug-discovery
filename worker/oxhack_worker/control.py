@@ -62,7 +62,7 @@ def pose_rmsds(poses: Chem.Mol, crystal: Chem.Mol) -> list[float]:
 def main(argv: Sequence[str] | None = None) -> int:
     from . import dock  # imports Vina, so only when actually docking
 
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
     parser.add_argument("pdb_id", help="A prepared structure, e.g. 6WTO.")
     parser.add_argument(
         "--structures",

@@ -48,10 +48,22 @@ ignore = ["N818"]
 [tool.pyright]
 include = ["oxhack_worker", "tests"]
 pythonVersion = "3.11"
-# Strict for the queue and the tests. prepare, dock and control run in the docking
-# venv against RDKit, Meeko, gemmi and Vina, which ship no type information.
+# Strict except where RDKit, Meeko, gemmi and Vina are used: they ship no type
+# information (prepare, dock and control run in the docking venv).
 typeCheckingMode = "standard"
-strict = ["oxhack_worker/queue.py", "tests"]
+strict = [
+  "oxhack_worker/__init__.py",
+  "oxhack_worker/queue.py",
+  "tests/conftest.py",
+  "tests/fake_dock.py",
+  "tests/test_cache_key.py",
+  "tests/test_queue.py",
+  "tests/test_real_vina.py",
+  "tests/test_runner.py",
+  "tests/test_structures.py",
+]
 venvPath = ".."
 venv = ".venv"
-extraPaths = ["../db", "tests"]
+# ../api: the API package's source, so pyright checks against it rather than an
+# untyped installed package.
+extraPaths = ["../api", "../db", "tests"]
