@@ -1,7 +1,9 @@
+/* Under the network, at its right: the key is read after the figure, as in a printed plate. */
 .legend {
   display: flex;
   flex: none;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: var(--space-4) var(--space-24);
   padding-top: var(--space-8);
   font-size: var(--text-body-sm);
