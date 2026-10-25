@@ -145,12 +145,16 @@ def open_jury(settings: Settings) -> JuryBackend:
     """The Model jury the settings name. Cortex refuses to start without its settings."""
     if settings.jury == "fixture":
         return FixtureJury(settings.fixtures_dir)
+    audit_dir = settings.data_dir / "experiments"
     if settings.jury == "mock":
-        return StreamAJury("mock")
+        return StreamAJury("mock", audit_dir=audit_dir)
     snowflake = SnowflakeSettings()
     snowflake.require_complete()
     return StreamAJury(
-        "cortex", models=snowflake.models, reasoning_effort=snowflake.reasoning_effort
+        "cortex",
+        models=snowflake.models,
+        reasoning_effort=snowflake.reasoning_effort,
+        audit_dir=audit_dir,
     )
 
 

@@ -14,6 +14,11 @@ consensus. Stream A runs the jurors one after another. This backend reports each
 juror as `running` when stream A first asks it, and saves its review as soon as
 it finishes (`run_jury`'s `on_juror`), so the UI never shows a finished juror
 still reviewing.
+
+Given an audit folder, each run also writes stream A's whole result to
+`<audit>/<experiment id>/jury_result.json`, next to the build's audit trail. It
+keeps what the contract leaves out: each juror's presented order and, for an
+answer that failed the checks, its last raw reply, so a failure can be checked.
 """
 
 from __future__ import annotations
@@ -24,6 +29,7 @@ import random
 import threading
 from collections.abc import Generator
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal, cast
 
 from ..schemas import (
@@ -47,6 +53,7 @@ from ..stream_a import (
     mock_model,
     run_jury,
     validate_packet,
+    write_json,
 )
 from .jury import (
     JurorFinished,
@@ -239,9 +246,11 @@ class StreamAJury:
         *,
         models: list[str] | None = None,
         reasoning_effort: dict[str, str | None] | None = None,
+        audit_dir: Path | None = None,
     ) -> None:
         shared = jury_settings()
         self.mode: LiveJuryMode = mode
+        self._audit_dir = audit_dir
         if mode == "mock":
             ids = cast(list[str], shared["models"])
             self._models = [
@@ -296,6 +305,8 @@ class StreamAJury:
             "reasoning_effort": {m.id: config.reasoning_effort.get(m.id) for m in config.models},
         }
         result = yield from self._run(packet, settings, dict(config.reasoning_effort))
+        if self._audit_dir is not None:
+            write_json(self._audit_dir / str(experiment.id) / "jury_result.json", result)
         mapped = map_jury_result(result, packet)
         if mapped.outcome is None:
             raise JuryUnavailable(

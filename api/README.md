@@ -80,7 +80,9 @@ the API starts (`app.open_ranking`):
   4.4's direct-evidence ranking, no network.
 
 Each build keeps its audit trail in `data/experiments/<id>/`, including
-stream B's complete ranking (`network_ranking.json.gz`) and its SHA-256.
+stream B's complete ranking (`network_ranking.json.gz`) and its SHA-256. A live
+jury adds stream A's whole result (`jury_result.json`), with the last raw reply
+of any model whose answer failed the checks.
 `uv run pytest -m network` runs real COVID-19 and myeloma builds.
 
 ## Run against Postgres
