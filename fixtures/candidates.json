@@ -4,7 +4,8 @@
   "releases": [
     "opentargets-26.09",
     "chembl-37",
-    "string-12.5"
+    "string-12.5",
+    "reactome-97"
   ],
   "candidates": [
     {
@@ -76,6 +77,18 @@
           "release": "opentargets-26.09",
           "statement": "Open Targets 26.09 records a regulator-backed approval for ERDAFITINIB from FDA.",
           "values": {}
+        },
+        {
+          "id": "E22",
+          "kind": "network_path",
+          "source": "string",
+          "source_id": "ENSG00000068078@d410b238a7baf780595ac5efe5f22868d4679a1f785d441cc3780efb626105ea",
+          "url": "https://string-db.org/cgi/network?identifiers=9606.ENSP00000339824&species=9606&network_type=physical&required_score=700&add_color_nodes=0&add_white_nodes=0",
+          "release": "string-12.5",
+          "statement": "In the filtered STRING 12.5 physical network (combined score ≥ 700, direct experiments ≥ 400), FGFR3 connects to the Disease Target FGFR3 in 0 steps: FGFR3. This is a network association, not a proven mechanism.",
+          "values": {
+            "hops": 0
+          }
         }
       ],
       "warnings": [],
@@ -235,6 +248,18 @@
           "release": "opentargets-26.09",
           "statement": "Open Targets 26.09 records a Black Box Warning for BARICITINIB: infectious disease.",
           "values": {}
+        },
+        {
+          "id": "E23",
+          "kind": "pathway",
+          "source": "reactome",
+          "source_id": "R-HSA-9006335",
+          "url": "https://reactome.org/content/detail/R-HSA-9006335",
+          "release": "reactome-97",
+          "statement": "In Reactome, at least one of this Candidate's Targets and at least one of the selected Disease Targets belong to 'Signaling by Erythropoietin' (R-HSA-9006335, 5 genes). Shared membership is not proof of effect.",
+          "values": {
+            "pathway_gene_count": 5
+          }
         }
       ],
       "warnings": [
@@ -357,6 +382,18 @@
           "release": "opentargets-26.09",
           "statement": "Open Targets 26.09 records a Black Box Warning for RUXOLITINIB: infectious disease.",
           "values": {}
+        },
+        {
+          "id": "E23",
+          "kind": "pathway",
+          "source": "reactome",
+          "source_id": "R-HSA-9006335",
+          "url": "https://reactome.org/content/detail/R-HSA-9006335",
+          "release": "reactome-97",
+          "statement": "In Reactome, at least one of this Candidate's Targets and at least one of the selected Disease Targets belong to 'Signaling by Erythropoietin' (R-HSA-9006335, 5 genes). Shared membership is not proof of effect.",
+          "values": {
+            "pathway_gene_count": 5
+          }
         }
       ],
       "warnings": [

@@ -400,7 +400,7 @@ def v2_lexicon(packet, identities):
                   and (re.search(r"[A-Za-z]", name) or re.fullmatch(r"[0-9]{2,7}-[0-9]{2}-[0-9]", name)))
 
 
-def v2_jobs(output):
+def v2_jobs(output, *, conditions=V2_CONDITIONS):
     from pipeline.panels import blind_prompt_leaks
     output = Path(output)
     panels = json.loads((output / "panels.json").read_text())["panels"]
@@ -409,14 +409,14 @@ def v2_jobs(output):
     jobs = []
     for index, panel in enumerate(panels):
         did = panel["disease"]["id"]
-        packets = {condition: json.loads((output / f"{'packet' if condition == 'named' else 'blind'}-{did}.json").read_text()) for condition in V2_CONDITIONS}
+        packets = {condition: json.loads((output / f"{'packet' if condition == 'named' else 'blind'}-{did}.json").read_text()) for condition in conditions}
         expected = {d["drug_id"] for d in [panel["true_drug"], *panel["decoys"]]}
         if any(len(p["candidates"]) != 15 or {c["candidate_id"] for c in p["candidates"]} != expected for p in packets.values()):
             raise ValueError("Each condition must contain exactly the frozen 15-drug panel")
         for model_index, model in enumerate(V2_MODELS):
-            order = [c["label"] for c in packets["named"]["candidates"]]
+            order = [c["label"] for c in next(iter(packets.values()))["candidates"]]
             random.Random(SEED + index*len(V2_MODELS)+model_index).shuffle(order)
-            for condition in V2_CONDITIONS:
+            for condition in conditions:
                 packet = packets[condition]
                 validate_packet(packet)
                 prompt = build_prompt(packet, order) + "\n" + suffix
@@ -683,12 +683,390 @@ def score_v2(output):
     return result
 
 
+
+
+B_MODELS = ['claude-opus-5-5', 'openai-gpt-5.4', 'kimi-k3']
+B_EFFORT = {model: 'low' for model in B_MODELS}
+B_MAX_CALLS = 45
+B_SUFFIX = 'Keep each rationale and objection concise (one short sentence each). Avoid quoting numeric measurements. Obey decision order across ranks.'
+
+
+def b_jobs(output):
+    from copy import deepcopy
+    from pipeline.panels import B_DISEASES, B_SEED, blind_prompt_leaks
+    output = Path(output)
+    panels = json.loads((output / 'panels.json').read_text())['panels']
+    if len(panels) != 11:
+        raise ValueError('Experiment B requires exactly eleven panels')
+    if [p['disease']['id'] for p in panels] != [d[0] for d in B_DISEASES]:
+        raise ValueError('Experiment B panels differ from the eleven declared Diseases')
+    identities = json.loads((output / 'identities.json').read_text())
+    ablation_ids = {panels[i]['disease']['id'] for i in random.Random(B_SEED).sample(range(11), 3)}
+    jobs = []
+    for index, panel in enumerate(panels):
+        did = panel['disease']['id']
+        packet = json.loads((output / f'blind-{did}.json').read_text())
+        expected = {d['drug_id'] for d in [panel['true_drug'], *panel['decoys']]}
+        if len(packet['candidates']) != 15 or {c['candidate_id'] for c in packet['candidates']} != expected:
+            raise ValueError('Packet differs from frozen fifteen-Candidate panel')
+        for model_index, model in enumerate(B_MODELS):
+            order = [c['label'] for c in packet['candidates']]
+            random.Random(B_SEED + index * 3 + model_index).shuffle(order)
+            for condition in (['pathways', 'no_pathways'] if did in ablation_ids else ['pathways']):
+                condition_packet = deepcopy(packet)
+                if condition == 'no_pathways':
+                    removed = {e['id'] for e in packet['evidence'] if e['kind'] == 'pathway'}
+                    condition_packet['evidence'] = [e for e in packet['evidence'] if e['id'] not in removed]
+                    for candidate in condition_packet['candidates']:
+                        candidate['evidence_ids'] = [e for e in candidate['evidence_ids'] if e not in removed]
+                validate_packet(condition_packet)
+                prompt = build_prompt(condition_packet, order).replace(
+                    'Evidence packet:\n', B_SUFFIX + '\nEvidence packet:\n', 1)
+                aliases = [a for c in packet['candidates'] for a in identities['drug_aliases'][c['candidate_id']]]
+                if blind_prompt_leaks(prompt, aliases):
+                    raise ValueError('Drug identity in Experiment B blind prompt')
+                jobs.append({'disease_id': did, 'model': model, 'condition': condition,
+                    'packet': condition_packet, 'presented_order': order, 'prompt': prompt,
+                    'name_aliases': v2_lexicon(condition_packet, identities),
+                    'path': str(output / 'runs' / f'{did}-{model}-{condition}.json')})
+    # All 33 primary jobs first, then the nine predeclared ablation jobs.
+    return sorted(jobs, key=lambda j: j['condition'] != 'pathways')
+
+
+def freeze_b(output='data/experiment_b', report_dir='results/experiment_b'):
+    """Seal protocol, inputs, prompts and code before the first model request."""
+    from pipeline.panels import B_SEED
+    output, report_dir = Path(output), Path(report_dir)
+    protocol = report_dir / 'protocol.md'
+    if not protocol.exists():
+        raise ValueError('Write protocol.md before freezing')
+    jobs = b_jobs(output)
+    if len(jobs) != 42:
+        raise ValueError('Expected 33 primary and nine ablation jobs')
+    source_paths = [Path(p) for p in ['jury/client.py', 'jury/pilot.py', 'pipeline/panels.py',
+                                     'pipeline/packets.py', 'pipeline/pathways.py']]
+    source_paths += sorted(Path('/Users/jessicamak/oxhack-workers/zaid-ro/ranking').glob('*.py'))
+    inputs = [p for p in output.glob('*.json') if p.name != 'preregistered.json']
+    declaration = {'protocol_sha256': sha256(protocol.read_bytes()).hexdigest(),
+        'models': B_MODELS, 'reasoning_effort': B_EFFORT, 'max_live_calls': B_MAX_CALLS,
+        'seed': B_SEED, 'prompt_version': 'jury-v6',
+        'inputs_sha256': {str(p): sha256(p.read_bytes()).hexdigest() for p in sorted(inputs)},
+        'source_sha256': {str(p): sha256(p.read_bytes()).hexdigest() for p in source_paths},
+        'jobs': [{k: j[k] for k in ('disease_id', 'model', 'condition', 'presented_order')} |
+                 {'prompt_sha256': sha256(j['prompt'].encode()).hexdigest()} for j in jobs]}
+    path = output / 'preregistered.json'
+    if path.exists():
+        if json.loads(path.read_text())['declaration'] != declaration:
+            raise ValueError('Frozen Experiment B protocol, inputs, prompts or code changed')
+    else:
+        if any((output / 'runs').glob('*.json')):
+            raise ValueError('Cannot preregister after calls')
+        write_json(path, {'frozen_at': datetime.now(timezone.utc).isoformat(), 'declaration': declaration})
+        write_json(report_dir / 'preregistered.json', json.loads(path.read_text()))
+        write_json(report_dir / 'results.json', {'status': 'frozen_before_live_calls',
+            'protocol_sha256': declaration['protocol_sha256'],
+            'frozen_at': json.loads(path.read_text())['frozen_at'],
+            'live_calls_including_retries': 0, 'budget': B_MAX_CALLS})
+        (report_dir / 'results.md').write_text('Protocol frozen before live calls. SHA256: `' + declaration['protocol_sha256'] + '`.\nNo live results yet.\n')
+    prompts = output / 'prompts'
+    prompts.mkdir(exist_ok=True)
+    for job in jobs:
+        (prompts / (Path(job['path']).stem + '.txt')).write_text(job['prompt'])
+    return declaration
+
+
+def b_live_attempt(job, model_call=None):
+    """A reserved request uses the production adapter, low effort and strict checks."""
+    path = Path(job['path'])
+    run = json.loads(path.read_text())
+    attempt = run['attempts'][-1]
+    attempt['dispatched_at'] = datetime.now(timezone.utc).isoformat()
+    write_json(path, run)
+    client = None
+    start = perf_counter()
+    try:
+        if model_call is None:
+            client = CortexModel(reasoning_effort=B_EFFORT)
+            if client.reasoning_effort != B_EFFORT:
+                raise ValueError('Environment overrides the frozen low-effort configuration')
+            model_call = lambda m, p: client(m, p, 0)
+        reply = model_call(job['model'], job['prompt'])
+        attempt.update(raw_output=reply.text, input_tokens=reply.input_tokens,
+                       output_tokens=reply.output_tokens, max_output_tokens=reply.max_output_tokens,
+                       stop_reason=reply.stop_reason)
+        reviews, flags = validate_reply(reply.text, job['packet'], name_aliases=job['name_aliases'])
+        attempt.update(status='valid' if reviews is not None else 'invalid', reviews=reviews, validation=flags)
+    except Exception as exc:
+        attempt.update(status='failed', error={'type': type(exc).__name__, 'http_status': getattr(exc, 'status_code', None)})
+    finally:
+        if client:
+            client.close()
+        attempt['latency_ms'] = round((perf_counter() - start) * 1000)
+        write_json(path, run)
+    return {'disease_id': job['disease_id'], 'model': job['model'],
+            'condition': job['condition'], 'status': attempt['status']}
+
+
+def run_b(output='data/experiment_b', report_dir='results/experiment_b'):
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from copy import deepcopy
+    output = Path(output)
+    if os.environ.get('SNOWFLAKE_REASONING_EFFORT') and json.loads(os.environ['SNOWFLAKE_REASONING_EFFORT']) != B_EFFORT:
+        raise ValueError('Remove conflicting SNOWFLAKE_REASONING_EFFORT before the frozen run')
+    freeze_b(output, report_dir)
+    jobs = b_jobs(output)
+    (output / 'runs').mkdir(exist_ok=True)
+    # A single writer/process owns the journal; prevent simultaneous runners.
+    lock = output / 'live.lock'
+    with lock.open('x') as handle:
+        handle.write(str(os.getpid()))
+    try:
+        for pass_number in (1, 2):
+            used = sum(len(json.loads(p.read_text())['attempts']) for p in (output / 'runs').glob('*.json'))
+            pending = []
+            for job in jobs:
+                path = Path(job['path'])
+                run = json.loads(path.read_text()) if path.exists() else {
+                    **{k: job[k] for k in ('disease_id', 'model', 'condition', 'presented_order')}, 'attempts': []}
+                if (len(run['attempts']) != pass_number - 1 or final_attempt(run)
+                        or used >= B_MAX_CALLS):
+                    continue
+                dispatched_job = deepcopy(job)
+                if pass_number == 2:
+                    errors = (run['attempts'][0].get('validation') or {}).get('errors', [])
+                    dispatched_job['prompt'] = ('Your previous reply failed validation: ' + '; '.join(errors) +
+                        '. Return a complete corrected JSON ballot.\n' + job['prompt'])
+                run['attempts'].append({'attempt': pass_number, 'status': 'reserved',
+                    'started_at': datetime.now(timezone.utc).isoformat(),
+                    'protocol_sha256': sha256((Path(report_dir) / 'protocol.md').read_bytes()).hexdigest(),
+                    'prompt_sha256': sha256(dispatched_job['prompt'].encode()).hexdigest(),
+                    'raw_output': None, 'reviews': None, 'validation': None,
+                    'input_tokens': None, 'output_tokens': None, 'latency_ms': None})
+                write_json(path, run)  # Interrupted/reserved attempts still count.
+                used += 1
+                pending.append(dispatched_job)
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                futures = [pool.submit(b_live_attempt, job) for job in pending]
+                for future in as_completed(futures):
+                    print(json.dumps(future.result()), flush=True)
+    finally:
+        lock.unlink()
+
+
+def b_metrics(rows):
+    return {'panels': len(rows), 'hits': sum(r['hits_at_5'] for r in rows),
+            'hits_at_5': sum(r['hits_at_5'] for r in rows)/len(rows),
+            'mrr': sum(r['reciprocal_rank'] for r in rows)/len(rows), 'per_panel': rows}
+
+
+def b_borda(packet, finals):
+    if not all(finals):
+        return None, None
+    result = consensus(packet, [{'status': 'valid', 'reviews': a['reviews']} for a in finals])
+    # A total order avoids optimistic recovery when Borda points tie at fifth place.
+    ranked = sorted(result['ranking'], key=lambda r: (-r['borda_points'], r['candidate_id']))
+    return [{**r, 'rank': i} for i, r in enumerate(ranked, 1)], result['kendalls_w']
+
+
+def score_b(output='data/experiment_b', report_dir='results/experiment_b'):
+    """Offline only; retain all failures and use the frozen scoring rules."""
+    import math
+    from bisect import bisect_left
+    from itertools import product
+    from pipeline.panels import B_SEED
+    output, report_dir = Path(output), Path(report_dir)
+    declaration = json.loads((output / 'preregistered.json').read_text())
+    protocol_hash = sha256((report_dir / 'protocol.md').read_bytes()).hexdigest()
+    if declaration['declaration']['protocol_sha256'] != protocol_hash:
+        raise ValueError('Protocol hash changed')
+    for group in ['inputs_sha256', 'source_sha256']:
+        for name, expected in declaration['declaration'][group].items():
+            if sha256(Path(name).read_bytes()).hexdigest() != expected:
+                raise ValueError(f'Frozen Experiment B bytes changed: {name}')
+    panel_document = json.loads((output / 'panels.json').read_text())
+    panels = panel_document['panels']
+    runs = [json.loads(p.read_text()) for p in sorted((output / 'runs').glob('*.json'))]
+    expected_jobs = {(j['disease_id'], j['model'], j['condition']) for j in declaration['declaration']['jobs']}
+    if {(r['disease_id'], r['model'], r['condition']) for r in runs} != expected_jobs:
+        raise ValueError('Complete all forty-two first attempts before scoring Experiment B')
+    by_key = {(r['disease_id'], r['model'], r['condition']): r for r in runs}
+    methods = {name: [] for name in ['jury', *B_MODELS, 'direct_evidence', 'network_z']}
+    paired = []
+    for panel in panels:
+        did, true = panel['disease']['id'], panel['true_drug']['drug_id']
+        packet = json.loads((output / f'blind-{did}.json').read_text())
+        finals = [final_attempt(by_key.get((did, m, 'pathways'), {'attempts': []})) for m in B_MODELS]
+        for model, final in zip(B_MODELS, finals):
+            methods[model].append({'disease_id': did, 'valid': bool(final),
+                **recovery(final['reviews'] if final else None, true)})
+        ranked, w = b_borda(packet, finals)
+        methods['jury'].append({'disease_id': did, 'complete': all(finals), 'kendalls_w': w,
+                               **recovery(ranked, true)})
+        items = {e['id']: e for e in packet['evidence']}
+        scores = {c['candidate_id']: max((items[e]['values']['evidence_only_score'] for e in c['evidence_ids']
+                    if items[e]['kind'] == 'target_association'), default=0) for c in packet['candidates']}
+        order = sorted(scores, key=lambda i: (-scores[i], i))
+        methods['direct_evidence'].append({'disease_id': did,
+            **recovery([{'candidate_id': c, 'rank': i} for i, c in enumerate(order, 1)], true)})
+        network = json.loads((output / f'network-{did}.json').read_text())
+        # Use Zaid's rank ordering unchanged, then project it to the frozen panel.
+        order = sorted((c for c in network['candidates'] if c['network'] and c['network']['rank'] is not None),
+                       key=lambda c: c['network']['rank'])
+        methods['network_z'].append({'disease_id': did,
+            'scorable_candidates': len(order),
+            **recovery([{'candidate_id': c['candidate_id'], 'rank': i} for i, c in enumerate(order, 1)], true)})
+        if (did, B_MODELS[0], 'no_pathways') in by_key:
+            no_finals = [final_attempt(by_key.get((did, m, 'no_pathways'), {'attempts': []})) for m in B_MODELS]
+            no_ranked, _ = b_borda(packet, no_finals)
+            with_result, without_result = recovery(ranked, true), recovery(no_ranked, true)
+            paired.append({'disease_id': did, 'both_complete': bool(all(finals) and all(no_finals)),
+                'with_pathways': with_result, 'without_pathways': without_result,
+                'hits_delta': with_result['hits_at_5'] - without_result['hits_at_5'],
+                'rr_delta': with_result['reciprocal_rank'] - without_result['reciprocal_rank'],
+                'jurors': {m: {'with_pathways': recovery(f['reviews'] if f else None, true),
+                              'without_pathways': recovery(n['reviews'] if n else None, true)}
+                           for m, f, n in zip(B_MODELS, finals, no_finals)}})
+    summary = {m: b_metrics(rows) for m, rows in methods.items()}
+    rng = random.Random(B_SEED)
+    null_mrr = sorted(sum(1/rng.randint(1, 15) for _ in range(11))/11 for _ in range(100000))
+    for value in summary.values():
+        k = value['hits']
+        value['hits_p_one_sided'] = sum(math.comb(11, j)*(1/3)**j*(2/3)**(11-j) for j in range(k, 12))
+        value['mrr_p_monte_carlo'] = (1 + len(null_mrr) - bisect_left(null_mrr, value['mrr']))/(1 + len(null_mrr))
+    # Holm over all six methods and both metrics: one predeclared family of 12 tests.
+    tests = sorted((v[key], m, key) for m, v in summary.items()
+                   for key in ['hits_p_one_sided', 'mrr_p_monte_carlo'])
+    adjusted = 0
+    for i, (p, method, key) in enumerate(tests):
+        adjusted = max(adjusted, min(1, p*(len(tests)-i)))
+        summary[method][key+'_holm'] = adjusted
+    deltas = [p['rr_delta'] for p in paired]
+    observed = sum(deltas)
+    ablation = {'panels': paired, 'n': len(paired),
+        'hits_at_5_delta': sum(p['hits_delta'] for p in paired)/len(paired),
+        'mrr_delta': observed/len(paired),
+        'sign_flip_p_one_sided': sum(sum(s*d for s,d in zip(signs, deltas)) >= observed-1e-12
+            for signs in product([-1, 1], repeat=len(deltas)))/(2**len(deltas))}
+    attempts = [a for r in runs for a in r['attempts']]
+    first = min((a['dispatched_at'] for a in attempts if a.get('dispatched_at')), default=None)
+    if first and first < declaration['frozen_at']:
+        raise ValueError('Model call precedes protocol freeze')
+    if len(attempts) > B_MAX_CALLS:
+        raise ValueError('Experiment B live call budget exceeded')
+    result = {'status': 'completed', 'protocol_sha256': protocol_hash, 'frozen_at': declaration['frozen_at'],
+        'panels': panels, 'eligibility_unmapped': panel_document.get('eligibility_unmapped', []),
+        'first_live_call_at': first, 'live_calls_including_retries': len(attempts), 'budget': B_MAX_CALLS,
+        'chance': {'hits_at_5': 5/15, 'mrr': sum(1/i for i in range(1, 16))/15},
+        'methods': summary, 'pathway_ablation': ablation,
+        'validity': {m: {c: sum(bool(final_attempt(r)) for r in runs if r['model']==m and r['condition']==c)
+                        for c in ['pathways', 'no_pathways']} for m in B_MODELS},
+        'rejections': rejection_counts(attempts),
+        'tokens': {k: None if any(a[k] is None for a in attempts) else sum(a[k] for a in attempts)
+                   for k in ['input_tokens', 'output_tokens']},
+        'selection_recall': 1.0,
+        'interpretation': 'Retrospective source-record recovery on purposive panels; decoys are unlabelled, not known ineffective. Not prospective or clinical validation.'}
+    audit = []
+    for model in B_MODELS:
+        options = []
+        for run in sorted(runs, key=lambda r: (r['disease_id'], r['condition'])):
+            final = final_attempt(run)
+            if run['model'] != model or run['condition'] != 'pathways' or not final:
+                continue
+            packet = json.loads((output / f"blind-{run['disease_id']}.json").read_text())
+            items = {e['id']: e for e in packet['evidence']}
+            for review in sorted(final['reviews'], key=lambda r: r['label']):
+                cited = review['supporting_evidence_ids'] + review['contradicting_evidence_ids']
+                options.append({'model': model, 'disease_id': run['disease_id'],
+                    'candidate_id': review['candidate_id'], 'label': review['label'],
+                    'rationale': review['rationale'], 'objection': review['objection'],
+                    'source_statements': {e: items[e]['statement'] for e in cited},
+                    'manual_entailment': 'not_reviewed'})
+        audit += random.Random(B_SEED).sample(options, min(6, len(options)))
+    write_json(report_dir / 'audit_sample.json', audit)
+    result['manual_citation_audit'] = {'selected_pairs': len(audit), 'status': 'not_reviewed',
+                                       'path': 'audit_sample.json'}
+    write_json(report_dir / 'results.json', result)
+    significant = [m for m,v in summary.items() if min(v['hits_p_one_sided_holm'], v['mrr_p_monte_carlo_holm']) < .05]
+    lines = ['# Experiment B: blind retrospective recovery', '',
+        f"Protocol SHA256: `{protocol_hash}`. Frozen {declaration['frozen_at']}; first live dispatch {first}.",
+        f"Live calls, including retries and interrupted reservations: **{len(attempts)}/45**. Three model IDs, all at low effort; prompt jury-v6. All strict checks were retained.", '',
+        'These panels test recovery of regulator-linked approval records in Open Targets 26.09. Such records can misstate a clinical indication; they are not independently adjudicated treatment labels.', '',
+        f"Chance on a complete 15-drug ordering: Hits@5 **33.3%**, MRR **{result['chance']['mrr']:.3f}**. Failed/invalid jobs score zero; the jury requires all three valid ballots. Borda ties are resolved by ChEMBL ID for evaluation.", '',
+        '| Method | Hits@5 | MRR | Hits p / Holm p | MRR p / Holm p |',
+        '|---|---:|---:|---:|---:|']
+    for m,v in summary.items():
+        lines.append(f"| {m} | {v['hits']}/11 ({v['hits_at_5']:.1%}) | {v['mrr']:.3f} | {v['hits_p_one_sided']:.4f} / {v['hits_p_one_sided_holm']:.4f} | {v['mrr_p_monte_carlo']:.4f} / {v['mrr_p_monte_carlo_holm']:.4f} |")
+    lines += ['', '## Frozen panels and Amendment 1 exclusions', '',
+        'Full Candidate names/IDs and all 14 decoys per panel are in results.json under panels. Plausible counts are actual exact top-50 Target overlaps among all selected decoys.', '',
+        '| Disease | True drug (ID) | Plausible decoys | Eligible plausible | Blind exclusions |',
+        '|---|---|---:|---:|---|']
+    for panel in panels:
+        excluded = ', '.join(e['name'] + ' (' + e['candidate_id'] + ')' for e in panel['blind_exclusions']) or 'None'
+        lines.append(f"| {panel['disease']['name']} | {panel['true_drug']['name']} ({panel['true_drug']['drug_id']}) | {panel['matching']['plausible_decoy_count']}/14 | {panel['matching']['eligible_plausible']} | {excluded} |")
+    exclusion_rows = [dict(disease_id=p['disease']['id'], **e) for p in panels for e in p['blind_exclusions']]
+    if exclusion_rows:
+        lines += ['', 'Every blind-panel exclusion (source-only, before calls):', '',
+            '| Disease ID | Candidate | Role | Exact matching alias | Target IDs | Round |',
+            '|---|---|---|---|---|---:|']
+        for e in exclusion_rows:
+            lines.append(f"| {e['disease_id']} | {e['name']} ({e['candidate_id']}) | {e['role']} | {', '.join(e['matching_aliases'])} | {', '.join(e['target_ids'])} | {e['selection_round']} |")
+    lines += ['', 'The seeded priority and matching rules were unchanged across replacements. When fewer than seven plausible decoys exist, all are used and the rest are count-matched. Incidental E#/C# label collisions were avoided by consistent renumbering, recorded per panel; no Target name, source measurement or biological claim was hidden to resolve a symbol collision.', '',
+        'Earlier source-eligibility exclusions (unverified parent ID; separate from blinding): ' +
+        ', '.join(e['candidate_id'] for e in panel_document.get('eligibility_unmapped', [])) + '.', '']
+    lines += ['', ('Methods with evidence above uniform-rank chance after the predeclared 12-test Holm correction: '+', '.join(significant)+'.') if significant else
+        'No method shows evidence above uniform-rank chance after the predeclared 12-test Holm correction. An observed metric above the chance mean alone is not enough to establish improvement.', '',
+        'Hits p values use a one-sided binomial null (11 panels, probability 1/3). MRR uses 100,000 uniform-rank null draws, seed 20261025. These tests concern these constructed panels; they do not establish generalisation to other Diseases.', '',
+        '## Per-panel true-drug ranks', '',
+        '| Disease | True drug (evaluation only) | Jury | Opus | GPT | Kimi | Direct | Network z |',
+        '|---|---|---:|---:|---:|---:|---:|---:|']
+    for i,p in enumerate(panels):
+        ranks = [summary[m]['per_panel'][i]['rank'] for m in summary]
+        lines.append('| '+p['disease']['name']+' | '+p['true_drug']['name']+' | '+' | '.join(str(r) if r else '—' for r in ranks)+' |')
+    lines += ['', 'A dash means unavailable or rejected, not a rank of zero. True drugs were inserted by panel design, so selection recall is 11/11; this says nothing about full-universe retrieval.', '',
+        '## Does pathway evidence help?', '',
+        'The budget permits a paired jury ablation on only three panels selected with the frozen seed, before calls. The paired prompts have identical Candidate order and evidence except that Reactome items and their references are removed. Both conditions retain the same jury-v6 instructions.', '',
+        '| Disease | With pathways | Without pathways | All six ballots valid |', '|---|---:|---:|---|']
+    names = {p['disease']['id']: p['disease']['name'] for p in panels}
+    for p in paired:
+        lines.append(f"| {names[p['disease_id']]} | {p['with_pathways']['rank'] or '—'} | {p['without_pathways']['rank'] or '—'} | {p['both_complete']} |")
+    complete_pairs = sum(p['both_complete'] for p in paired)
+    if ablation['mrr_delta'] > 1e-12:
+        pathway_answer = 'The jury had higher observed MRR with pathway evidence in these three pairs.'
+    elif ablation['mrr_delta'] < -1e-12:
+        pathway_answer = 'The jury had lower observed MRR with pathway evidence in these three pairs.'
+    else:
+        pathway_answer = 'The jury had unchanged observed MRR with pathway evidence in these three pairs.'
+    if complete_pairs < len(paired):
+        pathway_answer += f' Only {complete_pairs}/{len(paired)} pairs had all six valid ballots; availability differences also affect this comparison.'
+    result['answers'] = {'any_method_beats_chance': significant,
+        'pathways_help_jury': pathway_answer + ' A reliable benefit is not established by three pairs.'}
+    write_json(report_dir / 'results.json', result)
+    lines += ['', pathway_answer, '', f"With minus without: Hits@5 {ablation['hits_at_5_delta']:+.3f}; MRR {ablation['mrr_delta']:+.3f}. Exact paired MRR sign-flip p={ablation['sign_flip_p_one_sided']:.3f}.",
+        'Three pairs cannot establish a reliable benefit (the smallest possible one-sided sign-flip p is 0.125). The observed difference is descriptive; whether pathways improve the jury across all 11 panels remains unverified.', '',
+        '## Validity, provenance and limits', '',
+        f"Valid primary ballots: {result['validity']}. Rejections across all attempts: {result['rejections']}.",
+        'All inputs, prompts, code hashes, source manifests, per-attempt raw outputs, usage and validation flags are retained under data/experiment_b. Reactome 97 uses the lowest-level ENSG mapping, pathways ≤300 genes, at most three ordered by size then ID. Protein/transcript mapping rows are counted separately. Zaid’s PathReconstructor validates network edges and hop counts; his unchanged RankingEngine supplies network order (200 randomisations, seed 0, minimum degree-bin size 100). Scorable rows use z-score first; distance-only rows follow as in his code; unscorable true drugs miss.',
+        'Panels use exact parent/verified-salt IDs, up to seven priority plausible top-50 decoys and count-matched fill to fourteen, excluding any exact Disease clinical record and every observed name/synonym–Target-symbol collision as specified by Amendment 1. Count matching is a proxy for popularity and does not match network degree. The direct baseline uses the strongest assigned evidence-only association, with ChEMBL ID ties. All Candidate Target associations are supplied; top 50 controls pathways, plausible decoys and network Disease Targets.',
+        'Drug names, synonyms and ChEMBL IDs were screened out of visible prompts. Target/mechanism fingerprints, warnings, pathway names, literature co-mentions and model knowledge can still leak identities or known relationships. Only indication/trial features and the clinical_precedence/cancer_biomarkers association components are removed. Pathway membership and network connections do not establish causal direction or benefit. Missing warnings remain unknown.',
+        'A deterministic sample of six rationale/objection pairs per juror is saved in audit_sample.json; independent scientific entailment has not been verified. Citation IDs and numbers are machine-checked only.',
+        'No parameters, panels, validators or scoring rules were changed after live results. Credit costs and clinical label truth are unverified. The cohort is purposive, small and retrospective.', '']
+    (report_dir / 'results.md').write_text('\n'.join(lines)+'\n')
+    return result
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true")
+    parser.add_argument("--experiment-b", action="store_true")
     parser.add_argument("--v2", action="store_true")
     parser.add_argument("--output", type=Path, default=Path("data/pilot"))
     args = parser.parse_args()
+    if args.experiment_b:
+        output = Path('data/experiment_b') if args.output == Path('data/pilot') else args.output
+        if args.live:
+            run_b(output)
+        score_b(output)
+        raise SystemExit(0)
     if args.v2:
         output = Path("data/pilot/v2") if args.output == Path("data/pilot") else args.output
         if args.live:

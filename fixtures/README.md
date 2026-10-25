@@ -62,9 +62,9 @@ the degree-matched null has no spread; its `network` stays populated.
 `selected_by` contains
 `network` and/or `evidence`; Target `support` contains `mechanism` and/or
 `bioactivity`. Mapping `status` is `mapped`, `unmapped` or `ambiguous`, with a
-reason for either non-mapped status. Evidence `source` is `open_targets` or
-`chembl`; `kind` is `target_association`, `mechanism`, `bioactivity`, `approval`
-or `warning`. Safety is `warnings_recorded` or `unknown`, never safe.
+reason for either non-mapped status. Evidence `source` is `open_targets`, `chembl`, `string` or `reactome`; `kind` is
+`target_association`, `mechanism`, `bioactivity`, `approval`, `warning` or
+`network_path` or `pathway`. Safety is `warnings_recorded` or `unknown`, never safe.
 Juror `status` is `valid`, `invalid` or `failed`; `decision` is `investigate`,
 `watch` or `deprioritise`; `direction` is `supported`, `contradicted` or `unknown`.
 The live mechanism action type here is `INHIBITOR`.
@@ -129,3 +129,48 @@ Run `.venv/bin/python -m pytest -q`. No live APIs or model calls are needed
 for the fixture tests. Only Snowflake model availability remains unverified.
 Fictional numerical values and network outcomes are deliberately not verified
 against measurements. Downloaded source datasets remain under ignored `data/`.
+
+`network_path` evidence uses source `string`, release `string-12.5`, and
+`values: {"hops": n}`. One item represents one ID-resolved representative
+path; identical paths share an E ID. `source_id` is the ordered Ensembl gene
+IDs joined with `>`, then `@` and the pinned graph's SHA256. Symbols come from
+Open Targets target records joined by Ensembl ID. STRING links use mapped
+`9606.ENSP…` protein IDs and its documented `/cgi/network` endpoint
+([STRING API documentation](https://string-db.org/help/api/)). These pages show
+a network view; they do not reproduce the direct-experiment filter or provide
+individual edge citations. The graph artifact establishes the filtered path.
+
+E22 is a real zero-hop FGFR3 overlap from Zaid's myeloma path export
+(`data/a6_paths/MONDO_0009693/paths/shortlist.json`, nintedanib's FGFR3
+representative). Erdafitinib has the same ID-mapped Target. Its hop count and
+graph hash are measured, unlike the illustrative ranking numbers above.
+The graph is undirected, filtered at combined score ≥700 and direct
+experiments ≥400. A connection is an association, not a proven mechanism,
+causal direction, benefit or treatment evidence. Missing symbol/protein
+mappings are counted as unmapped outside the packet, never name-matched.
+No mean distance, z-score, rank or path-count metadata enters a packet.
+`jury-v5` explains these limits while retaining strict citation, numeric,
+complete-ballot and safety checks. No packet keys or value types changed.
+
+
+`pathway` evidence uses `source: reactome`, `release: reactome-97`, the
+R-HSA pathway ID as `source_id`, its Reactome detail page as `url`, and
+`values: {"pathway_gene_count": n}`. E23 is real: R-HSA-9006335,
+“Signaling by Erythropoietin”, has **5 distinct ENSG gene members** in the
+complete release-97 lowest-level Ensembl2Reactome mapping, including the
+fixture drug/Disease Target JAK2 (ENSG00000096968). This measured count is
+an exception to the fictional-measurements notice above. The six Disease
+Targets here remain a sample, standing in for a live top-50 set.
+Membership is joined by ENSG only. Protein/transcript identifiers are
+counted as unmapped; no symbol matching or All_Levels propagation occurs.
+Live selection excludes pathways with more than 300 genes and retains at
+most three per Candidate, smallest first then pathway ID. A shared pathway
+is not evidence of effect, causality, direction, benefit or treatment.
+The fixed statement can serve several Candidates sharing a pathway.
+`jury-v6` explains this while keeping all validators strict.
+
+Source: [Reactome release 97 mapping](https://reactome.org/download/97/Ensembl2Reactome.txt);
+[download format](https://reactome.org/download-data/);
+[data licence: CC0](https://reactome.org/license), checked 2026-10-25.
+The complete raw download hash and human-filtered hash, retrieval timestamp,
+URL, version and licence are in `data/reactome/97/manifest.json`.

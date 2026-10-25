@@ -19,7 +19,7 @@ from pathlib import Path
 import random
 import re
 import time
-from urllib.parse import urljoin
+from urllib.parse import urlencode, urljoin
 from uuid import UUID
 
 import duckdb
@@ -44,6 +44,90 @@ WEIGHTS = {"europepmc": .2, "expression_atlas": .2, "impc": .2,
            "cancer_biomarkers": .5, "ot_crispr_validation": .5,
            "ot_crispr": .5, "encore": .5}
 DROP = {"clinical_precedence", "cancer_biomarkers"}
+
+
+def add_network_paths(packet, candidates, *, graph, target_names, string_mappings,
+                      disease_target_ids, coverage=None):
+    """Append ID-resolved representative paths without copying ranking metadata.
+
+    graph is ranking.paths' network_paths_provenance.graph. The caller must
+    reconstruct/validate paths against those artifacts before calling this.
+    Missing display mappings are counted outside the blinded packet.
+    """
+    if (graph["graph_version"] != "string-12.5" or graph["undirected"] is not True
+            or graph["filters"]["combined_score_min"] != 700
+            or graph["filters"]["experiments_min"] != 400
+            or graph["filters"]["direct_experiments_column"] != "experiments"
+            or graph["filters"]["transferred_experiments_used_as_direct"] is not False):
+        raise ValueError("Expected pinned STRING 12.5 physical graph filters")
+    graph_hash = graph["artifact_files"]["graph.npz"]["sha256"]
+    if not re.fullmatch(r"[0-9a-f]{64}", graph_hash):
+        raise ValueError("Expected graph SHA256")
+    by_id = {c["candidate_id"]: c for c in candidates}
+    if len(by_id) != len(candidates):
+        raise ValueError("Duplicate path Candidate ID")
+    proteins = defaultdict(set)
+    protein_genes = defaultdict(set)
+    for row in string_mappings:
+        if row["status"] == "mapped":
+            if not re.fullmatch(r"9606\.ENSP[0-9]{11}", row["string_id"]):
+                raise ValueError("Expected human STRING protein ID")
+            protein_genes[row["string_id"]].add(row["target_id"])
+    for protein, genes in protein_genes.items():
+        if len(genes) != 1:
+            raise ValueError("Ambiguous STRING protein mapping")
+        proteins[next(iter(genes))].add(protein)
+    result = deepcopy(packet)
+    if any(e["kind"] == "network_path" for e in result["evidence"]):
+        raise ValueError("Packet already has path evidence")
+    evidence = {e["source_id"]: e for e in result["evidence"] if e["source"] == "string"}
+    next_id = max((int(e["id"][1:]) for e in result["evidence"]), default=0) + 1
+    rejected = []
+    for candidate in sorted(result["candidates"], key=lambda c: c["candidate_id"]):
+        paths = by_id[candidate["candidate_id"]]["network_paths"]["paths"]
+        if len(paths) > 3:
+            raise ValueError("At most three representative paths per Candidate")
+        for path in paths:
+            ids, hops = path["target_ids"], path["hops"]
+            if (path["status"] != "available" or path["graph_version"] != "string-12.5"
+                    or type(hops) is not int or hops < 0 or len(ids) != hops + 1
+                    or len(set(ids)) != len(ids) or not ids
+                    or any(not re.fullmatch(r"ENSG[0-9]{11}", i) for i in ids)
+                    or ids[0] != path["drug_target_id"] or ids[-1] != path["disease_target_id"]
+                    or ids[0] not in {t["id"] for t in candidate["targets"]}
+                    or ids[-1] not in disease_target_ids):
+                raise ValueError("Invalid representative path endpoints or hops")
+            missing = [i for i in ids if not target_names.get(i) or not proteins[i]]
+            if missing:
+                rejected.append({"candidate_id": candidate["candidate_id"], "status": "unmapped",
+                                 "target_ids": missing, "reason": "missing_symbol_or_STRING_protein_ID"})
+                continue
+            names = [target_names[i] for i in ids]
+            source_id = ">".join(ids) + "@" + graph_hash
+            if source_id not in evidence:
+                statement = ("In the filtered STRING 12.5 physical network (combined score ≥ 700, "
+                    f"direct experiments ≥ 400), {names[0]} connects to the Disease Target {names[-1]} "
+                    f"in {hops} {'step' if hops == 1 else 'steps'}: {' – '.join(names)}. "
+                    "This is a network association, not a proven mechanism.")
+                # STRING's documented network page accepts exact protein IDs.
+                url = "https://string-db.org/cgi/network?" + urlencode({
+                    "identifiers": "\r".join(p for i in ids for p in sorted(proteins[i])),
+                    "species": 9606, "network_type": "physical", "required_score": 700,
+                    "add_color_nodes": 0, "add_white_nodes": 0})
+                item = {"id": f"E{next_id}", "kind": "network_path", "source": "string",
+                        "source_id": source_id, "url": url, "release": "string-12.5",
+                        "statement": statement, "values": {"hops": hops}}
+                evidence[source_id] = item
+                result["evidence"].append(item)
+                next_id += 1
+            eid = evidence[source_id]["id"]
+            if eid not in candidate["evidence_ids"]:
+                candidate["evidence_ids"].append(eid)
+    if "string-12.5" not in result["releases"]:
+        result["releases"].append("string-12.5")
+    if coverage is not None:
+        coverage.update(unmapped_items=len(rejected), unmapped=rejected)
+    return result
 
 
 def _score(rows, excluded=DROP):
@@ -242,7 +326,8 @@ class EvidenceSources:
 
 def build_evidence_packet(disease, candidate_ids, disease_targets, drug_targets, *,
                           experiment_id, shuffle_seed=7, data_dir="data", offline=False,
-                          sources=None, releases=None, coverage=None):
+                          sources=None, releases=None, coverage=None,
+                          pathways=None, pathway_release=None):
     """Return fixture-shaped Candidate enrichments and the stored jury packet.
 
     disease is {id, name}; inputs use fixtures/disease_targets.json and
@@ -401,6 +486,66 @@ def build_evidence_packet(disease, candidate_ids, disease_targets, drug_targets,
     packet = {"experiment_id": str(experiment_id), "disease": {"id": disease["id"], "name": disease["name"]},
               "releases": list(dict.fromkeys(releases or drug_targets["releases"])),
               "candidates": packet_candidates, "evidence": list(evidence.values())}
+    pathway_coverage = {}
+    if pathways is not None:
+        packet = add_pathways(packet, disease_targets, pathways, release=pathway_release, coverage=pathway_coverage)
+        by_id = {c["candidate_id"]: c for c in packet["candidates"]}
+        items = {e["id"]: e for e in packet["evidence"]}
+        for update in updates:
+            update["evidence"] = [deepcopy(items[e]) for e in by_id[update["candidate_id"]]["evidence_ids"]]
     if coverage is not None:
         coverage.update(sources.coverage)
+        if pathways is not None:
+            coverage["pathways"] = pathway_coverage
     return updates, packet
+
+
+def add_pathways(packet, disease_targets, pathways, *, release, coverage=None):
+    """Append at most three smallest shared lowest-level pathways per Candidate."""
+    from pipeline.pathways import memberships
+    if not re.fullmatch(r'reactome-[0-9]+', release):
+        raise ValueError('Expected a numbered Reactome release')
+    if disease_targets['release'] != OT_RELEASE:
+        raise ValueError('Expected Open Targets 26.09 Disease Targets')
+    if disease_targets['disease_id'] != packet['disease']['id']:
+        raise ValueError('Pathway Disease mismatch')
+    if any(e['kind'] == 'pathway' for e in packet['evidence']):
+        raise ValueError('Packet already has pathway evidence')
+    top = {t['target_id'] for t in disease_targets['targets'][:50]}
+    result = deepcopy(packet)
+    evidence = {}
+    next_id = max((int(e['id'][1:]) for e in result['evidence']), default=0) + 1
+    mapped_genes = set().union(*(p['genes'] for p in pathways.values())) if pathways else set()
+    rejected = [{'disease_id': packet['disease']['id'], 'target_id': gene,
+                 'status': 'unmapped', 'reason': 'no_Reactome_gene_membership'}
+                for gene in sorted(top - mapped_genes)]
+    for candidate in sorted(result['candidates'], key=lambda c: c['candidate_id']):
+        genes = {t['id'] for t in candidate['targets']}
+        for gene in sorted(genes - mapped_genes):
+            rejected.append({'candidate_id': candidate['candidate_id'], 'target_id': gene,
+                             'status': 'unmapped', 'reason': 'no_Reactome_gene_membership'})
+        for pid, row in memberships(pathways, genes, top):
+            if pid not in evidence:
+                n = len(row['genes'])
+                # The same pathway record can serve several Candidates without implying
+                # that any one representative pair describes all of their Targets.
+                evidence[pid] = {
+                    'id': f'E{next_id}', 'kind': 'pathway', 'source': 'reactome',
+                    'source_id': pid, 'url': f'https://reactome.org/content/detail/{pid}',
+                    'release': release,
+                    'statement': ("In Reactome, at least one of this Candidate's Targets and at least "
+                                  "one of the selected Disease Targets belong to "
+                                  f"'{row['name']}' ({pid}, {n} genes). "
+                                  'Shared membership is not proof of effect.'),
+                    'values': {'pathway_gene_count': n},
+                }
+                next_id += 1
+                result['evidence'].append(evidence[pid])
+            candidate['evidence_ids'].append(evidence[pid]['id'])
+    if release not in result['releases']:
+        result['releases'].append(release)
+    if coverage is not None:
+        coverage.update(unmapped_items=len(rejected), unmapped=rejected,
+                        unmapped_disease_target_ids=sorted(top - mapped_genes),
+                        pathway_items=len(evidence))
+    return result

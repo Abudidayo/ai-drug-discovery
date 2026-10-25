@@ -328,3 +328,18 @@ def test_blinding_preserves_receptor_biology_when_a_synonym_overlaps():
     assert blind_prompt_leaks(blind['evidence'][0]['statement'], ['insulin',candidate['name']]) == []
     assert [c['targets'] for c in blind['candidates']] == [c['targets'] for c in packet['candidates']]
     assert [e['values'] for e in blind['evidence']] == [e['values'] for e in packet['evidence']]
+
+
+def test_v2_blind_only_jobs_preserve_frozen_presented_order(tmp_path):
+    from jury.pilot import v2_jobs
+    _v2_fixture(tmp_path)
+    all_jobs = v2_jobs(tmp_path)
+    expected = {(j['disease_id'],j['model']): j for j in all_jobs if j['condition']=='blind'}
+    for path in tmp_path.glob('packet-*.json'):
+        path.unlink()
+    blind = v2_jobs(tmp_path, conditions=('blind',))
+    assert len(blind) == 24
+    for job in blind:
+        prior = expected[job['disease_id'],job['model']]
+        assert job['prompt'] == prior['prompt']
+        assert job['presented_order'] == prior['presented_order']
