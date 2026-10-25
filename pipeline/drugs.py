@@ -72,8 +72,9 @@ def write_json(path: Path, value: object) -> None:
 
 
 class Cache:
-    def __init__(self, root: Path, client: httpx.Client):
+    def __init__(self, root: Path, client: httpx.Client | None, *, offline=False):
         self.root = root
+        self.offline = offline
         self.client = client
         self.chembl_verified = False
 
@@ -103,6 +104,8 @@ class Cache:
             if cached["release"] != CHEMBL_RELEASE or cached["request"] != request:
                 raise ValueError(f"Cache provenance mismatch: {path}")
             return cached["response"]
+        if self.offline:
+            raise FileNotFoundError(f"Missing offline ChEMBL cache: {path}")
         # Cached-only runs work offline. Before extending a cache, check the live
         # release so a future ChEMBL upgrade cannot silently mix releases.
         status_url = CHEMBL_URL + "status.json"

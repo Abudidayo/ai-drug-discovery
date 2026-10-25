@@ -225,7 +225,10 @@ Decisions must not improve as rank gets worse: investigate > watch > deprioritis
 Direction asks whether the drug's action (for example inhibiting a Target) would help this Disease. An association score only says a Target is linked to the Disease; it does not say whether inhibiting or activating that Target helps or harms. Use supported only when a cited item shows that this action on the Target is beneficial in this Disease, contradicted only when a cited item shows it is harmful, and unknown otherwise.
 Every quoted measurement in rationale or objection must equal a numeric value in the
 values of evidence cited by that review. Do not derive, round, convert to percentages,
-or invent numbers. Digits inside Disease, drug, protein and protein-family names,
+or invent numbers. Include E IDs for measurements in objections too, using
+contradicting_evidence_ids when the item supports the objection. An item's presence
+in the packet alone is insufficient: list it in that review's citation fields.
+Digits inside Disease, drug, protein and protein-family names,
 and Candidate/evidence IDs, are identifiers rather than measurements.
 Compare Candidates qualitatively; do not quote another Candidate's measurements
 in a review, including when explaining why its evidence is stronger or weaker.
@@ -483,6 +486,8 @@ class ModelReply:
     text: str | None
     input_tokens: int | None = None
     output_tokens: int | None = None
+    max_output_tokens: int | None = None
+    stop_reason: str | None = None
 
 
 class CortexModel:
@@ -508,8 +513,13 @@ class CortexModel:
 
     def __call__(self, model, prompt, temperature):
         if model.startswith("claude-"):
+            # The 15-Candidate run exhausted 4096 tokens mid-JSON. Allow 1024
+            # per complete review (prose, citations and safety), minimum 4096.
+            packet_json = prompt.partition("Evidence packet:\n")[2]
+            count = len(json.loads(packet_json)["candidates"]) if packet_json else 0
+            max_tokens = max(4096, 1024 * count)
             response = self.client.post("/messages", cast_to=dict, body={
-                "model": model, "max_tokens": 4096,
+                "model": model, "max_tokens": max_tokens,
                 "messages": [{"role": "user", "content": prompt}],
                 "output_config": {"format": {
                     "type": "json_schema", "schema": RESPONSE_FORMAT["json_schema"]["schema"],
@@ -519,7 +529,8 @@ class CortexModel:
             return ModelReply(
                 "".join(block["text"] for block in response.get("content", [])
                         if block.get("type") == "text"),
-                usage.get("input_tokens"), usage.get("output_tokens"))
+                usage.get("input_tokens"), usage.get("output_tokens"),
+                max_tokens, response.get("stop_reason"))
         response = self.client.chat.completions.create(
             model=model, messages=[{"role": "user", "content": prompt}], temperature=temperature,
             response_format=RESPONSE_FORMAT,
@@ -565,9 +576,12 @@ def validate_config(config):
         raise ValueError("temperature must be a finite number")
 
 
-def run_jury(packet, config, model_call):
+def run_jury(packet, config, model_call, *, max_calls=None):
     validate_packet(packet)
     validate_config(config)
+    if max_calls is not None and (type(max_calls) is not int or max_calls < len(config["models"])):
+        raise ValueError("Call budget must allow at least one attempt per juror")
+    remaining = max_calls if max_calls is not None else len(config["models"]) * config["max_attempts"]
     jurors = []
     for index, model in enumerate(config["models"]):
         order = [c["label"] for c in packet["candidates"]]
@@ -579,7 +593,10 @@ def run_jury(packet, config, model_call):
                           numbers_match=None, errors=[])
         status = "failed"
         started = perf_counter()
-        for attempt in range(1, config["max_attempts"] + 1):
+        # Reserve one attempt for every remaining juror before spending retries.
+        attempt_limit = min(config["max_attempts"], remaining - (len(config["models"]) - index - 1))
+        for attempt in range(1, attempt_limit + 1):
+            remaining -= 1
             usage = {"attempt": attempt, "input_tokens": None, "output_tokens": None}
             token_usage.append(usage)
             try:
@@ -590,6 +607,8 @@ def run_jury(packet, config, model_call):
                 continue
             if isinstance(reply, ModelReply):
                 usage.update(input_tokens=reply.input_tokens, output_tokens=reply.output_tokens)
+                if reply.max_output_tokens is not None:
+                    usage.update(max_output_tokens=reply.max_output_tokens, stop_reason=reply.stop_reason)
                 raw = reply.text
             else:
                 raw = reply
@@ -599,6 +618,10 @@ def run_jury(packet, config, model_call):
                 break
             status = "invalid"
             errors.extend(f"Attempt {attempt}: {error}" for error in validation["errors"])
+            prompt = ("Your previous reply failed validation: " + "; ".join(validation["errors"])
+                      + ". Return a complete corrected JSON ballot.\n" + build_prompt(packet, order))
+        if status != "valid" and attempt_limit < config["max_attempts"]:
+            errors.append("Total jury call budget exhausted; no further retry")
         validation["errors"] = errors
         jurors.append({"model": model, "status": status, "attempts": attempt,
                        "token_usage": token_usage,

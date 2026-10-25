@@ -17,6 +17,7 @@ from pipeline.packets import (
     ASSOC_QUERY, CHEMBL_RELEASE, CHEMBL_URL, EvidenceSources,
     OT_RELEASE, OT_URL, build_evidence_packet,
 )
+from pipeline.drugs import build_universe
 
 ROOT = Path(__file__).resolve().parents[2]
 SAMPLES = Path(__file__).parent / 'data/packets'
@@ -30,6 +31,17 @@ def read(path):
 def inputs():
     disease_targets = read(ROOT / 'fixtures/disease_targets.json')
     drug_targets = read(ROOT / 'fixtures/drug_targets.json')
+    recorded = read(Path(__file__).parent / 'data/drugs/recorded.json')
+    recorded.pop('provenance')
+    for name in ('clinical_indication', 'clinical_report'):
+        recorded['tables'][name] = read(Path(__file__).parent / f'data/drugs/{name}.json')['rows']
+    real_drugs = {d['drug_id']: d for d in build_universe(**recorded)['drugs']}
+    for drug in drug_targets['drugs']:
+        real_targets = {t['target_id']: t for t in real_drugs.get(drug['drug_id'], {}).get('targets', [])}
+        for target in drug['targets']:
+            if 'bioactivity' in target['support']:
+                for key in ('median_pchembl', 'n_activities'):
+                    target[key] = real_targets[target['target_id']][key]
     candidates = read(ROOT / 'fixtures/candidates.json')
     return disease_targets, drug_targets, candidates
 
@@ -103,7 +115,8 @@ def test_fixture_shapes_and_real_measurements(inputs, sources):
             continue
         item = actual[sample['kind'], sample['source_id']]
         assert item['values'].keys() == sample['values'].keys()
-        assert item['url'] == sample['url']
+        if sample['kind'] != 'bioactivity':
+            assert item['url'] == sample['url']
         if sample['kind'] in {'mechanism', 'warning'}:
             assert item['statement'] == sample['statement']
     # Shared association records have one E ID, reused by both JAK inhibitors.
@@ -401,3 +414,31 @@ def test_live_fixture_candidates(inputs):
         assert any(url.startswith(CHEMBL_URL) for url in successful_requests)
         assert any(url.startswith('https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/inchikey/')
                    for url in successful_requests)
+
+
+def test_reuses_a2_values_with_salt_only_source_ids(inputs, sources):
+    drug = next(d for d in inputs[1]['drugs'] if d['drug_id'] == 'CHEMBL2105759')
+    drug['source_chembl_ids'].append('CHEMBL999999')
+    chembl, pages = sources.chembl, sources.pages
+    sources.chembl = lambda endpoint: ({'molecule_hierarchy': {'parent_chembl_id': drug['drug_id']}}
+        if endpoint == 'molecule/CHEMBL999999.json' else chembl(endpoint))
+    # ID discovery needs no measurement values. Only the salt supplies the IDs.
+    sources.pages = lambda endpoint, key: (
+        [{'target_chembl_id': 'CHEMBL2835'}, {'target_chembl_id': 'CHEMBL3553'}]
+        if 'molecule_chembl_id=CHEMBL999999&' in endpoint else []
+        if endpoint.startswith('activity.json?') else pages(endpoint, key))
+    _, packet = build(inputs, sources, [drug['drug_id']])
+    actual = [e for e in packet['evidence'] if e['kind'] == 'bioactivity']
+    assert len(actual) == 2
+    assert {tuple(e['values'].items()) for e in actual} == {
+        (('median_pchembl', t['median_pchembl']), ('n_activities', t['n_activities']))
+        for t in drug['targets'] if 'bioactivity' in t['support']}
+    assert all('CHEMBL999999' in e['url'] and 'pchembl_value__gte=5' in e['url'] for e in actual)
+
+
+def test_obsolete_uniprot_ids_use_a2_index(sources):
+    sources._protein_map = None
+    relation = sources.table('target')
+    sources.table = lambda _: relation.project(
+        "id, list_transform(proteinIds, lambda p: {'id': p.id, 'source': 'uniprot_obsolete'}) as proteinIds")
+    assert sources.map_target('CHEMBL2835', single=True) == {'ENSG00000162434'}

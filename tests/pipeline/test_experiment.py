@@ -25,6 +25,12 @@ SAMPLES = Path(__file__).parent / "data/packets"
 
 def shape(actual, examples, key=""):
     """Same keys/types as A0, considering every fixture variant and nullability."""
+    if key in {"supporting_evidence_ids", "contradicting_evidence_ids", "evidence_ids"}:
+        # The fixture's contradiction arrays are all empty; the contract permits
+        # populated E-ID arrays too (validated against the Candidate below).
+        assert isinstance(actual, list)
+        assert all(isinstance(v, str) and re.fullmatch(r"E[0-9]+", v) for v in actual)
+        return
     if key == "values":
         assert isinstance(actual, dict)
         assert all(type(v) in (int, float) and math.isfinite(v) for v in actual.values())
@@ -137,7 +143,9 @@ def assert_outputs(out, drugs, string_map):
         else:
             assert juror["reviews"] is None and juror["validation"]["errors"]
             if juror["status"] == "invalid":
-                assert juror["raw_output"] and juror["attempts"] == result["jury"]["max_attempts"]
+                assert juror["raw_output"]
+                assert (juror["attempts"] == result["jury"]["max_attempts"]
+                        or "Total jury call budget exhausted; no further retry" in juror["validation"]["errors"])
     assert result["consensus"] == consensus(packet, result["jurors"])
     sources = ExperimentSources(ROOT / "data", out / "cache", offline=True)
     # The recorded test uses its own source Parquet files instead of local data/.
@@ -225,9 +233,15 @@ def test_direct_ranking_uses_full_scores_and_id_ties():
 @pytest.mark.parametrize("folder", ["MONDO_0009693", "MONDO_0100096", "MONDO_0100096/live"])
 def test_saved_real_outputs(folder):
     out = ROOT / "data/e2e" / folder
-    if not (out / "run.md").exists():
+    required = [out / n for n in ("run.md", "disease_targets.json", "candidates.json",
+                                 "evidence_packet.json", "jury_result.json", "consistency.json")]
+    required += [ROOT / "data/drug_targets.json", ROOT / "data/string_id_map.json"]
+    if not all(p.exists() for p in required):
         pytest.skip("Local real-data run not present")
-    files = assert_outputs(out, read_json(ROOT / "data/drug_targets.json"), read_json(ROOT / "data/string_id_map.json"))
+    try:
+        files = assert_outputs(out, read_json(ROOT / "data/drug_targets.json"), read_json(ROOT / "data/string_id_map.json"))
+    except FileNotFoundError:
+        pytest.skip("Local real-data source cache not present")
     assert len(files["disease_targets"]["targets"]) == 50
     assert len(files["candidates"]["candidates"]) == 15
 
@@ -238,6 +252,18 @@ def test_saved_bioactivity_cross_values(folder):
     if not path.exists():
         pytest.skip("Local real-data audit not present")
     audit = read_json(path)
-    if audit["differences"]:
-        pytest.xfail("Upstream A2 pools salts and pChEMBL >=5; A4 uses parent-only non-null activities")
+    assert audit["differences"] == []
     assert audit["bioactivity_matches_a2"] is True
+
+
+def test_batch_target_cache_ignores_manifest_sidecars(tmp_path):
+    cache = tmp_path / "chembl-37"
+    cache.mkdir()
+    target = {"target_chembl_id": "CHEMBL123"}
+    write_json(cache / "batch.json", {"release": "chembl-37",
+        "request": {"url": "https://www.ebi.ac.uk/chembl/api/data/target.json"},
+        "response": {"targets": [target]}})
+    write_json(cache / "batch.manifest.json", {"release": "chembl-37", "sources": []})
+    write_json(cache / "mapping.txt.retrieval.json", {"release": "chembl-37", "url": "https://example.org"})
+    sources = ExperimentSources(tmp_path, tmp_path / "output", offline=True)
+    assert sources.chembl("target/CHEMBL123.json") == target

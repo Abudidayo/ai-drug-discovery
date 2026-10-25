@@ -18,7 +18,6 @@ import math
 from pathlib import Path
 import random
 import re
-from statistics import median
 import time
 from urllib.parse import urljoin
 from uuid import UUID
@@ -150,6 +149,11 @@ class EvidenceSources:
             raise FileNotFoundError(f"Download Open Targets 26.09 {dataset} into {path} (build-reference §1)")
         return duckdb.read_parquet(str(path / "*.parquet"))
 
+    def bioactivity_target_ids(self, source_ids):
+        """Discover ChEMBL source IDs, without aggregating measurements."""
+        return {row["target_chembl_id"] for source_id in source_ids for row in self.pages(
+            f"activity.json?molecule_chembl_id={source_id}&pchembl_value__isnull=false&target_organism=Homo%20sapiens&limit=1000&only=activity_id,target_chembl_id,pchembl_value", "activities")}
+
     def associations(self, disease_id):
         rows = []
         index = 0
@@ -185,7 +189,8 @@ class EvidenceSources:
             self._protein_map = defaultdict(set)
             for gene, proteins in self.table("target").select("id", "proteinIds").fetchall():
                 for protein in proteins or []:
-                    if protein["source"] in {"uniprot_swissprot", "uniprot_trembl"}:
+                    # Match A2, including explicit OT uniprot_obsolete links.
+                    if protein["source"].startswith("uniprot_"):
                         self._protein_map[protein["id"]].add(gene)
         genes = set()
         for component in record["target_components"]:
@@ -241,8 +246,8 @@ def build_evidence_packet(disease, candidate_ids, disease_targets, drug_targets,
     """Return fixture-shaped Candidate enrichments and the stored jury packet.
 
     disease is {id, name}; inputs use fixtures/disease_targets.json and
-    fixtures/drug_targets.json verbatim. Their numeric examples are never used:
-    associations and bioactivities are read from real source records. The
+    fixtures/drug_targets.json's shape. Supply real A2 output: its bioactivity
+    values are authoritative; only associations are fetched independently. The
     caller supplies the Experiment UUID; no files are written except caches.
     Sources.coverage exposes unmapped records without adding packet keys.
     """
@@ -324,26 +329,30 @@ def build_evidence_packet(disease, candidate_ids, disease_targets, drug_targets,
             selected.append(item("mechanism", "chembl", mechanism["mec_id"],
                 f"{CHEMBL_URL}mechanism/{mechanism['mec_id']}.json",
                 f"ChEMBL 37 records {name}'s mechanism as {mechanism['mechanism_of_action']}."))
-        bio_genes = {t["target_id"] for t in drug["targets"] if "bioactivity" in t["support"]}
+        bio_genes = {t["target_id"]: t for t in drug["targets"] if "bioactivity" in t["support"]}
         if bio_genes:
-            activities = defaultdict(list)
-            for row in sources.pages(f"activity.json?molecule_chembl_id={candidate_id}&pchembl_value__isnull=false&target_organism=Homo%20sapiens&limit=1000&only=activity_id,target_chembl_id,pchembl_value", "activities"):
-                if row["pchembl_value"] is not None:
-                    value = float(row["pchembl_value"])
-                    if not math.isfinite(value):
-                        raise ValueError("Non-finite pChEMBL")
-                    activities[row["target_chembl_id"]].append(value)
-            for target_id, values in sorted(activities.items()):
+            # Discover source IDs only. A2 owns A7 pooling, filtering and medians.
+            target_ids = sources.bioactivity_target_ids(source_ids)
+            by_gene = defaultdict(set)
+            for target_id in sorted(target_ids):
                 genes = sources.map_target(target_id, single=True)
-                if not genes.intersection(bio_genes) or median(values) < drug_targets["rules"]["bioactivity"]["min_median_pchembl"]:
+                for gene in genes.intersection(bio_genes):
+                    by_gene[gene].add(target_id)
+            for gene, target in sorted(bio_genes.items()):
+                if len(by_gene[gene]) != 1:
+                    sources.reject("chembl", f"{candidate_id}/{gene}",
+                                   "ambiguous_target_mapping" if by_gene[gene] else "missing_target_mapping")
                     continue
-                gene = next(iter(genes))
-                target_name = next(t["name"] for t in targets if t["id"] == gene)
-                value = median(values)
+                target_id = next(iter(by_gene[gene]))
+                value, count = target["median_pchembl"], target["n_activities"]
+                if (type(value) not in (int, float) or not math.isfinite(value)
+                        or value < drug_targets["rules"]["bioactivity"]["min_median_pchembl"]
+                        or type(count) is not int or count < 1):
+                    raise ValueError("Invalid A2 bioactivity values")
                 selected.append(item("bioactivity", "chembl", f"{candidate_id}/{target_id}",
-                    f"{CHEMBL_URL}activity.json?molecule_chembl_id={candidate_id}&target_chembl_id={target_id}&pchembl_value__isnull=false",
-                    f"ChEMBL 37 records a median pChEMBL of {value} across {len(values)} human {target_name} activities for {name}.",
-                    {"median_pchembl": value, "n_activities": len(values)}))
+                    f"{CHEMBL_URL}activity.json?molecule_chembl_id__in={','.join(source_ids)}&target_chembl_id={target_id}&pchembl_value__gte=5&target_organism=Homo%20sapiens",
+                    f"ChEMBL 37 records a median pChEMBL of {value} across {count} human {target['name']} activities for {name}.",
+                    {"median_pchembl": value, "n_activities": count}))
         approval = sources.approval(source_ids)
         if approval:
             selected.append(item("approval", "open_targets", approval["id"], approval["url"],
