@@ -146,7 +146,10 @@ test("the jury has started on its own; a student compares drugs, then archives a
 async function trackWebGLContexts(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const contexts: WebGLRenderingContext[] = [];
-    const origins = new Map<WebGLRenderingContext, { stack: string; lossRequests: number }>();
+    const origins = new Map<
+      WebGLRenderingContext,
+      { stack: string; lossRequests: number; lostOnStep?: string }
+    >();
     interface HasContext {
       getContext: (this: unknown, ...args: never[]) => unknown;
     }
@@ -158,13 +161,17 @@ async function trackWebGLContexts(page: Page): Promise<void> {
           context instanceof WebGLRenderingContext || context instanceof WebGL2RenderingContext;
         if (isGL && !contexts.includes(context)) {
           contexts.push(context);
-          const origin = { stack: new Error().stack ?? "unknown", lossRequests: 0 };
+          const origin: { stack: string; lossRequests: number; lostOnStep?: string } = {
+            stack: new Error().stack ?? "unknown",
+            lossRequests: 0,
+          };
           origins.set(context, origin);
           const extension = context.getExtension("WEBGL_lose_context");
           if (extension !== null) {
             const lose = extension.loseContext.bind(extension);
             extension.loseContext = () => {
               origin.lossRequests += 1;
+              origin.lostOnStep ??= document.querySelector("h1")?.textContent ?? "";
               lose();
             };
           }
@@ -183,6 +190,11 @@ async function trackWebGLContexts(page: Page): Promise<void> {
     Object.assign(window, {
       nativeTransitionStarts: () => starts,
       liveWebGLContexts: () => contexts.filter((context) => !context.isContextLost()).length,
+      lostOnSteps: () =>
+        contexts.flatMap((context) => {
+          const step = origins.get(context)?.lostOnStep;
+          return step === undefined ? [] : [step];
+        }),
       webGLContextDiagnostics: () =>
         contexts.map((context) => ({
           ...origins.get(context),
@@ -336,6 +348,12 @@ test("a student shows baricitinib's binding pose and checks it against the cryst
     ),
     "3Dmol clearing must not render a final protein frame during navigation",
   ).toBe(false);
+  expect(
+    await page.evaluate(() =>
+      (window as unknown as { lostOnSteps: () => string[] }).lostOnSteps().at(-1),
+    ),
+    "losing the pose's context waits for the GPU, so it must not hold up the next step",
+  ).toBe("History");
   expect(
     await page.evaluate(() =>
       (window as unknown as { nativeTransitionStarts: () => number }).nativeTransitionStarts(),
