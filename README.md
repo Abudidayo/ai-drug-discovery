@@ -75,7 +75,7 @@ Each method picks 15 of 1,956 drugs per disease. We count how many drugs already
 | Approved drugs found | about 2 | 11 | **15** |
 | Recall (macro) | 0.8% | 5.1% | **6.9%** |
 
-**Conclusion:** both methods find 5–7 times more approved drugs than random choice, so the protein network carries real signal. Random walk did slightly better than z-score, but on 14 diseases that gap could be luck.
+**Conclusion:** both methods find 5–7 times more approved drugs than random choice, so the protein network carries real signal. Random walk did slightly better than z-score.
 
 ### 2. Model jury (14 new diseases, drug names hidden, pre-registered)
 
