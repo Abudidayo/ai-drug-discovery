@@ -3,7 +3,8 @@ import { expect, test } from "./console";
 
 /*
  * Walks the network steps against the real API in fixture mode (COVID-19), the plan's first
- * working demonstration: search, create, watch the build, then biology, candidate drugs and evidence,
+ * working demonstration: step 1 opens the first common disease (COVID-19) and draws its network,
+ * search still finds it, then Next to biology, candidate drugs and evidence,
  * including the drugs whose closeness can't be measured, the one that can't be placed on the
  * network, and an antibody with no 3D model. Wording comes from web/src/copy/en.ts.
  */
@@ -17,18 +18,29 @@ async function expectStep(page: Page, title: string) {
 }
 
 test("a student walks from choosing COVID-19 to the evidence for baricitinib", async ({ page }) => {
-  // Step 1: choose a disease.
+  // Step 1 opens the first common disease, marks it in the list and draws its network.
   await page.goto("/");
+  await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}\/disease$/);
   await expectStep(page, "Choose a disease");
+  await expect(page.getByText("Common diseases", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /COVID-19/ })).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await expect(
+    page.getByRole("img", { name: "Protein network in 3D. Drag to rotate." }),
+  ).toBeVisible({ timeout: 15_000 });
+
+  // Typing searches every disease instead, with the matched synonym and the ID.
   await page.getByRole("searchbox", { name: "Search diseases" }).fill("sars-cov");
   const covid = page.getByRole("button", { name: /COVID-19/ });
   await expect(covid).toContainText("MONDO_0100096");
   await expect(covid).toContainText("SARS-CoV-2");
-  await covid.click();
+  await expect(page.getByText("Common diseases", { exact: true })).toHaveCount(0);
 
-  // The Experiment builds in stages, then step 2 shows its biology.
+  // Next, at the bottom right, carries on to its biology.
+  await page.getByRole("contentinfo").getByRole("button", { name: "Next", exact: true }).click();
   await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}\/biology$/);
-  await expect(page.getByRole("list", { name: "Building the experiment" })).toBeVisible();
   const banner = page.getByRole("banner");
   await expect(banner.getByText("COVID-19", { exact: true })).toBeVisible();
   const bars = page.getByRole("list", { name: "Disease proteins by link strength" });
@@ -91,8 +103,6 @@ test("a student walks from choosing COVID-19 to the evidence for baricitinib", a
 
 test("the network persists across steps instead of being rebuilt", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("searchbox").fill("covid");
-  await page.getByRole("button", { name: /COVID-19/ }).click();
   const network = page.getByRole("img", { name: "Protein network in 3D. Drag to rotate." });
   await expect(network).toBeVisible({ timeout: 15_000 });
   // Tag the network's element; if a step change rebuilt the network, the tag would be gone.
@@ -100,6 +110,8 @@ test("the network persists across steps instead of being rebuilt", async ({ page
     element.setAttribute("data-marker", "first");
   });
 
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Its biology");
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Candidate drugs");
   await page.getByRole("link", { name: "Evidence", exact: true }).click();

@@ -1,11 +1,11 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 import { copy, stepSlugs, type StepSlug } from "../copy/en";
 import { covidExperiment, EXPERIMENT_ID } from "../test/fixtures";
 import { renderApp } from "../test/render";
-import { serveExperiment } from "../test/server";
+import { fakeApi, http, networkError, server, serveExperiment } from "../test/server";
 import { Shell } from "./Shell";
 
 const E = `/e/${EXPERIMENT_ID}`;
@@ -36,7 +36,9 @@ describe("Shell", () => {
       const title = titleOf(slug);
       const intro = copy.steps[stepSlugs.indexOf(slug)]?.intro ?? "";
       // Let the Experiment load, so the step's own figure is on screen too.
-      await screen.findByRole("link", { name: copy.evaluation.title });
+      await waitFor(() => {
+        expect(screen.queryByText(copy.experiment.loading)).not.toBeInTheDocument();
+      });
 
       expect(screen.getAllByRole("heading", { name: title })).toHaveLength(1);
       expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
@@ -46,13 +48,15 @@ describe("Shell", () => {
       expect(screen.getAllByText(title)).toHaveLength(2);
     });
 
-    it("labels the header buttons exactly Back and Next, with no step counter", () => {
+    it("puts exactly Back and Next in the footer, with no step counter or other link", () => {
       renderAt(`${E}/${slug}`);
-      const header = screen.getByRole("banner");
-      const buttons = within(header)
+      const footer = screen.getByRole("contentinfo");
+      const buttons = within(footer)
         .getAllByRole("button")
         .map((button) => button.textContent);
       expect(buttons).toEqual([copy.back, copy.next]);
+      expect(within(footer).queryByRole("link")).not.toBeInTheDocument();
+      expect(within(screen.getByRole("banner")).queryByRole("button")).not.toBeInTheDocument();
       expect(document.body).not.toHaveTextContent(/step \d|\d (of|\/) 8/i);
     });
   });
@@ -122,7 +126,20 @@ describe("Shell", () => {
 });
 
 describe("Landing page", () => {
-  it("is step 1 with no Experiment: only Back and Next, both disabled, later steps unavailable", async () => {
+  it("opens the first common disease's saved Experiment on step 1, without building again", async () => {
+    const created = fakeApi.created;
+    const router = renderAt("/");
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(`${E}/disease`);
+    });
+    expectOnStep("disease");
+    expect(screen.getByRole("button", { name: copy.next })).toBeEnabled();
+    expect(await screen.findByRole("img", { name: copy.network.label })).toBeInTheDocument();
+    expect(fakeApi.created).toBe(created);
+  });
+
+  it("stays step 1 with no Experiment when the API can't be reached: Back and Next disabled", async () => {
+    server.use(http.untyped.get("*/api/diseases/common", networkError));
     const user = userEvent.setup();
     const router = renderAt("/");
     expectOnStep("disease");

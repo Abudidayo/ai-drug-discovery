@@ -87,6 +87,7 @@ export const copy = {
 
   search: {
     placeholder: "Search diseases",
+    common: "Common diseases",
     noMatch: (query: string) => `No diseases match “${query}”. Try another name.`,
     unavailable: "Disease search isn’t answering right now.",
     createFailed: "The experiment couldn’t be started. The server isn’t answering.",

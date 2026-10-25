@@ -18,6 +18,7 @@ export type ExperimentStatus = Schema<"ExperimentStatus">;
 export type BuildStage = Schema<"BuildStage">;
 export type Candidate = Schema<"Candidate">;
 export type CandidateNetwork = Schema<"CandidateNetwork">;
+export type DiseaseRef = Schema<"DiseaseRef">;
 export type DiseaseSearchResult = Schema<"DiseaseSearchResult">;
 export type DiseaseTarget = Schema<"DiseaseTarget">;
 export type TargetExcludedReason = Schema<"TargetExcludedReason">;

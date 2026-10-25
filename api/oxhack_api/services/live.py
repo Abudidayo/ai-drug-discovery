@@ -84,6 +84,18 @@ from .source import BuildResult, BuildSteps, EarlyResult, ExperimentPlan, Source
 
 log = logging.getLogger(__name__)
 
+COMMON_DISEASES = (
+    "MONDO_0100096",  # COVID-19: shown first; finds baricitinib, the known-answer check
+    "MONDO_0008383",  # rheumatoid arthritis
+    "MONDO_0005083",  # psoriasis
+    "MONDO_0004979",  # asthma
+    "MONDO_0005101",  # ulcerative colitis
+    "MONDO_0004975",  # Alzheimer disease
+    "MONDO_0009693",  # plasma cell myeloma
+)
+"""Well-known Diseases offered before a search. Each was built live on 25 Oct 2026 (Open
+Targets 26.09, STRING 12.5): a full shortlist of 15, every Candidate placed on the network."""
+
 PREPARE_HINT = "Run `uv run python -m oxhack_api.prepare` first."
 STRING_MAP = Path("string_id_map.json")
 """Stream A's STRING-to-gene mapping (A3) under the data folder; network routes cite it."""
@@ -281,6 +293,10 @@ class LiveSource:
 
     def search_diseases(self, query: str, limit: int) -> list[DiseaseSearchResult]:
         return self._catalogue.search(query, limit)
+
+    def common_diseases(self) -> list[DiseaseRef]:
+        entries = (self._catalogue.resolve(disease_id) for disease_id in COMMON_DISEASES)
+        return [DiseaseRef(id=entry.id, name=entry.name) for entry in entries if entry]
 
     def plan(self, disease_id: str) -> ExperimentPlan | None:
         entry = self._catalogue.resolve(disease_id)

@@ -65,6 +65,10 @@ export function serveExperiment(...responses: Experiment[]): void {
 }
 
 export const handlers = [
+  http.get("/api/diseases/common", ({ response }) =>
+    response(200).json({ items: [{ id: covidExperiment().disease.id, name: "COVID-19" }] }),
+  ),
+
   http.get("/api/diseases/search", ({ query, response }) => {
     const q = query.get("q");
     return response(200).json({ query: q, results: searchDiseases(q) });
@@ -93,9 +97,10 @@ export const handlers = [
 
   http.get("/api/experiments", ({ query, response }) => {
     const archived = query.get("archived") === "true";
+    const building = query.get("include_building") === "true";
     const items = [...fakeApi.experiments.values()]
       .flatMap((sequence) => sequence.slice(-1))
-      .filter((experiment) => experiment.status === "ready")
+      .filter((experiment) => building || experiment.status === "ready")
       .filter((experiment) => (experiment.archived_at !== null) === archived)
       .sort((a, b) => b.created_at.localeCompare(a.created_at))
       .map(summaryOf);

@@ -22,6 +22,7 @@ from ..jobs import JobRef, Runner, pending_jurors, utcnow
 from ..repo import AlreadyExists, DockInputs, DuplicateComputation, Repo
 from ..schemas import (
     DOCK_FILE_NAMES,
+    DiseaseRef,
     DiseaseSearchResult,
     DockFileName,
     DockJob,
@@ -105,6 +106,12 @@ class ExperimentService:
     def search(self, query: str, limit: int) -> list[DiseaseSearchResult]:
         try:
             return self.source.search_diseases(query, limit)
+        except SourceError as exc:
+            raise Unavailable(str(exc)) from exc
+
+    def common_diseases(self) -> list[DiseaseRef]:
+        try:
+            return self.source.common_diseases()
         except SourceError as exc:
             raise Unavailable(str(exc)) from exc
 

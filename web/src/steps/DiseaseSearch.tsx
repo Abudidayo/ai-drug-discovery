@@ -1,9 +1,10 @@
-import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router";
-import { useCreateExperiment, useDiseaseSearch } from "../api/queries";
-import type { DiseaseSearchResult, Experiment } from "../api/types";
+import { isBuilding, useCommonDiseases, useDiseaseSearch, useOpenDisease } from "../api/queries";
+import type { Experiment } from "../api/types";
+import { BuildLine } from "../app/ExperimentStatus";
 import { Panel } from "../app/Figure";
-import { stepPath } from "../app/steps";
+import { HOME_PATH, stepPath } from "../app/steps";
 import { copy } from "../copy/en";
 import styles from "./DiseaseSearch.module.css";
 
@@ -23,38 +24,64 @@ function marked(text: string, query: string): ReactNode {
   );
 }
 
+/** One Disease to choose: a search result, or a common Disease before anything is typed. */
+interface Option {
+  id: string;
+  name: string;
+  matched_synonym: string | null;
+}
+
 interface DiseaseSearchProps {
   /** The Experiment on screen, if any: its Disease is pre-filled and marked as current. */
   current?: Experiment | undefined;
+  /** Open the first common Disease straight away, in place of this page (the landing page). */
+  preload?: boolean;
 }
 
 /**
- * Step 1: search Diseases and choose one. Choosing creates an Experiment and moves on to its
- * biology, where the build progress shows. Choosing the current Experiment's Disease again just
- * moves on.
+ * Step 1: choose a Disease. Until something is typed the list holds well-known Diseases (the
+ * current one marked); typing searches every Disease instead. Choosing one stays on this step and
+ * shows its network: a saved Experiment for it when there is one, else a new one as it builds.
+ * Next then carries on with whichever Disease is shown.
  */
-export function DiseaseSearch({ current }: DiseaseSearchProps) {
+export function DiseaseSearch({ current, preload = false }: DiseaseSearchProps) {
   const [query, setQuery] = useState(current?.disease.name ?? "");
-  const search = useDiseaseSearch(query);
-  const create = useCreateExperiment();
+  const searching = query.trim() !== "" && query !== current?.disease.name;
+  const search = useDiseaseSearch(searching ? query : "");
+  const common = useCommonDiseases();
+  const open = useOpenDisease();
   const navigate = useNavigate();
   const listId = useId();
   const listRef = useRef<HTMLUListElement>(null);
 
-  const blank = query.trim() === "";
-  const results = blank ? [] : (search.data?.results ?? []);
+  const results: Option[] = searching
+    ? (search.data?.results ?? [])
+    : (common.data ?? []).map((disease) => ({ ...disease, matched_synonym: null }));
+  const marking = searching ? query.trim() : "";
 
-  const choose = (result: DiseaseSearchResult) => {
-    if (current?.disease.id === result.id) {
-      void navigate(stepPath(current.id, "biology") ?? "/");
-      return;
-    }
-    create.mutate(result.id, {
-      onSuccess: (experiment) => {
-        void navigate(stepPath(experiment.id, "biology") ?? "/");
+  const { mutate } = open;
+  const choose = (diseaseId: string, replace = false) => {
+    if (current?.disease.id === diseaseId) return;
+    // A mutation's own callbacks never run once this page has gone, so a choice made while
+    // the first common Disease is still opening wins.
+    mutate(diseaseId, {
+      onSuccess: (experimentId) => {
+        void navigate(stepPath(experimentId, "disease") ?? HOME_PATH, { replace });
       },
     });
   };
+
+  const first = common.data?.[0]?.id;
+  const preloaded = useRef(false);
+  useEffect(() => {
+    if (!preload || first === undefined || preloaded.current) return;
+    preloaded.current = true;
+    mutate(first, {
+      onSuccess: (experimentId) => {
+        void navigate(stepPath(experimentId, "disease") ?? HOME_PATH, { replace: true });
+      },
+    });
+  }, [preload, first, mutate, navigate]);
 
   const options = () => [...(listRef.current?.querySelectorAll("button") ?? [])];
 
@@ -62,7 +89,7 @@ export function DiseaseSearch({ current }: DiseaseSearchProps) {
     const first = results[0];
     if (event.key === "Enter" && first !== undefined) {
       event.preventDefault();
-      choose(first);
+      choose(first.id);
     } else if (event.key === "ArrowDown" && first !== undefined) {
       event.preventDefault();
       options()[0]?.focus();
@@ -80,8 +107,8 @@ export function DiseaseSearch({ current }: DiseaseSearchProps) {
   };
 
   let status: ReactNode = null;
-  if (create.isError) {
-    const retryId = create.variables;
+  if (open.isError) {
+    const retryId = open.variables;
     status = (
       <>
         <p>{copy.search.createFailed}</p>
@@ -89,15 +116,14 @@ export function DiseaseSearch({ current }: DiseaseSearchProps) {
           type="button"
           className={styles.retry}
           onClick={() => {
-            const retry = results.find((result) => result.id === retryId);
-            if (retry) choose(retry);
+            choose(retryId);
           }}
         >
           {copy.retry}
         </button>
       </>
     );
-  } else if (!blank && search.isError && search.data === undefined) {
+  } else if (searching && search.isError && search.data === undefined) {
     status = (
       <>
         <p>{copy.search.unavailable}</p>
@@ -106,9 +132,11 @@ export function DiseaseSearch({ current }: DiseaseSearchProps) {
         </button>
       </>
     );
-  } else if (!blank && search.settled && search.isSuccess && results.length === 0) {
+  } else if (searching && search.settled && search.isSuccess && results.length === 0) {
     status = <p>{copy.search.noMatch(query.trim())}</p>;
   }
+  // The Disease on screen is still building: its network appears as soon as it is drawn.
+  const building = !searching && current !== undefined && isBuilding(current) ? current : null;
 
   return (
     <Panel area="search" label={copy.search.placeholder}>
@@ -124,16 +152,17 @@ export function DiseaseSearch({ current }: DiseaseSearchProps) {
           spellCheck={false}
           onChange={(event) => {
             setQuery(event.target.value);
-            if (create.isError) create.reset();
+            if (open.isError) open.reset();
           }}
           onKeyDown={onInputKey}
         />
+        {!searching && results.length > 0 && <p className={styles.label}>{copy.search.common}</p>}
         {/* Arrow keys move between results; handled on the list, as the buttons inside it. */}
         {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
         <ul id={listId} ref={listRef} className={styles.results} onKeyDown={onListKey}>
           {results.map((result) => {
             const isCurrent = current?.disease.id === result.id;
-            const busy = create.isPending && create.variables === result.id;
+            const busy = open.isPending && open.variables === result.id;
             return (
               <li key={result.id}>
                 <button
@@ -141,16 +170,16 @@ export function DiseaseSearch({ current }: DiseaseSearchProps) {
                   className={styles.option}
                   aria-current={isCurrent ? "true" : undefined}
                   aria-busy={busy || undefined}
-                  disabled={create.isPending}
+                  disabled={open.isPending}
                   onClick={() => {
-                    choose(result);
+                    choose(result.id);
                   }}
                 >
-                  <span className={styles.name}>{marked(result.name, query.trim())}</span>
+                  <span className={styles.name}>{marked(result.name, marking)}</span>
                   <span className={styles.id}>{result.id}</span>
                   {result.matched_synonym !== null && (
                     <span className={styles.synonym}>
-                      {marked(result.matched_synonym, query.trim())}
+                      {marked(result.matched_synonym, marking)}
                     </span>
                   )}
                 </button>
@@ -161,6 +190,11 @@ export function DiseaseSearch({ current }: DiseaseSearchProps) {
         {status !== null && (
           <div className={styles.status} role="status">
             {status}
+          </div>
+        )}
+        {building !== null && status === null && (
+          <div className={styles.status}>
+            <BuildLine experiment={building} />
           </div>
         )}
       </div>

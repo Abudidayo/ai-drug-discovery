@@ -23,6 +23,7 @@ const SEARCH_LIMIT = 8;
 
 export const queryKeys = {
   search: (query: string) => ["diseases", "search", query] as const,
+  commonDiseases: ["diseases", "common"] as const,
   experiment: (id: string) => ["experiments", id] as const,
   conformer: (cid: number) => ["molecules", cid, "conformer"] as const,
   history: (archived: boolean) => ["history", { archived }] as const,
@@ -55,14 +56,37 @@ export function useDiseaseSearch(query: string) {
   return { ...result, query: debounced, settled: debounced === query.trim() };
 }
 
-/** Starts building an Experiment for a Disease. The new Experiment is cached for its page. */
-export function useCreateExperiment() {
+/** Well-known Diseases to offer before a search; the API puts the one to show first first. */
+export function useCommonDiseases() {
+  return useQuery({
+    queryKey: queryKeys.commonDiseases,
+    queryFn: ({ signal }) =>
+      unwrap(api.GET("/api/diseases/common", { signal })).then((list) => list.items),
+    staleTime: Infinity,
+  });
+}
+
+/**
+ * Opens a Disease and resolves to the Experiment to show for it: the newest active one that is
+ * ready or still building, so its network can show at once, or else a new one, which starts
+ * building. Choosing a Disease twice never builds it twice.
+ */
+export function useOpenDisease() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (diseaseId: string) =>
-      unwrap(api.POST("/api/experiments", { body: { disease_id: diseaseId } })),
-    onSuccess: (experiment) => {
+    mutationFn: async (diseaseId: string) => {
+      const saved = await unwrap(
+        api.GET("/api/experiments", { params: { query: { include_building: true } } }),
+      );
+      const reuse = saved.items.find(
+        (item) => item.disease.id === diseaseId && item.status !== "failed",
+      );
+      if (reuse !== undefined) return reuse.id;
+      const experiment = await unwrap(
+        api.POST("/api/experiments", { body: { disease_id: diseaseId } }),
+      );
       queryClient.setQueryData(queryKeys.experiment(experiment.id), experiment);
+      return experiment.id;
     },
   });
 }

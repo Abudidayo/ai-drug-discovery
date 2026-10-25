@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+  "/api/diseases/common": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Well-known Diseases to offer before a search, the one to show first leading */
+    get: operations["common_diseases"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/diseases/search": {
     parameters: {
       query?: never;
@@ -405,6 +422,17 @@ export interface components {
        * @description Gene symbol of the Target, e.g. JAK1 (stream A's field name).
        */
       name: string;
+    };
+    /**
+     * CommonDiseases
+     * @description Well-known Diseases to offer before anything is searched for.
+     */
+    CommonDiseases: {
+      /**
+       * Items
+       * @description Diseases this API is known to build a full network shortlist for, the one to show first leading.
+       */
+      items: components["schemas"]["DiseaseRef"][];
     };
     /** ConfidenceInterval */
     ConfidenceInterval: {
@@ -1682,6 +1710,35 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  common_diseases: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CommonDiseases"];
+        };
+      };
+      /** @description A data source is unavailable. */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
   search_diseases: {
     parameters: {
       query: {

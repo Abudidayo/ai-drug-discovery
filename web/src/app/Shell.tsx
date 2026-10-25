@@ -17,9 +17,10 @@ interface ShellProps {
 }
 
 /**
- * The app shell: product, Disease, step navigation, Back and Next; then the step title, its
- * intro and the figure. The step's name is said once, as the page title; the navigation marks the
- * current step by state (underline and aria-current) and the buttons never repeat a step name.
+ * The app shell: product, Disease and step navigation in the header; then the step title, its
+ * intro and the figure; then Back and Next at the bottom right, where a reader finishes the step.
+ * The step's name is said once, as the page title; the navigation marks the current step by
+ * state (underline and aria-current) and the buttons never repeat a step name.
  */
 export function Shell({ step, experimentId, disease, children }: ShellProps) {
   const navigate = useNavigate();
@@ -84,25 +85,27 @@ export function Shell({ step, experimentId, disease, children }: ShellProps) {
               })}
             </ol>
           </nav>
-          <div className={styles.actions}>
-            <button
-              type="button"
-              className={styles.button}
-              onClick={goPrevious}
-              disabled={previousPath === undefined}
-            >
-              {copy.back}
-            </button>
-            <button
-              type="button"
-              className={`${styles.button ?? ""} ${styles.primary ?? ""}`}
-              onClick={goNext}
-              disabled={nextPath === undefined}
-            >
-              {copy.next}
-            </button>
-          </div>
         </>
+      }
+      footer={
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={styles.button}
+            onClick={goPrevious}
+            disabled={previousPath === undefined}
+          >
+            {copy.back}
+          </button>
+          <button
+            type="button"
+            className={`${styles.button ?? ""} ${styles.primary ?? ""}`}
+            onClick={goNext}
+            disabled={nextPath === undefined}
+          >
+            {copy.next}
+          </button>
+        </div>
       }
     >
       <PageBody title={title} intro={intro}>

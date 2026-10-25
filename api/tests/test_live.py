@@ -9,9 +9,11 @@ from typing import Any
 import pytest
 
 from oxhack_api.services import plain
+from oxhack_api.services.live import COMMON_DISEASES, DiseaseCatalogue
 from oxhack_api.services.live_jury import display_name, map_jury_result
 from oxhack_api.services.ranking import EvidenceRanking, RankingInput
 from oxhack_api.settings import REPO_ROOT
+from oxhack_api.stream_a import DISEASE_PARQUET
 
 FIXTURES = REPO_ROOT / "fixtures"
 DATA = REPO_ROOT / "data"
@@ -240,3 +242,18 @@ def test_routes_are_listed_under_every_candidate_whose_target_starts_them() -> N
     }
     share_routes(packet)
     assert [c["evidence_ids"] for c in packet["candidates"]] == [["E9"], ["E9", "E8"], []]
+
+
+@pytest.mark.skipif(
+    not (DATA / DISEASE_PARQUET).is_file(),
+    reason="run `uv run python -m oxhack_api.prepare` first to download the Disease listing",
+)
+def test_common_diseases_are_current_open_targets_diseases() -> None:
+    """Each common Disease is in the 26.09 listing under its own ID (not an obsolete one that
+    another replaced), and COVID-19 comes first: it is the one the landing page opens."""
+    catalogue = DiseaseCatalogue(DATA / DISEASE_PARQUET)
+    entries = [catalogue.resolve(disease_id) for disease_id in COMMON_DISEASES]
+    assert [entry.id if entry else None for entry in entries] == list(COMMON_DISEASES)
+    assert entries[0] is not None
+    assert entries[0].name == "COVID-19"
+    assert len(set(COMMON_DISEASES)) == len(COMMON_DISEASES)

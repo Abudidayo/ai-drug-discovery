@@ -79,16 +79,6 @@
   padding: var(--space-16) var(--page-gutter) var(--space-24);
 }
 
-.evaluation {
-  flex: none;
-  font-size: var(--text-label);
-  color: var(--color-grey-1);
-}
-
-.evaluation:hover {
-  color: var(--color-ink);
-}
-
 @media (max-width: 1360px) {
   .header {
     gap: var(--space-16);
@@ -103,10 +93,6 @@
   .page {
     height: auto;
     min-height: 100dvh;
-  }
-
-  .footer {
-    justify-content: flex-start;
   }
 }
 

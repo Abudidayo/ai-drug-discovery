@@ -12,6 +12,7 @@ from .. import __version__
 from ..deps import ComponentsDep, ServiceDep
 from ..errors import NotFound, responses
 from ..schemas import (
+    CommonDiseases,
     Conformer,
     DiseaseSearchResponse,
     DockJob,
@@ -49,6 +50,16 @@ def search_diseases(
     limit: Annotated[int, Query(ge=1, le=50, description="Most results to return.")] = 10,
 ) -> DiseaseSearchResponse:
     return DiseaseSearchResponse(query=q, results=service.search(q, limit))
+
+
+@router.get(
+    "/diseases/common",
+    tags=["diseases"],
+    summary="Well-known Diseases to offer before a search, the one to show first leading",
+    responses=responses(503),
+)
+def common_diseases(service: ServiceDep) -> CommonDiseases:
+    return CommonDiseases(items=service.common_diseases())
 
 
 # Experiments -------------------------------------------------------------------

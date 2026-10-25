@@ -86,6 +86,10 @@ returns the result. The caller adds `saving`."""
 class ExperimentSource(Protocol):
     def search_diseases(self, query: str, limit: int) -> list[DiseaseSearchResult]: ...
 
+    def common_diseases(self) -> list[DiseaseRef]:
+        """Well-known Diseases this source builds well, the one to show first leading."""
+        ...
+
     def plan(self, disease_id: str) -> ExperimentPlan | None:
         """The fixed settings for a new Experiment, or None if the Disease is unknown."""
         ...
@@ -144,6 +148,11 @@ class FixtureSource:
                 raise SourceError(f"The saved data in {disease_id} is for {fixture.disease.id}.")
             self._cache[disease_id] = fixture
             return fixture
+
+    def common_diseases(self) -> list[DiseaseRef]:
+        """Every saved Disease, in name order: they are all there is to show."""
+        diseases = [self.load(disease_id).disease for disease_id in self.disease_ids()]
+        return sorted(diseases, key=lambda disease: (disease.name.casefold(), disease.id))
 
     def search_diseases(self, query: str, limit: int) -> list[DiseaseSearchResult]:
         needle = query.strip().casefold()

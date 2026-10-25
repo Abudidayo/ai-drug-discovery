@@ -37,6 +37,11 @@ def test_search_without_a_match_is_empty(client: TestClient) -> None:
     assert body == {"query": "zzzz", "results": []}
 
 
+def test_common_diseases_are_the_saved_ones_in_fixture_mode(client: TestClient) -> None:
+    body = client.get("/api/diseases/common").json()
+    assert body == {"items": [{"id": COVID, "name": "COVID-19"}]}
+
+
 def test_search_needs_a_query(client: TestClient) -> None:
     assert client.get("/api/diseases/search").status_code == 422
     assert client.get("/api/diseases/search", params={"q": ""}).status_code == 422
@@ -68,6 +73,7 @@ def test_openapi_covers_every_route() -> None:
     assert set(paths) == {
         "/api/health",
         "/api/diseases/search",
+        "/api/diseases/common",
         "/api/experiments",
         "/api/experiments/{experiment_id}",
         "/api/experiments/{experiment_id}/jury",

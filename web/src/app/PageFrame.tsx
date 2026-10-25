@@ -1,23 +1,23 @@
 import type { ReactNode } from "react";
-import { Link, useMatch } from "react-router";
+import { Link } from "react-router";
 import { copy } from "../copy/en";
 import styles from "./PageFrame.module.css";
 
 interface PageFrameProps {
   /** What the header shows after the product name, in reading order. */
   header?: ReactNode;
+  /** What the footer shows at its right, e.g. a step's Back and Next; no footer without it. */
+  footer?: ReactNode;
   /** A reading page grows with its content and the window scrolls; steps fit the window. */
   flow?: "fit" | "document";
   children: ReactNode;
 }
 
 /**
- * The frame of every screen: a header that starts with the product name, the main area, and a
- * footer with the link to the evaluation. Rendering them here is what keeps each to exactly once.
+ * The frame of every screen: a header that starts with the product name, the main area, and an
+ * optional footer. Rendering them here is what keeps each to exactly once.
  */
-export function PageFrame({ header, flow = "fit", children }: PageFrameProps) {
-  // The evaluation's page has no footer: its title already says where you are.
-  const onEvaluation = useMatch("/evaluation") !== null;
+export function PageFrame({ header, footer, flow = "fit", children }: PageFrameProps) {
   return (
     <div className={styles.page} data-flow={flow}>
       <header className={styles.header}>
@@ -27,13 +27,7 @@ export function PageFrame({ header, flow = "fit", children }: PageFrameProps) {
         {header}
       </header>
       <main className={styles.main}>{children}</main>
-      {!onEvaluation && (
-        <footer className={styles.footer}>
-          <Link to="/evaluation" className={styles.evaluation}>
-            {copy.evaluation.title}
-          </Link>
-        </footer>
-      )}
+      {footer !== undefined && <footer className={styles.footer}>{footer}</footer>}
     </div>
   );
 }

@@ -4,25 +4,62 @@ import { describe, expect, it } from "vitest";
 import { copy } from "../copy/en";
 import { covidExperiment, EXPERIMENT_ID } from "../test/fixtures";
 import { renderApp } from "../test/render";
-import { http, networkError, server, serveExperiment } from "../test/server";
+import { fakeApi, http, networkError, server, serveExperiment } from "../test/server";
 
 const E = `/e/${EXPERIMENT_ID}`;
 
+/** The search box once the Experiment has loaded and its Disease name is pre-filled. */
+async function loadedSearchbox() {
+  await waitFor(() => {
+    expect(screen.getByRole("searchbox", { name: copy.search.placeholder })).toHaveValue(
+      "COVID-19",
+    );
+  });
+  return screen.getByRole("searchbox", { name: copy.search.placeholder });
+}
+
 describe("Choosing a disease", () => {
-  it("searches, creates the Experiment, shows the build, then its biology", async () => {
+  it("builds the first common disease on arrival, on step 1, then Next shows its biology", async () => {
+    const created = fakeApi.created;
     const user = userEvent.setup();
     const { router } = renderApp("/");
 
-    await user.type(screen.getByRole("searchbox", { name: copy.search.placeholder }), "sars");
-    const result = await screen.findByRole("button", { name: /COVID-19/ });
-    // The matched synonym and the disease ID are quiet secondary text on the result.
-    expect(within(result).getByText("MONDO_0100096")).toBeInTheDocument();
-    expect(result).toHaveTextContent("SARS-CoV-2");
+    // Nothing saved yet: the first common Disease starts building, and step 1 stays on screen
+    // with it marked in the list and its build in one line.
+    await waitFor(() => {
+      expect(router.state.location.pathname).toMatch(/^\/e\/[0-9a-f-]+\/disease$/);
+    });
+    expect(fakeApi.created).toBe(created + 1);
+    expect(screen.getByText(copy.search.common)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /COVID-19/ })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    expect(
+      await screen.findByRole("img", { name: copy.network.label }, { timeout: 3000 }),
+    ).toBeInTheDocument();
 
-    await user.click(result);
+    await user.click(screen.getByRole("button", { name: copy.next }));
     await waitFor(() => {
       expect(router.state.location.pathname).toMatch(/^\/e\/[0-9a-f-]+\/biology$/);
     });
+    expect(
+      await screen.findByRole("list", { name: copy.biology.targetsLabel }, { timeout: 3000 }),
+    ).toBeInTheDocument();
+    expect(fakeApi.created).toBe(created + 1);
+  });
+
+  it("shows the build on step 2 while it runs", async () => {
+    const user = userEvent.setup();
+    const { router } = renderApp("/");
+    await waitFor(() => {
+      expect(router.state.location.pathname).toMatch(/^\/e\/[0-9a-f-]+\/disease$/);
+    });
+    // Keep it building for a few polls, so the stages can be read on step 2.
+    const id = router.state.location.pathname.split("/")[2] ?? "";
+    const building = covidExperiment("building", "ranking", id);
+    fakeApi.experiments.set(id, [building, building, covidExperiment("ready", null, id)]);
+    await user.click(screen.getByRole("button", { name: copy.next }));
 
     // Queued, then building (polled each second): the stages in plain words, the current one
     // marked. The queued moment is short-lived; its own test covers it.
@@ -51,18 +88,41 @@ describe("Choosing a disease", () => {
     expect(screen.getAllByText("COVID-19")).toHaveLength(1);
   });
 
-  it("says plainly when no disease matches", async () => {
+  it("searches every disease, with the matched synonym and ID as quiet secondary text", async () => {
+    serveExperiment(covidExperiment());
     const user = userEvent.setup();
-    renderApp("/");
-    await user.type(screen.getByRole("searchbox"), "zzzz");
+    renderApp(`${E}/disease`);
+    const box = await loadedSearchbox();
+    await user.clear(box);
+    await user.type(box, "sars");
+    // The search results replace the common Diseases; the match is underlined, so its text
+    // is split across elements.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /COVID-19/ })).toHaveTextContent("SARS-CoV-2");
+    });
+    const result = screen.getByRole("button", { name: /COVID-19/ });
+    expect(within(result).getByText("MONDO_0100096")).toBeInTheDocument();
+    expect(screen.queryByText(copy.search.common)).not.toBeInTheDocument();
+  });
+
+  it("says plainly when no disease matches", async () => {
+    serveExperiment(covidExperiment());
+    const user = userEvent.setup();
+    renderApp(`${E}/disease`);
+    const box = await loadedSearchbox();
+    await user.clear(box);
+    await user.type(box, "zzzz");
     expect(await screen.findByText(copy.search.noMatch("zzzz"))).toBeInTheDocument();
   });
 
   it("offers a retry when the search can't reach the API", async () => {
     server.use(http.untyped.get("*/api/diseases/search", networkError));
+    serveExperiment(covidExperiment());
     const user = userEvent.setup();
-    renderApp("/");
-    await user.type(screen.getByRole("searchbox"), "covid");
+    renderApp(`${E}/disease`);
+    const box = await loadedSearchbox();
+    await user.clear(box);
+    await user.type(box, "covid");
     expect(await screen.findByText(copy.search.unavailable)).toBeInTheDocument();
 
     server.resetHandlers();
@@ -77,22 +137,23 @@ describe("Choosing a disease", () => {
         response(503).json({ detail: "The ranking service is down." }),
       ),
     );
-    const user = userEvent.setup();
     const { router } = renderApp("/");
-    await user.type(screen.getByRole("searchbox"), "covid");
-    await user.click(await screen.findByRole("button", { name: /COVID-19/ }));
+    // The first common Disease couldn't be opened: step 1 stays, saying so, with a retry.
     expect(await screen.findByText(copy.search.createFailed)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: copy.retry })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/");
   });
 
-  it("marks the current Experiment's disease and reopens it without building again", async () => {
+  it("marks the current Experiment's disease, and choosing it again changes nothing", async () => {
     serveExperiment(covidExperiment());
+    const created = fakeApi.created;
     const user = userEvent.setup();
     const { router } = renderApp(`${E}/disease`);
     const current = await screen.findByRole("button", { name: /COVID-19/ });
     expect(current).toHaveAttribute("aria-current", "true");
     await user.click(current);
-    expect(router.state.location.pathname).toBe(`${E}/biology`);
+    expect(router.state.location.pathname).toBe(`${E}/disease`);
+    expect(fakeApi.created).toBe(created);
   });
 });
 

@@ -34,6 +34,18 @@
   padding-bottom: calc(var(--space-12) - 1.5px);
 }
 
+/* Names the list before anything is typed: well-known Diseases, not search results. */
+.label {
+  margin-top: var(--space-24);
+  font-size: var(--text-label);
+  font-weight: var(--weight-semibold);
+  color: var(--color-grey-1);
+}
+
+.label + .results {
+  margin-top: var(--space-8);
+}
+
 /* The list scrolls; it reaches into the gutter so the current result's bar sits outside the
    text column, as in the prototype. */
 .results {

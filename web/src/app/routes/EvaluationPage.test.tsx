@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
@@ -23,19 +23,17 @@ async function rows() {
 }
 
 describe("Evaluation page", () => {
-  it("is linked once from every other screen's footer", async () => {
+  it("opens at its own address, though no step links to it", async () => {
     const user = userEvent.setup();
-    renderApp("/");
-    await user.click(screen.getByRole("link", { name: text.title }));
+    renderApp("/evaluation");
     expect(await screen.findByRole("heading", { level: 1, name: text.title })).toBeInTheDocument();
-    // On its own page, the title says it: no link to itself.
     expect(screen.queryByRole("link", { name: text.title })).not.toBeInTheDocument();
 
-    // The header's button leads back into the steps.
+    // The header's button leads back into the steps, where step 1 opens a common Disease.
     await user.click(screen.getByRole("link", { name: text.start }));
-    expect(
-      await screen.findByRole("heading", { level: 1, name: copy.steps[0].title }),
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(copy.steps[0].title);
+    });
   });
 
   it("puts the app's ranking first and the random baseline last", async () => {

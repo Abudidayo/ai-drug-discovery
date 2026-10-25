@@ -245,6 +245,17 @@ class DiseaseSearchResponse(Model):
     )
 
 
+class CommonDiseases(Model):
+    """Well-known Diseases to offer before anything is searched for."""
+
+    items: list[DiseaseRef] = Field(
+        description=(
+            "Diseases this API is known to build a full network shortlist for, the one to "
+            "show first leading."
+        )
+    )
+
+
 # ---------------------------------------------------------------------------
 # Settings fixed per Experiment.
 # ---------------------------------------------------------------------------

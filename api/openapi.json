@@ -341,6 +341,25 @@
         "title": "CandidateTarget",
         "type": "object"
       },
+      "CommonDiseases": {
+        "additionalProperties": false,
+        "description": "Well-known Diseases to offer before anything is searched for.",
+        "properties": {
+          "items": {
+            "description": "Diseases this API is known to build a full network shortlist for, the one to show first leading.",
+            "items": {
+              "$ref": "#/components/schemas/DiseaseRef"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CommonDiseases",
+        "type": "object"
+      },
       "ConfidenceInterval": {
         "additionalProperties": false,
         "properties": {
@@ -2880,6 +2899,37 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/diseases/common": {
+      "get": {
+        "operationId": "common_diseases",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommonDiseases"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A data source is unavailable."
+          }
+        },
+        "summary": "Well-known Diseases to offer before a search, the one to show first leading",
+        "tags": [
+          "diseases"
+        ]
+      }
+    },
     "/api/diseases/search": {
       "get": {
         "operationId": "search_diseases",
