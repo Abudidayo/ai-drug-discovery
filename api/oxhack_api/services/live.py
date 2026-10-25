@@ -96,6 +96,25 @@ COMMON_DISEASES = (
 """Well-known Diseases offered before a search. Each was built live on 25 Oct 2026 (Open
 Targets 26.09, STRING 12.5): a full shortlist of 15, every Candidate placed on the network."""
 
+NOT_DISEASE_AREAS = (
+    "EFO_0001444",  # measurement: blood pressure, LDL cholesterol, biomarker levels
+    "EFO_0000651",  # phenotype: a symptom or sign, not a Disease
+    "GO_0008150",  # biological process
+    "MONDO_0005583",  # non-human animal disease
+    "EFO_0002571",  # medical procedure
+)
+"""Open Targets therapeutic areas that aren't diseases. An entry filed only under these
+is left out of search; one also filed under a disease area (asthma is also a phenotype)
+stays."""
+
+MIN_TESTED_DRUGS = 3
+"""Search lists a Disease only when at least this many drugs reached phase 2 or later for it.
+Diseases nobody has tried to treat (most rare monogenic syndromes, "susceptibility to"
+entries) give a thin shortlist and nothing for the jury to weigh, so they aren't what the
+app is for. 1,757 Diseases in Open Targets 26.09 qualify, every common one among them."""
+
+TESTED_STAGES = ("PHASE_2", "PHASE_2_3", "PHASE_3", "PHASE_4", "APPROVAL")
+
 PREPARE_HINT = "Run `uv run python -m oxhack_api.prepare` first."
 STRING_MAP = Path("string_id_map.json")
 """Stream A's STRING-to-gene mapping (A3) under the data folder; network routes cite it."""
@@ -124,9 +143,14 @@ class DiseaseEntry:
 
 
 class DiseaseCatalogue:
-    """Every Disease in the Open Targets 26.09 listing, kept in memory (about 46,000)."""
+    """Every Disease in the Open Targets 26.09 listing, kept in memory (about 46,000).
 
-    def __init__(self, path: Path) -> None:
+    Any of them resolves by ID, so saved Experiments keep working, but search lists only
+    the investigable ones: real diseases (`NOT_DISEASE_AREAS`) that drugs have been tested
+    for (`MIN_TESTED_DRUGS`). Without `indications`, search lists every entry.
+    """
+
+    def __init__(self, path: Path, indications: Path | None = None) -> None:
         with duckdb.connect() as connection:
             rows = connection.execute(
                 """
@@ -137,6 +161,32 @@ class DiseaseCatalogue:
                 """,
                 [str(path)],
             ).fetchall()
+            searchable = (
+                None
+                if indications is None
+                else {
+                    disease_id
+                    for (disease_id,) in connection.execute(
+                        """
+                        select d.id
+                        from read_parquet(?) d
+                        join read_parquet(?) i on i.diseaseId = d.id
+                        where len(list_filter(coalesce(d.therapeuticAreas, []),
+                                              lambda area: not list_contains(?, area))) > 0
+                          and list_contains(?, i.maxClinicalStage)
+                        group by d.id
+                        having count(distinct i.drugId) >= ?
+                        """,
+                        [
+                            str(path),
+                            str(indications / "*.parquet"),
+                            list(NOT_DISEASE_AREAS),
+                            list(TESTED_STAGES),
+                            MIN_TESTED_DRUGS,
+                        ],
+                    ).fetchall()
+                }
+            )
         listing = cast(
             list[tuple[str, str, str | None, list[str] | None, list[str] | None, list[str] | None]],
             rows,
@@ -152,6 +202,11 @@ class DiseaseCatalogue:
             )
             for disease_id, name, description, exact, other, obsolete in listing
         ]
+        self._searchable = (
+            self._entries
+            if searchable is None
+            else [entry for entry in self._entries if entry.id in searchable]
+        )
         self._by_id = {entry.id: entry for entry in self._entries}
         self._by_obsolete: dict[str, list[DiseaseEntry]] = {}
         for entry in self._entries:
@@ -181,7 +236,7 @@ class DiseaseCatalogue:
         if not needle:
             return []
         scored: list[tuple[tuple[int, int, str, str], DiseaseSearchResult]] = []
-        for entry in self._entries:
+        for entry in self._searchable:
             match = _match(entry, needle)
             if match is None:
                 continue
@@ -274,7 +329,9 @@ class LiveSource:
         self._ranking = ranking
         self._dockable = dockable
         self._offline = offline
-        self._catalogue = DiseaseCatalogue(data_dir / DISEASE_PARQUET)
+        self._catalogue = DiseaseCatalogue(
+            data_dir / DISEASE_PARQUET, data_dir / "ot" / "clinical_indication"
+        )
         self._drugs = cast(JSON, json.loads((data_dir / "drug_targets.json").read_text()))
         self._symbols = _gene_symbols(data_dir / "ot" / "target")
         self._pathways = Pathways(*reactome)

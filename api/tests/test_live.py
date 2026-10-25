@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
 from typing import Any
 
+import duckdb
 import pytest
 
 from oxhack_api.services import plain
-from oxhack_api.services.live import COMMON_DISEASES, DiseaseCatalogue
+from oxhack_api.services.live import COMMON_DISEASES, MIN_TESTED_DRUGS, DiseaseCatalogue
 from oxhack_api.services.live_jury import display_name, map_jury_result
 from oxhack_api.services.ranking import EvidenceRanking, RankingInput
 from oxhack_api.settings import REPO_ROOT
@@ -257,3 +259,71 @@ def test_common_diseases_are_current_open_targets_diseases() -> None:
     assert entries[0] is not None
     assert entries[0].name == "COVID-19"
     assert len(set(COMMON_DISEASES)) == len(COMMON_DISEASES)
+
+
+def write_catalogue(
+    folder: Path, diseases: list[tuple[str, str, list[str]]], tested: dict[str, list[str]]
+) -> tuple[Path, Path]:
+    """A tiny Disease listing and clinical_indication table: (id, name, therapeutic
+    areas) per Disease, and the clinical stage of each drug tested for one."""
+    listing = folder / "disease.parquet"
+    indications = folder / "clinical_indication"
+    indications.mkdir()
+    with duckdb.connect() as db:
+        db.execute(
+            "create table d (id varchar, name varchar, description varchar, "
+            "exactSynonyms varchar[], relatedSynonyms varchar[], narrowSynonyms varchar[], "
+            "broadSynonyms varchar[], obsoleteTerms varchar[], therapeuticAreas varchar[])"
+        )
+        for disease_id, name, areas in diseases:
+            db.execute(
+                "insert into d values (?, ?, null, [], [], [], [], [], ?)",
+                [disease_id, name, areas],
+            )
+        db.execute(f"copy d to '{listing}' (format parquet)")
+        db.execute("create table i (diseaseId varchar, drugId varchar, maxClinicalStage varchar)")
+        for disease_id, stages in tested.items():
+            for n, stage in enumerate(stages):
+                db.execute("insert into i values (?, ?, ?)", [disease_id, f"CHEMBL{n}", stage])
+        db.execute(f"copy i to '{indications / '00000000.parquet'}' (format parquet)")
+    return listing, indications
+
+
+def test_search_lists_only_diseases_that_drugs_were_tested_for(tmp_path: Path) -> None:
+    """Measurements, symptoms and untreated rare syndromes give thin or meaningless
+    builds, so search leaves them out. They still resolve, for saved Experiments."""
+    enough = ["PHASE_2", "PHASE_3", "APPROVAL"]
+    assert len(enough) == MIN_TESTED_DRUGS
+    listing, indications = write_catalogue(
+        tmp_path,
+        [
+            ("MONDO_1", "asthma", ["OTAR_0000010", "EFO_0000651"]),  # also a phenotype
+            ("EFO_2", "asthma symptoms measurement", ["EFO_0001444"]),
+            ("HP_3", "asthma-like wheeze", ["EFO_0000651"]),
+            ("MONDO_4", "asthma, susceptibility to, 5", ["OTAR_0000018"]),
+            ("MONDO_5", "asthma in early trials", ["OTAR_0000010"]),
+        ],
+        {
+            "MONDO_1": enough,
+            "EFO_2": enough,
+            "HP_3": enough,
+            "MONDO_5": ["PHASE_1", "PHASE_1", "EARLY_PHASE_1", "PHASE_2"],
+        },
+    )
+    catalogue = DiseaseCatalogue(listing, indications)
+    assert [r.id for r in catalogue.search("asthma", 10)] == ["MONDO_1"]
+    hidden = catalogue.resolve("MONDO_4")
+    assert hidden is not None
+    assert hidden.name == "asthma, susceptibility to, 5"
+    # Without the indications, search lists every entry, as before.
+    assert len(DiseaseCatalogue(listing).search("asthma", 10)) == 5
+
+
+@pytest.mark.skipif(
+    not (DATA / DISEASE_PARQUET).is_file() or not (DATA / "ot" / "clinical_indication").is_dir(),
+    reason="run `uv run python -m oxhack_api.prepare` first to download the Open Targets data",
+)
+def test_common_diseases_are_searchable() -> None:
+    catalogue = DiseaseCatalogue(DATA / DISEASE_PARQUET, DATA / "ot" / "clinical_indication")
+    for disease_id in COMMON_DISEASES:
+        assert [r.id for r in catalogue.search(disease_id, 1)] == [disease_id]
