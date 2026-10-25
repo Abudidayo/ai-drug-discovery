@@ -44,18 +44,20 @@
   cursor: default;
 }
 
+/* One grid for every model, so the statuses share a left edge whatever the names' widths. */
 .jurors {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-16);
+  display: grid;
+  grid-template-columns: 12px minmax(10em, max-content) 1fr;
+  column-gap: var(--space-12);
+  row-gap: var(--space-16);
+  font-size: var(--text-body-lg);
 }
 
 .juror {
   display: grid;
-  grid-template-columns: 12px minmax(10em, auto) auto;
-  column-gap: var(--space-12);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  font-size: var(--text-body-lg);
 }
 
 .jurorName {
