@@ -3,12 +3,17 @@
 # Local secrets (see .env.example).
 .env
 
-# Downloaded source data (Open Targets, ChEMBL, STRING): cached locally, never committed.
+# Downloaded source data (Open Targets, ChEMBL, STRING) and generated
+# graph/distance artifacts: cached locally, never committed.
 /data/
+/ranking/artifacts/
 
-# Python caches and local virtual environments.
+# Python caches, local virtual environments and tools.
 __pycache__/
 *.py[cod]
+*.egg-info/
 .venv/
+/.venv-ranking/
+/workstream_b/.tools/
 .pytest_cache/
 .ruff_cache/
