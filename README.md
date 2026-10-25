@@ -238,4 +238,3 @@ Developed by a three-person team:
 - **Abudi:** application experience, backend, integration, molecular docking and deployment.
 -- **Zaid:** biomedical graph construction, prediction algorithms, Candidate shortlisting, network-path explanations and evaluation.
   
-**HalfLife — a second life for existing medicines.**
