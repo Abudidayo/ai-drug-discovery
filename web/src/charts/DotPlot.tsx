@@ -47,7 +47,8 @@ export function DotPlot({ models, rows, maxRank, hovered, onHover }: DotPlotProp
     gridTemplateColumns: `max-content minmax(120px, 2.2fr) repeat(${String(models.length)}, minmax(6.5em, 1fr))`,
     gridTemplateRows: `auto ${rows.map((row) => (row.contested ? CONTESTED_ROW : ROW)).join(" ")} auto`,
   };
-  const anyContested = rows.some((row) => row.contested);
+  const contestedCount = rows.filter((row) => row.contested).length;
+  const anyContested = contestedCount > 0;
 
   return (
     <div className={styles.chart}>
@@ -96,7 +97,7 @@ export function DotPlot({ models, rows, maxRank, hovered, onHover }: DotPlotProp
         <p className={styles.key}>
           <span className={styles.swatch} aria-hidden="true" />
           <span>
-            <b>{copy.jury.contestedTitle}.</b> {copy.jury.contestedNote}
+            <b>{copy.jury.contestedTitle}.</b> {copy.jury.contestedNote(contestedCount)}
           </span>
         </p>
       )}

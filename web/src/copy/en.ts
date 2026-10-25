@@ -224,7 +224,10 @@ export const copy = {
     agreementMissing: "Fewer than two models answered, so agreement can’t be measured.",
     objectionTitle: (model: string, drug: string) => `${model}’s objection to ${drug}`,
     contestedTitle: "Split decision",
-    contestedNote: "The models chose different next steps for this drug.",
+    contestedNote: (count: number) =>
+      count === 1
+        ? "The models chose different next steps for this drug."
+        : `The models chose different next steps for these ${String(count)} drugs.`,
     retried: (count: number) =>
       count === 1
         ? "One model’s first answer didn’t pass our checks, so it was asked again."

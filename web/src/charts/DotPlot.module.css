@@ -80,6 +80,11 @@
   background: color-mix(in srgb, var(--color-contested) 11%, var(--color-paper));
 }
 
+/* Back-to-back split rows keep a paper gap, so each drug's three lines read as one group. */
+.row[data-contested] + .row[data-contested]::before {
+  inset: 4px 0 0;
+}
+
 .row[data-contested][data-on]::before {
   background: color-mix(in srgb, var(--color-contested) 20%, var(--color-paper));
 }
