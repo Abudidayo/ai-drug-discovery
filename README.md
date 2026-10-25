@@ -68,7 +68,7 @@ To check the method works, we hide what we already know. For each disease, we ta
 
 ### 1. Network shortlist (14 diseases, 293 known drug–disease pairs)
 
-For each disease, each method picks 15 drugs out of 1,956. We count how many of the drugs already approved for that disease made the 15. Across the 14 diseases there are 293 drug–disease pairs where the drug is already approved for that disease. Choosing 15 drugs at random would include only about **2** of those 293. Our two ranking methods included 11 and 15.
+For each disease, each method picks 15 drugs out of 1,956. We count how many of the drugs already approved for that disease made the 15. Across the 14 diseases there are 293 drug–disease pairs where the drug is already approved for that disease. If you instead picked 15 drugs at random for each disease, on average only about **2** of those 293 approved drugs would end up in the picks (calculated: 293 × 15 ÷ 1,956). Our two ranking methods included 11 and 15.
 
 Higher is better for every number below.
 
