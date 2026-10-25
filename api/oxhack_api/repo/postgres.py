@@ -1,4 +1,4 @@
-"""Postgres storage on the tables in `db/migrations/` (0001 to 0003). psycopg 3, plain SQL.
+"""Postgres storage on the tables in `db/migrations/` (0001 to 0004). psycopg 3, plain SQL.
 
 How the contract maps onto the tables:
 
@@ -51,7 +51,7 @@ from ..schemas import (
 )
 from .base import AlreadyExists, DockInputs, DuplicateComputation
 
-SCHEMA_VERSION = "0003"
+SCHEMA_VERSION = "0004"
 """The newest file in `db/migrations/` this code needs applied."""
 
 Conn = Connection[DictRow]
@@ -484,13 +484,14 @@ class PostgresRepo:
             cur.executemany(
                 """
                 insert into jurors (
-                  experiment_id, model_id, status, attempts, latency_ms, validation
-                ) values (%s, %s, %s, %s, %s, %s)
+                  experiment_id, model_id, status, attempts, latency_ms, validation, token_usage
+                ) values (%s, %s, %s, %s, %s, %s, %s)
                 on conflict (experiment_id, model_id) do update set
                   status = excluded.status,
                   attempts = excluded.attempts,
                   latency_ms = excluded.latency_ms,
-                  validation = jurors.validation || excluded.validation
+                  validation = jurors.validation || excluded.validation,
+                  token_usage = excluded.token_usage
                 """,
                 [
                     (
@@ -500,6 +501,7 @@ class PostgresRepo:
                         juror.attempts,
                         juror.latency_ms,
                         Jsonb({"errors": juror.errors}),
+                        Jsonb([usage.model_dump(mode="json") for usage in juror.token_usage]),
                     )
                     for juror in run.jurors
                 ],
@@ -547,7 +549,7 @@ class PostgresRepo:
         jurors = conn.execute(
             """
             select model_id, status, attempts, latency_ms,
-                   coalesce(validation -> 'errors', '[]'::jsonb) as errors
+                   coalesce(validation -> 'errors', '[]'::jsonb) as errors, token_usage
             from jurors where experiment_id = %s
             """,
             (experiment_id,),

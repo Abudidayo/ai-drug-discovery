@@ -430,3 +430,31 @@ def test_a_vote_may_have_no_packet_label(migrated: str) -> None:
                  '{"status": "unknown", "evidence_ids": []}')""",
             (experiment_id,),
         )
+
+
+# ---------------------------------------------------------------------------
+# 0004: token usage per juror attempt
+# ---------------------------------------------------------------------------
+
+
+def test_juror_token_usage_defaults_to_an_empty_list_and_must_be_a_list(
+    migrated: str,
+) -> None:
+    with psycopg.connect(migrated) as conn:
+        experiment_id = _experiment(conn)
+        conn.execute(
+            """insert into jurors (experiment_id, model_id, status, attempts, presented_order, validation)
+               values (%s, 'claude-sonnet-5', 'valid', 1, '{}', '{}')""",
+            (experiment_id,),
+        )
+        assert conn.execute("select token_usage from jurors").fetchone()[0] == []
+        usage = '[{"attempt": 1, "input_tokens": 3475, "output_tokens": 1977}]'
+        conn.execute("update jurors set token_usage = %s::jsonb", (usage,))
+        assert (
+            conn.execute(
+                "select token_usage -> 0 ->> 'input_tokens' from jurors"
+            ).fetchone()[0]
+            == "3475"
+        )
+        with pytest.raises(errors.CheckViolation):
+            conn.execute("""update jurors set token_usage = '{"attempt": 1}'::jsonb""")

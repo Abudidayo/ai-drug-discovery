@@ -1692,6 +1692,14 @@
           "status": {
             "$ref": "#/components/schemas/JurorStatus",
             "description": "pending: not started. running: reviewing now. valid: review passed every check. invalid: replied, but no reply passed the checks. failed: never replied."
+          },
+          "token_usage": {
+            "description": "Tokens each attempt used, for cost reporting. A null count means the full cost is unknown; counts are never estimated.",
+            "items": {
+              "$ref": "#/components/schemas/TokenUsage"
+            },
+            "title": "Token Usage",
+            "type": "array"
           }
         },
         "required": [
@@ -1737,6 +1745,14 @@
             "description": "Version of the review prompt, e.g. jury-v3.",
             "title": "Prompt Version",
             "type": "string"
+          },
+          "reasoning_effort": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Reasoning effort sent to each model that takes one, by model ID, e.g. {'gpt-5.4': 'low'}. Models without an entry use their default.",
+            "title": "Reasoning Effort",
+            "type": "object"
           },
           "shuffle_seed": {
             "description": "Seed for the order each juror sees the Candidates in.",
@@ -2471,6 +2487,51 @@
           "outside_largest_component"
         ],
         "type": "string"
+      },
+      "TokenUsage": {
+        "additionalProperties": false,
+        "description": "Tokens one attempt used, as the provider reported them. Null means not reported.",
+        "properties": {
+          "attempt": {
+            "description": "Which attempt, starting at 1.",
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Tokens sent; null if not reported.",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Tokens returned; null if not reported.",
+            "title": "Output Tokens"
+          }
+        },
+        "required": [
+          "attempt",
+          "input_tokens",
+          "output_tokens"
+        ],
+        "title": "TokenUsage",
+        "type": "object"
       },
       "UnprocessableResponse": {
         "additionalProperties": false,

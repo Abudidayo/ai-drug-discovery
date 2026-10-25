@@ -585,3 +585,42 @@ def test_an_invalid_juror_is_stored_with_no_reviews_and_no_votes(
     assert query(
         conninfo, "select count(*) from jury_votes where model_id = %s", (glm["model_id"],)
     ) == [(0,)]
+
+
+def test_token_usage_and_reasoning_effort_round_trip(
+    pg_settings: Settings, pg_repo: PostgresRepo, tmp_path: Path
+) -> None:
+    """Stream A records tokens per attempt (null when not reported) and effort per model."""
+    experiment = json.loads((FIXTURES_DIR / COVID / "experiment.json").read_text())
+    experiment["jury_config"]["reasoning_effort"] = {"openai-gpt-5.4": "low"}
+    recorded = json.loads((FIXTURES_DIR / COVID / "jury.json").read_text())
+    usage = [
+        {"attempt": 1, "input_tokens": None, "output_tokens": None},
+        {"attempt": 2, "input_tokens": 3475, "output_tokens": 1977},
+    ]
+    recorded["jurors"][0].update(attempts=2, token_usage=usage)
+    (tmp_path / COVID).mkdir()
+    (tmp_path / COVID / "experiment.json").write_text(json.dumps(experiment))
+    (tmp_path / COVID / "jury.json").write_text(json.dumps(recorded))
+
+    runner = SteppedRunner()
+    components = bound_components(
+        pg_settings, pg_repo, runner, source=FixtureSource(tmp_path), jury=FixtureJury(tmp_path)
+    )
+    client = client_for(components)
+    experiment_id = ready_experiment(client, runner)["id"]
+    client.post(f"/api/experiments/{experiment_id}/jury")
+    runner.drain()
+
+    jury = client.get(f"/api/experiments/{experiment_id}").json()["jury"]
+    assert jury["jurors"][0]["token_usage"] == usage
+    assert jury["jurors"][1]["token_usage"] == []
+    conninfo = pg_settings.database_url or ""
+    assert query(
+        conninfo,
+        "select token_usage from jurors where model_id = %s",
+        (recorded["jurors"][0]["model_id"],),
+    ) == [(usage,)]
+    assert query(conninfo, "select jury_config -> 'reasoning_effort' from experiments") == [
+        ({"openai-gpt-5.4": "low"},)
+    ]

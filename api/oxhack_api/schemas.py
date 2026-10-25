@@ -262,6 +262,13 @@ class JuryConfig(Model):
         ge=1, description="Tries per juror before its review counts as invalid."
     )
     shuffle_seed: int = Field(description="Seed for the order each juror sees the Candidates in.")
+    reasoning_effort: dict[str, str] = Field(
+        default_factory=dict[str, str],
+        description=(
+            "Reasoning effort sent to each model that takes one, by model ID, e.g. "
+            "{'gpt-5.4': 'low'}. Models without an entry use their default."
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -526,6 +533,14 @@ class Candidate(Model):
 # ---------------------------------------------------------------------------
 
 
+class TokenUsage(Model):
+    """Tokens one attempt used, as the provider reported them. Null means not reported."""
+
+    attempt: int = Field(ge=1, description="Which attempt, starting at 1.")
+    input_tokens: int | None = Field(ge=0, description="Tokens sent; null if not reported.")
+    output_tokens: int | None = Field(ge=0, description="Tokens returned; null if not reported.")
+
+
 class Juror(Model):
     """Progress and outcome of one model's review."""
 
@@ -542,6 +557,13 @@ class Juror(Model):
     )
     errors: list[str] = Field(
         description="Why earlier or failed attempts were rejected, one line each."
+    )
+    token_usage: list[TokenUsage] = Field(
+        default_factory=list[TokenUsage],
+        description=(
+            "Tokens each attempt used, for cost reporting. A null count means the full cost "
+            "is unknown; counts are never estimated."
+        ),
     )
 
 
