@@ -1112,6 +1112,14 @@
       "Evaluation": {
         "additionalProperties": false,
         "properties": {
+          "diseases": {
+            "description": "Every Disease tested, once per scope, including those left out.",
+            "items": {
+              "$ref": "#/components/schemas/EvaluationDisease"
+            },
+            "title": "Diseases",
+            "type": "array"
+          },
           "fixture_note": {
             "anyOf": [
               {
@@ -1135,9 +1143,83 @@
         },
         "required": [
           "results",
+          "diseases",
           "fixture_note"
         ],
         "title": "Evaluation",
+        "type": "object"
+      },
+      "EvaluationCaseStatus": {
+        "enum": [
+          "evaluated",
+          "missing_labels",
+          "no_positive_references",
+          "no_positive_in_scope",
+          "empty_universe"
+        ],
+        "type": "string"
+      },
+      "EvaluationDisease": {
+        "additionalProperties": false,
+        "description": "One Disease the evaluation tested, in one scope.",
+        "properties": {
+          "candidates": {
+            "description": "Drugs ranked for this Disease in this scope.",
+            "minimum": 0.0,
+            "title": "Candidates",
+            "type": "integer"
+          },
+          "disease_id": {
+            "description": "Open Targets disease ID, with an underscore, e.g. MONDO_0100096.",
+            "examples": [
+              "MONDO_0100096"
+            ],
+            "pattern": "^[A-Za-z]+_[A-Za-z0-9]+$",
+            "title": "Disease Id",
+            "type": "string"
+          },
+          "known": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Known drugs among them; null when no known drugs are recorded.",
+            "title": "Known"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Display name; null when unknown.",
+            "title": "Name"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/EvaluationScope"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EvaluationCaseStatus",
+            "description": "evaluated: counted in the averages. Otherwise why it was left out: missing_labels (no known drugs recorded), no_positive_references (an empty list recorded), no_positive_in_scope (no known drug among the drugs ranked), empty_universe (no drugs ranked)."
+          }
+        },
+        "required": [
+          "disease_id",
+          "name",
+          "scope",
+          "status",
+          "candidates",
+          "known"
+        ],
+        "title": "EvaluationDisease",
         "type": "object"
       },
       "EvaluationKind": {
@@ -1149,7 +1231,7 @@
       },
       "EvaluationResult": {
         "additionalProperties": false,
-        "description": "Frozen metrics for one method in one evaluation (row of `evaluation_results`).",
+        "description": "Frozen metrics for one method in one evaluation scope (row of `evaluation_results`).",
         "properties": {
           "confidence_intervals": {
             "anyOf": [
@@ -1163,7 +1245,7 @@
                 "type": "null"
               }
             ],
-            "description": "Bootstrap intervals by metric name; null when not computed.",
+            "description": "Bootstrap 95% intervals by metric name; null when too few Diseases.",
             "title": "Confidence Intervals"
           },
           "coverage": {
@@ -1204,7 +1286,7 @@
             "type": "string"
           },
           "method": {
-            "description": "The ranking method measured, e.g. network_proximity.",
+            "description": "The ranking method measured, e.g. degree_matched_z.",
             "title": "Method",
             "type": "string"
           },
@@ -1212,15 +1294,20 @@
             "additionalProperties": {
               "type": "number"
             },
-            "description": "Metric values by name, e.g. recall_at_10.",
+            "description": "Metric values by name, e.g. recall_at_10. A metric with no value is absent.",
             "title": "Metrics",
             "type": "object"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/EvaluationScope",
+            "description": "The drugs ranked. full_eligible: every approved drug; one a method can't score counts as not found. common_scorable: only drugs every method can score."
           }
         },
         "required": [
           "manifest_hash",
           "experiment",
           "method",
+          "scope",
           "data_releases",
           "metrics",
           "coverage",
@@ -1229,6 +1316,13 @@
         ],
         "title": "EvaluationResult",
         "type": "object"
+      },
+      "EvaluationScope": {
+        "enum": [
+          "full_eligible",
+          "common_scorable"
+        ],
+        "type": "string"
       },
       "EvidenceItem": {
         "additionalProperties": false,

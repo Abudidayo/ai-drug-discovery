@@ -155,6 +155,17 @@ DockFileName = TypeAliasType(
     Literal["receptor.pdb", "poses.sdf", "crystal_ligand.sdf", "scores.json", "log.txt"],
 )
 EvaluationKind = TypeAliasType("EvaluationKind", Literal["retrieval", "reranking"])
+EvaluationScope = TypeAliasType("EvaluationScope", Literal["full_eligible", "common_scorable"])
+EvaluationCaseStatus = TypeAliasType(
+    "EvaluationCaseStatus",
+    Literal[
+        "evaluated",
+        "missing_labels",
+        "no_positive_references",
+        "no_positive_in_scope",
+        "empty_universe",
+    ],
+)
 
 SHORTLIST_MAX = 15
 """The Candidate list is the shortlist only: never more than this many."""
@@ -1063,24 +1074,55 @@ class ConfidenceInterval(Model):
 
 
 class EvaluationResult(Model):
-    """Frozen metrics for one method in one evaluation (row of `evaluation_results`)."""
+    """Frozen metrics for one method in one evaluation scope (row of `evaluation_results`)."""
 
     manifest_hash: str = Field(description="SHA-256 of the frozen evaluation manifest.")
     experiment: EvaluationKind = Field(
         description="retrieval: finding known drugs. reranking: ordering a fixed panel."
     )
-    method: str = Field(description="The ranking method measured, e.g. network_proximity.")
+    method: str = Field(description="The ranking method measured, e.g. degree_matched_z.")
+    scope: EvaluationScope = Field(
+        description=(
+            "The drugs ranked. full_eligible: every approved drug; one a method can't score "
+            "counts as not found. common_scorable: only drugs every method can score."
+        )
+    )
     data_releases: list[DataRelease] = Field(min_length=1, description="Pinned source releases.")
-    metrics: dict[str, float] = Field(description="Metric values by name, e.g. recall_at_10.")
+    metrics: dict[str, float] = Field(
+        description="Metric values by name, e.g. recall_at_10. A metric with no value is absent."
+    )
     coverage: dict[str, int] = Field(description="Counts of Diseases and pairs covered, by name.")
     confidence_intervals: dict[str, ConfidenceInterval] | None = Field(
-        description="Bootstrap intervals by metric name; null when not computed."
+        description="Bootstrap 95% intervals by metric name; null when too few Diseases."
     )
     created_at: datetime = Field(description="When the result was frozen.")
 
 
+class EvaluationDisease(Model):
+    """One Disease the evaluation tested, in one scope."""
+
+    disease_id: DiseaseId
+    name: str | None = Field(description="Display name; null when unknown.")
+    scope: EvaluationScope
+    status: EvaluationCaseStatus = Field(
+        description=(
+            "evaluated: counted in the averages. Otherwise why it was left out: "
+            "missing_labels (no known drugs recorded), no_positive_references (an empty list "
+            "recorded), no_positive_in_scope (no known drug among the drugs ranked), "
+            "empty_universe (no drugs ranked)."
+        )
+    )
+    candidates: int = Field(ge=0, description="Drugs ranked for this Disease in this scope.")
+    known: int | None = Field(
+        ge=0, description="Known drugs among them; null when no known drugs are recorded."
+    )
+
+
 class Evaluation(Model):
     results: list[EvaluationResult] = Field(description="Every frozen result.")
+    diseases: list[EvaluationDisease] = Field(
+        description="Every Disease tested, once per scope, including those left out."
+    )
     fixture_note: str | None = Field(
         description="Set when the results are fixture data: says the numbers are made up."
     )

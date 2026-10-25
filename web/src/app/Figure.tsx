@@ -6,7 +6,7 @@ import styles from "./Figure.module.css";
  * one grid. `layout` picks the grid; each panel names its own area in it.
  */
 export type FigureLayout =
-  "search" | "biology" | "candidates" | "evidence" | "jury" | "pose" | "single";
+  "search" | "biology" | "candidates" | "evidence" | "jury" | "pose" | "evaluation" | "single";
 
 interface FigureGridProps {
   layout: FigureLayout;
@@ -36,6 +36,8 @@ export type PanelArea =
   | "pose"
   | "scores"
   | "unsupported"
+  | "results"
+  | "tested"
   | "main";
 
 interface PanelProps {

@@ -28,6 +28,7 @@ export const queryKeys = {
   history: (archived: boolean) => ["history", { archived }] as const,
   allHistory: ["history"] as const,
   structures: ["structures"] as const,
+  evaluation: ["evaluation"] as const,
   dockJob: (id: string) => ["dock", id] as const,
   dockFile: (url: string, sha256: string) => ["dock-files", url, sha256] as const,
 };
@@ -203,6 +204,15 @@ export function useStructures() {
     queryKey: queryKeys.structures,
     queryFn: ({ signal }) =>
       unwrap(api.GET("/api/structures", { signal })).then((list) => list.structures),
+    staleTime: Infinity,
+  });
+}
+
+/** The frozen evaluation: it never changes while the app runs. */
+export function useEvaluation() {
+  return useQuery({
+    queryKey: queryKeys.evaluation,
+    queryFn: ({ signal }) => unwrap(api.GET("/api/evaluation", { signal })),
     staleTime: Infinity,
   });
 }

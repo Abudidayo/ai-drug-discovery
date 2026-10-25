@@ -1,4 +1,4 @@
-"""Postgres storage on the tables in `db/migrations/` (0001 to 0005). psycopg 3, plain SQL.
+"""Postgres storage on the tables in `db/migrations/` (0001 to 0006). psycopg 3, plain SQL.
 
 How the contract maps onto the tables:
 
@@ -51,7 +51,7 @@ from ..schemas import (
 )
 from .base import AlreadyExists, DockInputs, DuplicateComputation
 
-SCHEMA_VERSION = "0005"
+SCHEMA_VERSION = "0006"
 """The newest file in `db/migrations/` this code needs applied."""
 
 Conn = Connection[DictRow]

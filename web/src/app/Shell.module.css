@@ -122,41 +122,6 @@ a.navLink:hover,
   pointer-events: none;
 }
 
-/* Page head: the step title, said once, and its intro. */
-
-.head {
-  padding: var(--space-32) var(--page-gutter);
-}
-
-.title {
-  font-family: var(--font-serif);
-  font-size: var(--text-title);
-  font-weight: var(--weight-semibold);
-  font-variation-settings: "opsz" 60;
-  line-height: var(--leading-tight);
-  letter-spacing: -0.018em;
-  text-wrap: balance;
-}
-
-.intro {
-  max-width: var(--measure);
-  margin-top: var(--space-8);
-  font-family: var(--font-serif);
-  font-size: var(--text-intro);
-  line-height: var(--leading-body);
-  color: var(--color-grey-1);
-}
-
-/* The figure: each step composes at most three panels here. */
-
-.figure {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-  padding: 0 var(--page-gutter);
-}
-
 @media (max-width: 1360px) {
   .disease {
     font-size: var(--text-label);
@@ -183,17 +148,6 @@ a.navLink:hover,
 @media (min-width: 1700px) {
   .navList {
     gap: 28px;
-  }
-}
-
-@media (max-height: 820px) and (min-width: 721px) {
-  .head {
-    padding-top: var(--space-16);
-    padding-bottom: var(--space-16);
-  }
-
-  .intro {
-    margin-top: var(--space-4);
   }
 }
 

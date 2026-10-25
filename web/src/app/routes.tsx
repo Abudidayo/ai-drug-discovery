@@ -1,4 +1,5 @@
 import type { RouteObject } from "react-router";
+import { EvaluationPage } from "./routes/EvaluationPage";
 import { ExperimentLayout } from "./routes/ExperimentLayout";
 import { LandingPage } from "./routes/LandingPage";
 import { NotFoundPage } from "./routes/NotFoundPage";
@@ -16,6 +17,7 @@ export const routes: RouteObject[] = [
         element: <ExperimentLayout />,
         children: [{ path: ":step", element: <StepFigure /> }],
       },
+      { path: "evaluation", element: <EvaluationPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

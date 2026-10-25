@@ -8,6 +8,7 @@ import {
   covidExperiment,
   covidJury,
   dockJob,
+  evaluation,
   redockControl,
   searchDiseases,
   structures,
@@ -144,6 +145,8 @@ export const handlers = [
     }
     return response(200).json(contract(restored));
   }),
+
+  http.get("/api/evaluation", ({ response }) => response(200).json(evaluation)),
 
   http.get("/api/structures", ({ response }) =>
     response(200).json({

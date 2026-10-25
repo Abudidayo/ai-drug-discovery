@@ -4,6 +4,7 @@
  */
 import covidFile from "@api-fixtures/MONDO_0100096/experiment.json";
 import juryFile from "@api-fixtures/MONDO_0100096/jury.json";
+import evaluationFile from "@api-fixtures/evaluation.json";
 import structuresFile from "@api-fixtures/structures.json";
 import type {
   BuildStage,
@@ -11,6 +12,7 @@ import type {
   DiseaseSearchResult,
   DockFiles,
   DockJob,
+  Evaluation,
   Experiment,
   ExperimentSummary,
   JuryRun,
@@ -133,6 +135,9 @@ export function searchDiseases(query: string): DiseaseSearchResult[] {
 type JuryFixture = Pick<JuryRun, "jurors" | "votes" | "consensus" | "agreement" | "contested">;
 
 const covidJuryFile = juryFile as unknown as JuryFixture;
+
+/** The API's evaluation file, as `/api/evaluation` serves it. */
+export const evaluation = evaluationFile as unknown as Evaluation;
 
 export const structures = (structuresFile as unknown as { structures: Structure[] }).structures;
 

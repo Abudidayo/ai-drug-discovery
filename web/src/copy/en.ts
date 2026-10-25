@@ -8,6 +8,8 @@ type JurorStatus = components["schemas"]["JurorStatus"];
 type EvidenceSource = components["schemas"]["EvidenceSource"];
 type TargetExcludedReason = components["schemas"]["TargetExcludedReason"];
 type ControlStatus = components["schemas"]["ControlStatus"];
+type EvaluationScope = components["schemas"]["EvaluationScope"];
+type EvaluationCaseStatus = components["schemas"]["EvaluationCaseStatus"];
 
 /** A length in ångströms, e.g. 1.74 Å or 2 Å: at most two decimals, no trailing zeros. */
 function angstrom(value: number): string {
@@ -351,6 +353,66 @@ export const copy = {
       `${String(candidates)} candidate ${candidates === 1 ? "drug" : "drugs"}, ${String(docked)} binding ${docked === 1 ? "pose" : "poses"}`,
     actionFailed: "That didn’t work. The server isn’t answering.",
     data: (versions: readonly string[]) => `Data: ${versions.join(", ")}`,
+  },
+
+  /** `/evaluation`: how well each ranking finds drugs already approved for a disease. */
+  evaluation: {
+    title: "How well the ranking works",
+    /** The way into the steps, in the header. */
+    start: "Choose a disease",
+    intro:
+      "A test on past data: for diseases that already have approved treatments, how high does each ranking put them?",
+    loading: "Loading the test results",
+    unavailable: "The test results couldn’t be loaded. The server isn’t answering.",
+    empty: "No test results yet.",
+    example: "Example numbers: the real test hasn’t run yet.",
+    resultsTitle: "Known treatments found",
+    scopeLabel: "Which drugs to rank",
+    scopes: {
+      full_eligible: "All approved drugs",
+      common_scorable: "Drugs every ranking can place",
+    } satisfies Record<EvaluationScope, string>,
+    method: "Ranking",
+    ours: "The app’s main ranking",
+    /** Names for stream B's methods; an unknown one shows its code. */
+    methods: {
+      degree_matched_z: "Network closeness",
+      direct_evidence: "Disease link strength",
+      shared_targets: "Shared proteins",
+      raw_proximity: "Network distance alone",
+      random: "Random order",
+    } as Record<string, string | undefined>,
+    metrics: {
+      recall_at_5: "In top 5",
+      recall_at_10: "In top 10",
+      recall_at_20: "In top 20",
+      mrr: "First hit score",
+    },
+    missing: "No value",
+    range: (low: string, high: string) => `likely between ${low} and ${high}`,
+    howToRead: [
+      "In top 5, 10 and 20: the share of each disease’s known treatments that the ranking puts that high.",
+      "First hit score: 1 when a known treatment comes first, 0.5 when second, near 0 when the first is far down.",
+    ],
+    rangeNote: "Lines show where each score likely lies (95% range).",
+    testedTitle: "Diseases tested",
+    found: (known: number, candidates: number) =>
+      `${String(known)} known ${known === 1 ? "treatment" : "treatments"} among ${candidates.toLocaleString("en-GB")} drugs`,
+    leftOut: {
+      missing_labels: "Left out: no known treatments are recorded.",
+      no_positive_references: "Left out: its record lists no known treatments.",
+      no_positive_in_scope: "Left out: none of its known treatments are among these drugs.",
+      empty_universe: "Left out: there are no drugs to rank.",
+    } satisfies Record<Exclude<EvaluationCaseStatus, "evaluated">, string>,
+    limitsTitle: "Keep in mind",
+    tooFew: (count: number) =>
+      `Only ${String(count)} ${count === 1 ? "disease" : "diseases"} counted: too few to draw a conclusion.`,
+    limits: [
+      "The known treatments come from the same public data the rankings read, so this isn’t an independent test.",
+      "A drug not yet approved for a disease isn’t proof it doesn’t work.",
+    ],
+    record: (hash: string, versions: readonly string[], date: string) =>
+      `Frozen record ${hash.slice(0, 12)}, ${date}. Data: ${versions.join(", ")}`,
   },
 
   notFound: {

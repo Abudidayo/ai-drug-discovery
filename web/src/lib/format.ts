@@ -57,3 +57,10 @@ const DATE_TIME = new Intl.DateTimeFormat("en-GB", {
 export function dateTime(iso: string): string {
   return DATE_TIME.format(new Date(iso));
 }
+
+const DATE = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+/** A day in the reader's time zone, e.g. "25 Oct 2026". */
+export function date(iso: string): string {
+  return DATE.format(new Date(iso));
+}

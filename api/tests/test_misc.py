@@ -45,10 +45,10 @@ def test_search_needs_a_query(client: TestClient) -> None:
 
 def test_evaluation(client: TestClient) -> None:
     body = client.get("/api/evaluation").json()
-    assert body["fixture_note"]
-    methods = {(r["experiment"], r["method"]) for r in body["results"]}
-    assert ("retrieval", "network_proximity") in methods
-    assert ("reranking", "jury_consensus") in methods
+    methods = {(r["scope"], r["method"]) for r in body["results"]}
+    assert ("full_eligible", "degree_matched_z") in methods
+    assert ("full_eligible", "random") in methods
+    assert {d["disease_id"] for d in body["diseases"]} == {COVID, "MONDO_0009693"}
 
 
 def test_unknown_route_is_404(client: TestClient) -> None:
