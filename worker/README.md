@@ -71,6 +71,34 @@ docker run --rm --platform linux/amd64 -v "$PWD":/repo -w /repo -e PYTHONPATH=/r
   'pip install -q -r .devcontainer/docking-requirements.txt && python -m oxhack_worker.control 6WTO'
 ```
 
+### The whole stack on a Mac
+
+Vina has no arm64 wheel, so on Apple Silicon the docking worker runs in an amd64
+container (`oxhack-docking:local`, built from `.devcontainer/docking-requirements.txt`)
+while the API runs natively. Both share the repository, so results land in
+`data/docking/` for the API to serve. Use a local Postgres, not Tiger:
+
+```bash
+docker run -d --name oxhack-dockworker --platform linux/amd64 -v "$PWD":/repo -w /repo \
+  -e DATABASE_URL="postgresql://<user>:<password>@host.docker.internal:<port>/<db>" \
+  -e OXHACK_REPO=postgres -e OXHACK_DOCKING=vina -e DOCKING_VENV=/usr/local \
+  -e UV_PROJECT_ENVIRONMENT=/opt/venv -e UV_LINK_MODE=copy oxhack-docking:local \
+  sh -c 'pip install -q uv && uv sync --all-packages --frozen --quiet &&
+         exec uv run --no-sync python -m oxhack_worker.queue'
+```
+
+Then start the API with `OXHACK_REPO=postgres OXHACK_DOCKING=vina
+DOCKING_VENV=/usr/local` and the same database on `127.0.0.1`.
+
+## Which ligand is docked
+
+The SMILES is fixed when a request is queued and saved with the job
+(`dock_jobs.ligand_smiles`); the worker docks exactly that. The API takes it from
+`api/oxhack_api/fixtures/docking.json` (hand-checked) or, for any other live
+Candidate, from ChEMBL's parent record (`services/ligands.py`), kept in
+`data/ligands/`. A drug ChEMBL does not call a small molecule (an antibody, a
+protein) has no SMILES and is not offered for docking.
+
 ## Prepare the structures again
 
 ```bash
