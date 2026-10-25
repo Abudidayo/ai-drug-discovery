@@ -31,6 +31,62 @@ flowchart TD
 6. **Model jury.** Three AI models (GPT-5.4, GLM-5.3 and Kimi K3, via Snowflake Cortex) review the same cited evidence without seeing the scores. Every claim must cite real evidence.
 7. **Docking (optional).** AutoDock Vina predicts how a drug might sit in its protein.
 
+## The ranking engine: random walk with restart
+
+Picture a walker on the protein network. It starts on the disease's proteins and keeps stepping to random neighbours. At every step it has a 30% chance of jumping back to a disease protein. After many steps, proteins near the disease get visited often; distant ones rarely.
+
+A drug scores high when its target proteins get visited a lot.
+
+```mermaid
+flowchart LR
+    D1(("Disease<br/>protein")) --- X(("protein"))
+    D2(("Disease<br/>protein")) --- X
+    X --- T1(("Drug A<br/>target"))
+    D2 --- T2(("Drug B<br/>target"))
+    X --- Y(("protein"))
+    Y --- Z(("protein"))
+    Z --- T3(("Drug C<br/>target"))
+    classDef disease fill:#f6c1c1,stroke:#b33
+    classDef drug fill:#c1d8f6,stroke:#3366b3
+    class D1,D2 disease
+    class T1,T2,T3 drug
+```
+
+Drug B's target is one step from a disease protein, so it's visited most. Drug A is close behind. Drug C is far away and scores lowest.
+
+```mermaid
+flowchart TD
+    S["Start: probability spread evenly<br/>over the disease's proteins"] --> W["Each step:<br/>70% move to a random neighbour<br/>30% jump back to a disease protein"]
+    W --> C{"Changed by less<br/>than 1e-12?"}
+    C -- no --> W
+    C -- yes --> R["Read the probability<br/>at each drug's target proteins"]
+    R --> M["Drug score = average over<br/>its targets; rank all 1,956 drugs"]
+```
+
+The update, repeated until it stops changing:
+
+$$p_{t+1} = 0.7\,P^{\top} p_t + 0.3\,p_0 \qquad \text{score(drug)} = \operatorname{mean}_{g \,\in\, \text{drug targets}} \; p_\infty[g]$$
+
+- $P$: row-normalised adjacency matrix of the protein network (each protein splits its probability evenly between its neighbours).
+- $p_0$: uniform over the disease's proteins that are in the network.
+- $p_\infty$: the stable visit probability of every protein.
+
+| Setting | Value |
+|---|---|
+| Network | STRING 12.5 physical interactions, combined score ≥ 700, direct experiments ≥ 400 |
+| Size | 19,199 genes, 113,969 edges; largest connected part 12,834 genes |
+| Seeds | Top 50 disease proteins from Open Targets (clinical and cancer-biomarker evidence removed) |
+| Restart probability | 0.3 |
+| Stop rule | L1 change < 1e-12, at most 1,000 steps (converges in about 60) |
+| Drug targets | ChEMBL mechanisms + potent bioactivity (median pChEMBL ≥ 7) |
+| No targets in the network | No score (never scored as zero) |
+
+**Why a random walk?** The older method only uses the single shortest path between a drug and the disease. The walk counts every route, so a drug linked to the disease through many proteins scores higher than one linked by a single thin path. The older score (shortest-path distance, compared with random protein sets of matched connectivity) is kept for comparison.
+
+**The shortlist.** The top 10 drugs by walk score, plus the top 5 by direct evidence (their targets are themselves disease proteins), make 15. Shortest paths from each drug's targets to the disease's proteins are saved as the explanation.
+
+**The jury's checks.** Each reply must be valid JSON, rank every Candidate once, cite only real evidence IDs, and quote numbers exactly as the evidence states them. Failed or refused replies are recorded, never filled in. Votes are combined by Borda count over the valid jurors (at least two).
+
 ## Results
 
 We test whether known approved drugs come back, with rules fixed before each test.
