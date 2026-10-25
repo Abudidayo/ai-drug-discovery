@@ -31,6 +31,8 @@ const DENSE_PITCH = 28;
 const CHAR = 8.1; // average width of a 15px Instrument Sans character
 const DIGIT = 7.4; // width of a 13px tabular digit
 const TICK_INSET = 12; // half the widest closeness tick ("−5"), so the first tick isn't clipped
+const UNRANKED_HIT = 110; // past the rank axis, covering "Not ranked"
+const END_HIT = 8; // around the rank axes' points
 
 /** A zig-zag across a vertical axis where ranks jump, so a gap never reads as a step of one. */
 function AxisBreak({ x, y }: { x: number; y: number }) {
@@ -213,13 +215,27 @@ export function SlopeChart({ rows, hovered, onHover, knownAnswerNote, below }: S
                     onHover(null);
                   }}
                 >
+                  {/* Hover targets follow what is drawn: the row's own band up to the network
+                      rank axis, then the drug's line and its end, never another drug's row. */}
                   <rect
                     className={styles.hit}
                     x={0}
                     y={rowY - pitch / 2}
-                    width={width}
+                    width={left + (rightY === null ? UNRANKED_HIT : END_HIT)}
                     height={pitch}
                   />
+                  {rightY !== null && (
+                    <>
+                      <line className={styles.hitLine} x1={left} y1={rowY} x2={right} y2={rightY} />
+                      <rect
+                        className={styles.hit}
+                        x={right - END_HIT}
+                        y={rightY - pitch / 2}
+                        width={width - right + END_HIT}
+                        height={pitch}
+                      />
+                    </>
+                  )}
                   {row.closeness !== null && (
                     <>
                       <line className={styles.guide} x1={0} x2={stripEnd} y1={rowY} y2={rowY} />

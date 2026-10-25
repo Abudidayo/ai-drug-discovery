@@ -56,6 +56,13 @@
   fill: transparent;
 }
 
+/* A wide invisible stroke along a drug's line, so pointing near it is enough. */
+.hitLine {
+  stroke: transparent;
+  stroke-width: 12;
+  pointer-events: stroke;
+}
+
 .guide {
   stroke: var(--color-edge);
   stroke-dasharray: 1 3;

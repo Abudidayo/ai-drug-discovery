@@ -141,6 +141,17 @@ describe("Step 3, Candidate drugs", () => {
     // Closeness sits on the drug's own row.
     const row = screen.getByTestId("slope-row-CHEMBL2105759");
     expect(within(row).getByText("−3.1")).toBeInTheDocument();
+    // Lines cross other drugs' rows, so no hover band spans the chart's width: past the network
+    // rank axis a drug reacts only along its own line, traced by an invisible twin, and its end.
+    const width = Number(row.closest("svg")?.getAttribute("width"));
+    for (const band of row.querySelectorAll("rect")) {
+      const x = Number(band.getAttribute("x"));
+      expect(x > 0 || x + Number(band.getAttribute("width")) < width).toBe(true);
+    }
+    const ends = [...row.querySelectorAll("line")].map((line) =>
+      ["x1", "y1", "x2", "y2"].map((name) => line.getAttribute(name)).join(" "),
+    );
+    expect(ends.filter((end, index) => ends.indexOf(end) !== index)).toHaveLength(1);
   });
 
   it("reveals the whole shortlist, with no closeness where it wasn't measured", async () => {
