@@ -331,7 +331,8 @@ test("a student shows baricitinib's binding pose and checks it against the cryst
   await expectStep(page, "History");
   await expect(view).toHaveCount(0);
   try {
-    await expect.poll(() => liveContexts(page)).toBe(1);
+    // Released after History is drawn, once the GPU has caught up: seconds on a software GPU.
+    await expect.poll(() => liveContexts(page), { timeout: 30_000 }).toBe(1);
   } catch (error) {
     const diagnostics = await page.evaluate(() =>
       (window as unknown as { webGLContextDiagnostics: () => unknown }).webGLContextDiagnostics(),
