@@ -454,6 +454,9 @@ class LiveSource:
         while True:
             ranking = self._ranking.rank(request, frozenset(excluded))
             ids = [ranked.candidate_id for ranked in ranking.shortlist]
+            # Everything the checks below and the evidence step ask ChEMBL about these
+            # drugs, fetched in parallel first: a first build no longer waits on each in turn.
+            sources.prefetch(ids, by_drug)
             conflicts = {i for i in ids if not sources.is_parent(i)}
             for candidate_id in sorted(conflicts):
                 sources.reject("chembl", candidate_id, "upstream_parent_contract_conflict")

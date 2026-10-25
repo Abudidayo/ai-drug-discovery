@@ -19,8 +19,10 @@ repository root describe their inputs and outputs.
 from __future__ import annotations
 
 import json
+import logging
 import threading
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Protocol, cast
 
@@ -36,6 +38,11 @@ from pipeline import pathways as _pathways
 from pipeline import string_map as _string_map
 
 JSON = dict[str, Any]
+
+log = logging.getLogger(__name__)
+
+PREFETCH_THREADS = 6
+"""ChEMBL requests a build makes at once while it warms the response cache."""
 """A stream A record: the JSON shapes in the repository's `fixtures/`."""
 
 OT_RELEASE: str = _packets.OT_RELEASE
@@ -128,6 +135,45 @@ class EvidenceSources:
         # A4 reuses these checked scores instead of fetching the associations again.
         self._sources.association_scores = scores  # pyright: ignore[reportAttributeAccessIssue]
         return targets, scores
+
+    def prefetch(self, candidate_ids: Iterable[str], drugs: Mapping[str, JSON]) -> None:
+        """Fetch the records stream A reads for these drugs, several at a time, into the
+        response cache: from ChEMBL each drug's molecule record and its salt forms', its
+        mechanisms and its bioactivity pages, and from PubChem its compound ID. The parent
+        check and the A4 evidence packet read them one request at a time, so on a first
+        build they now find them saved instead.
+
+        Only warms the cache, through stream A's own requests (so the URLs are the ones it
+        reads): nothing here decides anything, and a fetch that fails is left to stream A,
+        which asks again and reports it. Each URL is fetched by one thread only, as the cache
+        writes a response through one temporary file per URL. The fetches go through a
+        separate copy of stream A's sources over the same folder, so what they would reject
+        is left to the build, which records rejections in its own order (they are saved with
+        the evidence packet)."""
+        warm = EvidenceSources(self._sources.data_dir, offline=self._sources.offline)
+        sources = warm._sources
+
+        def molecule(source_id: str) -> None:
+            record = sources.chembl(f"molecule/{source_id}.json")
+            if source_id in candidates:
+                sources.pubchem_cid(record)
+
+        def bioactivity(source_id: str) -> None:
+            sources.bioactivity_target_ids([source_id])
+
+        def mechanisms(candidate_id: str) -> None:
+            warm.mechanisms(candidate_id)
+
+        candidates = list(dict.fromkeys(candidate_ids))
+        tasks: list[tuple[Callable[[str], None], str]] = []
+        for candidate_id in candidates:
+            source_ids = dict.fromkeys([candidate_id, *drugs[candidate_id]["source_chembl_ids"]])
+            tasks += [(fetch, s) for s in source_ids for fetch in (molecule, bioactivity)]
+            tasks.append((mechanisms, candidate_id))
+        with ThreadPoolExecutor(PREFETCH_THREADS, thread_name_prefix="chembl-prefetch") as pool:
+            for future in [pool.submit(fetch, chembl_id) for fetch, chembl_id in tasks]:
+                if (error := future.exception()) is not None:
+                    log.info("prefetch left a request to the build: %s", error)
 
     def is_parent(self, candidate_id: str) -> bool:
         """True when ChEMBL lists the molecule as its own parent (A4 requires it)."""

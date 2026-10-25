@@ -15,7 +15,7 @@ from oxhack_api.services.live import COMMON_DISEASES, MIN_TESTED_DRUGS, DiseaseC
 from oxhack_api.services.live_jury import display_name, map_jury_result
 from oxhack_api.services.ranking import EvidenceRanking, RankingInput
 from oxhack_api.settings import REPO_ROOT
-from oxhack_api.stream_a import DISEASE_PARQUET
+from oxhack_api.stream_a import DISEASE_PARQUET, EvidenceSources
 
 FIXTURES = REPO_ROOT / "fixtures"
 DATA = REPO_ROOT / "data"
@@ -327,3 +327,11 @@ def test_common_diseases_are_searchable() -> None:
     catalogue = DiseaseCatalogue(DATA / DISEASE_PARQUET, DATA / "ot" / "clinical_indication")
     for disease_id in COMMON_DISEASES:
         assert [r.id for r in catalogue.search(disease_id, 1)] == [disease_id]
+
+
+def test_prefetch_only_warms_the_cache_and_never_fails_a_build(tmp_path: Path) -> None:
+    """Offline with nothing saved, every warm-up fetch fails: it says so in the log and
+    leaves the requests, and any rejection, to the build itself."""
+    sources = EvidenceSources(tmp_path, offline=True)
+    sources.prefetch(["CHEMBL1"], {"CHEMBL1": {"source_chembl_ids": ["CHEMBL1", "CHEMBL2"]}})
+    assert sources.coverage["unmapped_items"] == 0
