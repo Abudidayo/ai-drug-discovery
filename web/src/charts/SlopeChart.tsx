@@ -30,6 +30,7 @@ const ROOMY_PITCH = 40;
 const DENSE_PITCH = 28;
 const CHAR = 8.1; // average width of a 15px Instrument Sans character
 const DIGIT = 7.4; // width of a 13px tabular digit
+const TICK_INSET = 12; // half the widest closeness tick ("−5"), so the first tick isn't clipped
 
 /** A zig-zag across a vertical axis where ranks jump, so a gap never reads as a step of one. */
 function AxisBreak({ x, y }: { x: number; y: number }) {
@@ -70,7 +71,7 @@ export function SlopeChart({ rows, hovered, onHover, knownAnswerNote, below }: S
 
   const measured = rows.flatMap((row) => (row.closeness === null ? [] : [row.closeness]));
   const [low, high] = closenessDomain(measured);
-  const zx = (z: number) => ((z - low) / (high - low)) * stripEnd;
+  const zx = (z: number) => TICK_INSET + ((z - low) / (high - low)) * (stripEnd - TICK_INSET);
   const zTicks: number[] = [];
   for (let t = Math.ceil(low); t <= Math.floor(high); t++) zTicks.push(t);
 

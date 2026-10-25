@@ -52,7 +52,7 @@ describe("Step 2, Its biology", () => {
     // CCR2 is not in the network: no bar, one sentence with the reason.
     expect(within(bars).queryByText("CCR2")).not.toBeInTheDocument();
     expectOnce(
-      copy.biology.excluded.not_in_graph("CCR2"),
+      copy.biology.excluded.not_in_graph(["CCR2"]),
       copy.biology.rule(9, 8),
       copy.biology.strength,
       copy.legend.disease,
@@ -73,7 +73,10 @@ describe("Step 2, Its biology", () => {
     serveExperiment(experiment);
     renderApp(`${E}/biology`);
     expect(await screen.findByText(copy.network.empty)).toBeInTheDocument();
-    expectOnce(copy.biology.rule(9, 0), copy.biology.excluded.not_in_graph("ACE2"));
+    expectOnce(
+      copy.biology.rule(9, 0),
+      copy.biology.excluded.not_in_graph(experiment.targets.map((target) => target.symbol)),
+    );
     expect(screen.queryByRole("list", { name: copy.biology.targetsLabel })).not.toBeInTheDocument();
   });
 });
@@ -218,6 +221,91 @@ describe("Step 4, Evidence", () => {
     await ready();
     expectOnce(copy.evidence.noRouteTitle, unscorableReasonText("no_retained_drug_targets"));
     expect(screen.queryByText(copy.evidence.pathTitle)).not.toBeInTheDocument();
+  });
+
+  it("calls a drug's route just a route when evidence, not closeness, chose it", async () => {
+    const experiment = covidExperiment();
+    experiment.candidates = experiment.candidates.map((candidate) =>
+      candidate.name === "BARICITINIB"
+        ? {
+            ...candidate,
+            selected_by: ["evidence"],
+            selection_reasons: ["initial_evidence_quota"],
+          }
+        : candidate,
+    );
+    serveExperiment(experiment);
+    renderApp(`${E}/evidence`);
+    await ready();
+    expectOnce(copy.evidence.routeTitle, copy.evidence.route.self("Baricitinib", "TYK2"));
+    expect(screen.queryByText(copy.evidence.pathTitle)).not.toBeInTheDocument();
+  });
+
+  it("links network routes to STRING and pathways to Reactome, saying the shown route once", async () => {
+    const experiment = covidExperiment();
+    const hash = "b".repeat(64);
+    experiment.candidates = experiment.candidates.map((candidate) =>
+      candidate.name === "BARICITINIB"
+        ? {
+            ...candidate,
+            evidence: [
+              ...candidate.evidence,
+              {
+                id: "E901",
+                kind: "network_path",
+                source: "string",
+                source_id: `ENSG00000105397@${hash}`,
+                url: "https://string-db.org/cgi/network?identifiers=9606.ENSP00000264818",
+                release: "string-12.5",
+                statement: "In the filtered STRING 12.5 physical network, TYK2 ...",
+                summary: "TYK2 is itself a disease protein, so the drug acts on it directly.",
+                values: { hops: 0 },
+              },
+              {
+                id: "E902",
+                kind: "network_path",
+                source: "string",
+                source_id: `ENSG00000162434>ENSG00000105397@${hash}`,
+                url: "https://string-db.org/cgi/network?identifiers=9606.ENSP00000342850",
+                release: "string-12.5",
+                statement: "In the filtered STRING 12.5 physical network, JAK1 ...",
+                summary: "JAK1 connects to TYK2 in 1 step in the protein network.",
+                values: { hops: 1 },
+              },
+              {
+                id: "E903",
+                kind: "pathway",
+                source: "reactome",
+                source_id: "R-HSA-9020933",
+                url: "https://reactome.org/content/detail/R-HSA-9020933",
+                release: "reactome-97",
+                statement: "In Reactome, at least one of this Candidate's Targets ...",
+                summary:
+                  "Targets a protein in the interleukin-23 signalling pathway, which also includes the disease protein TYK2.",
+                values: { pathway_gene_count: 13 },
+              },
+            ],
+          }
+        : candidate,
+    );
+    serveExperiment(experiment);
+    renderApp(`${E}/evidence`);
+    await ready();
+    const facts = screen.getByRole("list", { name: copy.evidence.listLabel });
+    // The route the network panel says in words isn't listed again as a fact.
+    expectOnce(copy.evidence.route.self("Baricitinib", "TYK2"));
+    expect(within(facts).queryByText(/TYK2 is itself a disease protein/)).not.toBeInTheDocument();
+    expect(
+      within(facts).getByText("JAK1 connects to TYK2 in 1 step in the protein network."),
+    ).toBeInTheDocument();
+    expect(within(facts).getByRole("link", { name: "STRING" })).toHaveAttribute(
+      "href",
+      "https://string-db.org/cgi/network?identifiers=9606.ENSP00000342850",
+    );
+    expect(within(facts).getByRole("link", { name: "Reactome" })).toHaveAttribute(
+      "href",
+      "https://reactome.org/content/detail/R-HSA-9020933",
+    );
   });
 
   it("names the route through connecting proteins", async () => {

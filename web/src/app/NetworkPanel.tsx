@@ -40,7 +40,10 @@ export function NetworkPanel({ experiment, step, view, focusId, hidden }: Networ
   if (step === "evidence") {
     const candidate = focusCandidate(experiment.candidates, focusId);
     if (candidate?.network) {
-      title = candidate.status === "scored" ? copy.evidence.pathTitle : copy.evidence.routeTitle;
+      // "Why it ranks high" only for a drug the network ranking put on the shortlist; one
+      // chosen for its direct evidence (or with no closeness) just has a route.
+      const rankedHigh = candidate.status === "scored" && candidate.selected_by.includes("network");
+      title = rankedHigh ? copy.evidence.pathTitle : copy.evidence.routeTitle;
       lede = routeSentence(candidate, graph);
     } else if (candidate?.unscorable_reason) {
       title = copy.evidence.noRouteTitle;

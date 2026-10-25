@@ -5,7 +5,7 @@ import type { Candidate, EvidenceItem, Experiment } from "../api/types";
 import { FigureNote, Panel } from "../app/Figure";
 import { useNetworkHover } from "../app/networkHover";
 import { copy, unscorableReasonText } from "../copy/en";
-import { focusCandidate, noModelText, warningSentence } from "../lib/candidates";
+import { focusCandidate, listedEvidence, noModelText, warningSentence } from "../lib/candidates";
 import { drugName } from "../lib/format";
 import styles from "./EvidenceStep.module.css";
 
@@ -124,7 +124,7 @@ export function EvidenceStep({ experiment }: { experiment: Experiment }) {
   const candidate = focusCandidate(experiment.candidates, params.get(DRUG_PARAM));
   if (candidate === undefined) return null;
 
-  const facts = mergeFacts(candidate.evidence.filter((item) => item.kind !== "warning"));
+  const facts = mergeFacts(listedEvidence(candidate, experiment.network));
   // Without a network there is no route panel; the drug's reason is said here, once.
   const noRoute =
     experiment.network === null && candidate.unscorable_reason !== null

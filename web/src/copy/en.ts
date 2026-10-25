@@ -1,5 +1,6 @@
 import type { components } from "../api/schema";
 import type { UnsupportedReason } from "../lib/docking";
+import { listOf } from "../lib/format";
 
 type BuildStage = components["schemas"]["BuildStage"];
 type Decision = components["schemas"]["Decision"];
@@ -133,12 +134,17 @@ export const copy = {
     noNetwork: "The protein network isn’t available for this experiment.",
     strength: "Link strength",
     targetsLabel: "Disease proteins by link strength",
+    /** The proteins left out for one reason, named together in one sentence. */
     excluded: {
-      not_in_graph: (symbol: string) =>
-        `${symbol} isn’t in the protein network, so it can’t be used.`,
-      outside_largest_component: (symbol: string) =>
-        `${symbol} sits apart from the main protein network, so it can’t be used.`,
-    } satisfies Record<TargetExcludedReason, (symbol: string) => string>,
+      not_in_graph: (symbols: readonly string[]) =>
+        symbols.length === 1
+          ? `${listOf(symbols)} isn’t in the protein network, so it can’t be used.`
+          : `${listOf(symbols)} aren’t in the protein network, so they can’t be used.`,
+      outside_largest_component: (symbols: readonly string[]) =>
+        symbols.length === 1
+          ? `${listOf(symbols)} sits apart from the main protein network, so it can’t be used.`
+          : `${listOf(symbols)} sit apart from the main protein network, so they can’t be used.`,
+    } satisfies Record<TargetExcludedReason, (symbols: readonly string[]) => string>,
   },
 
   candidates: {
@@ -177,7 +183,7 @@ export const copy = {
     noWarnings: "No label warnings are recorded. That doesn’t mean the drug is safe.",
     missingTitle: "Not yet known",
     pathTitle: "Why it ranks high",
-    /** For a drug ranked by distance only: it has a route, but closeness didn't rank it high. */
+    /** For a drug that has a route but wasn't shortlisted for its closeness. */
     routeTitle: "Its route to the disease",
     noRouteTitle: "Not on the network",
     route: {

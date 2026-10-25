@@ -1,4 +1,4 @@
-import type { DiseaseTarget, Experiment } from "../api/types";
+import type { DiseaseTarget, Experiment, TargetExcludedReason } from "../api/types";
 import { Panel } from "../app/Figure";
 import { useNetworkHover } from "../app/networkHover";
 import { copy } from "../copy/en";
@@ -16,13 +16,15 @@ const tick = (value: number) => (value === 0 || value === 1 ? String(value) : va
 export function BiologyTargets({ experiment }: { experiment: Experiment }) {
   const setHover = useNetworkHover();
   const used = experiment.targets.filter((target) => target.retained);
-  const excluded = experiment.targets.filter(
-    (
-      target,
-    ): target is DiseaseTarget & {
-      excluded_reason: NonNullable<DiseaseTarget["excluded_reason"]>;
-    } => target.excluded_reason !== null,
-  );
+  // The proteins left out, by reason, in rank order: one sentence per reason.
+  const excluded = new Map<TargetExcludedReason, string[]>();
+  for (const target of experiment.targets) {
+    if (target.excluded_reason === null) continue;
+    excluded.set(target.excluded_reason, [
+      ...(excluded.get(target.excluded_reason) ?? []),
+      target.symbol,
+    ]);
+  }
 
   const point = (target: DiseaseTarget | null) => {
     setHover(target ? { highlight: [target.target_id], focus: [target.target_id] } : null);
@@ -80,10 +82,8 @@ export function BiologyTargets({ experiment }: { experiment: Experiment }) {
         ) : (
           <p>{copy.biology.rule(experiment.targets.length, used.length)}</p>
         )}
-        {excluded.map((target) => (
-          <p key={target.target_id}>
-            {copy.biology.excluded[target.excluded_reason](target.symbol)}
-          </p>
+        {[...excluded].map(([reason, symbols]) => (
+          <p key={reason}>{copy.biology.excluded[reason](symbols)}</p>
         ))}
       </div>
     </Panel>

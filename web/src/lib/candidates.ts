@@ -1,4 +1,4 @@
-import type { Candidate, NetworkGraph } from "../api/types";
+import type { Candidate, EvidenceItem, NetworkGraph } from "../api/types";
 import { copy } from "../copy/en";
 import { capitalise, drugName, listOf } from "./format";
 
@@ -51,6 +51,26 @@ export function routeSentence(candidate: Candidate, graph: NetworkGraph): string
   const through = rest.slice(0, -1);
   if (through.length === 0) return copy.evidence.route.direct(drug, first, last);
   return copy.evidence.route.via(drug, first, last, listOf(through));
+}
+
+/**
+ * The proteins of a network-route evidence item, in order (its `source_id` is the route's IDs
+ * joined by ">", then "@" and the network's hash). Null for any other kind of item.
+ */
+export function routeOf(item: EvidenceItem): string[] | null {
+  if (item.kind !== "network_path") return null;
+  return item.source_id.split("@")[0]?.split(">") ?? null;
+}
+
+/**
+ * The facts the Evidence step lists for a Candidate: every item except its label warnings (said
+ * in the warning box) and the route the network panel already describes in words.
+ */
+export function listedEvidence(candidate: Candidate, graph: NetworkGraph | null): EvidenceItem[] {
+  const shown = graph === null ? null : (candidate.network?.path.join(">") ?? null);
+  return candidate.evidence.filter(
+    (item) => item.kind !== "warning" && (shown === null || routeOf(item)?.join(">") !== shown),
+  );
 }
 
 /**
