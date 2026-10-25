@@ -17,6 +17,8 @@ from pydantic import (
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
+NETWORK_BUNDLE = "string-12.5-c700-e400"
+"""Stream B's bundle name for the STRING 12.5 network at combined score 700, experiments 400."""
 REPO_ROOT = Path(__file__).resolve().parents[2]
 """The repository root. A relative OXHACK_DATA_DIR is read from here, whatever the cwd."""
 
@@ -29,8 +31,8 @@ class Settings(BaseSettings):
         description=(
             "Where Experiment data comes from. fixture: saved files in fixtures_dir. live: "
             "stream A's pipeline over the prepared data in data_dir "
-            "(`python -m oxhack_api.prepare`), with the evidence ranking while no network "
-            "ranking is available."
+            "(`python -m oxhack_api.prepare`), with the network ranking when its bundle "
+            "exists, else the evidence ranking."
         ),
     )
     data_dir: Path = Field(
@@ -38,6 +40,15 @@ class Settings(BaseSettings):
         description=(
             "Prepared source data for the live source (git-ignored). A relative path is "
             "relative to the repository root."
+        ),
+    )
+    network_dir: Path = Field(
+        default=Path(),
+        description=(
+            "Stream B's protein network bundle, by default data_dir/ranking/"
+            "string-12.5-c700-e400 (`python -m oxhack_api.prepare` builds it). When it "
+            "exists, live Experiments use the network ranking; otherwise the evidence "
+            "ranking. A relative path is relative to the repository root."
         ),
     )
     jury: Literal["fixture", "mock", "cortex"] = Field(
@@ -109,6 +120,10 @@ class Settings(BaseSettings):
     def _resolve_data_dir(self) -> Settings:
         if not self.data_dir.is_absolute():
             self.data_dir = REPO_ROOT / self.data_dir
+        if self.network_dir == Path():
+            self.network_dir = self.data_dir / "ranking" / NETWORK_BUNDLE
+        elif not self.network_dir.is_absolute():
+            self.network_dir = REPO_ROOT / self.network_dir
         return self
 
     @model_validator(mode="after")

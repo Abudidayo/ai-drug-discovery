@@ -20,6 +20,7 @@ markers = ["network: needs internet access; run with -m network"]
 # Makes pipeline/ and jury/ an installable package, so the API (api/) depends on
 # them instead of copying them, and joins api/ into one uv workspace: one .venv
 # and one uv.lock at the repository root. Nothing above this line changed.
+# ranking/ (stream B) is a member too, so the API imports its engine.
 [build-system]
 requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
@@ -28,4 +29,4 @@ build-backend = "hatchling.build"
 packages = ["pipeline", "jury"]
 
 [tool.uv.workspace]
-members = ["api"]
+members = ["api", "ranking"]

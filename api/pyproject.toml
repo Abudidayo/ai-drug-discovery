@@ -9,6 +9,8 @@ dependencies = [
   # Stream A (pipeline/ and jury/ at the repository root): the live evidence
   # pipeline and the Model jury.
   "oxhack-drug-repurposing",
+  # Stream B (ranking/ at the repository root): the network-proximity ranking.
+  "oxhack-ranking",
   "psycopg-pool>=3.2,<4",
   "psycopg[binary]>=3.2,<4",
   "pydantic>=2.9",
@@ -29,6 +31,7 @@ dev = [
 
 [tool.uv.sources]
 oxhack-drug-repurposing = { workspace = true }
+oxhack-ranking = { workspace = true }
 
 [build-system]
 requires = ["hatchling>=1.25"]

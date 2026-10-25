@@ -32,6 +32,8 @@ from pipeline import drugs as _a2
 from pipeline import experiment as _experiment
 from pipeline import opentargets as _opentargets
 from pipeline import packets as _packets
+from pipeline import pathways as _pathways
+from pipeline import string_map as _string_map
 
 JSON = dict[str, Any]
 """A stream A record: the JSON shapes in the repository's `fixtures/`."""
@@ -177,6 +179,21 @@ class EvidenceSources:
         )
         return {cast(str, gene): cast(str, name) for gene, name in rows if name}
 
+    def target_symbols(self, target_ids: Iterable[str]) -> dict[str, str]:
+        """Approved gene symbols of Ensembl genes, from the Open Targets target table."""
+        ids = sorted(set(target_ids))
+        if not ids:
+            return {}
+        rows = (
+            self._sources.table("target")
+            .filter(
+                duckdb.ColumnExpression("id").isin(*(duckdb.ConstantExpression(i) for i in ids))
+            )
+            .select("id", "approvedSymbol")
+            .fetchall()
+        )
+        return {cast(str, gene): cast(str, symbol) for gene, symbol in rows if symbol}
+
     def evidence_packet(
         self,
         disease: JSON,
@@ -186,9 +203,16 @@ class EvidenceSources:
         *,
         experiment_id: str,
         releases: list[str],
+        pathways: Pathways | None = None,
+        network_paths: NetworkPaths | None = None,
     ) -> tuple[list[JSON], JSON]:
         """A4: each Candidate's evidence, warnings and PubChem ID, and the blinded jury
-        packet, with stream A's HTTPS fix for legacy FDA links applied to both."""
+        packet, with stream A's HTTPS fix for legacy FDA links applied to both.
+
+        With `pathways`, A4 adds the Reactome pathways each Candidate shares with the
+        Disease Targets. With `network_paths`, stream A's `add_network_paths` adds each
+        Candidate's representative routes in the protein network, and the Candidates'
+        evidence lists are rebuilt from the packet, as A4 does for pathways."""
         updates, packet = _packets.build_evidence_packet(
             disease,
             candidate_ids,
@@ -197,7 +221,31 @@ class EvidenceSources:
             experiment_id=experiment_id,
             sources=self._sources,
             releases=releases,
+            pathways=None if pathways is None else pathways.pathways,
+            pathway_release=None if pathways is None else pathways.release,
         )
+        if network_paths is not None:
+            packet = _packets.add_network_paths(
+                packet,
+                [
+                    {
+                        "candidate_id": cid,
+                        "network_paths": {"paths": network_paths.paths.get(cid, [])},
+                    }
+                    for cid in candidate_ids
+                ],
+                graph=network_paths.graph,
+                target_names=network_paths.symbols,
+                string_mappings=network_paths.string_mappings,
+                disease_target_ids=set(network_paths.disease_target_ids),
+                coverage=network_paths.coverage,
+            )
+            by_id = {c["candidate_id"]: c for c in packet["candidates"]}
+            items = {e["id"]: e for e in packet["evidence"]}
+            for update in updates:
+                update["evidence"] = [
+                    dict(items[e]) for e in by_id[update["candidate_id"]]["evidence_ids"]
+                ]
         _experiment.normalize_evidence_urls(updates, packet)
         return cast(list[JSON], updates), cast(JSON, packet)
 
@@ -207,6 +255,88 @@ class EvidenceSources:
             list[JSON],
             _experiment.bioactivity_consistency(drug_targets, updates, self._sources),
         )
+
+
+class Pathways:
+    """A Reactome release's lowest-level pathways (`pipeline.pathways`), by pathway ID:
+    `{"name": ..., "genes": {ENSG...}}`, joined to genes by Ensembl ID only."""
+
+    def __init__(self, path: Path, release: str) -> None:
+        pathways, unmapped = _pathways.load_pathways(path)
+        self.pathways = cast(dict[str, JSON], pathways)
+        self.unmapped = cast(dict[str, int], unmapped)
+        self.release = release
+
+    def name(self, pathway_id: str) -> str:
+        return cast(str, self.pathways[pathway_id]["name"])
+
+    def genes(self, pathway_id: str) -> set[str]:
+        return cast(set[str], self.pathways[pathway_id]["genes"])
+
+
+def reactome_release(data_dir: Path) -> tuple[Path, str] | None:
+    """The newest Reactome release `pipeline.pathways` saved under `data_dir/reactome/`, as
+    (human mapping file, release), or None when there is none."""
+    saved: list[tuple[int, Path, str]] = []
+    for manifest in (data_dir / "reactome").glob("*/manifest.json"):
+        record = cast(JSON, json.loads(manifest.read_text(encoding="utf-8")))
+        mapping = manifest.with_name("Ensembl2Reactome.human.tsv")
+        if mapping.is_file() and manifest.parent.name.isdigit():
+            saved.append((int(manifest.parent.name), mapping, cast(str, record["release"])))
+    if not saved:
+        return None
+    _, mapping, release = max(saved)
+    return mapping, release
+
+
+def download_reactome(data_dir: Path) -> tuple[Path, JSON]:
+    """Stream A's pinned download of Reactome's current lowest-level human mapping, unless
+    that release is saved already. Returns the mapping file and its manifest."""
+    path, manifest = _pathways.download(str(data_dir))
+    return Path(path), cast(JSON, manifest)
+
+
+class NetworkPaths:
+    """What stream A's `add_network_paths` needs to cite routes in the protein network."""
+
+    def __init__(
+        self,
+        *,
+        paths: dict[str, list[JSON]],
+        graph: JSON,
+        symbols: dict[str, str],
+        string_mappings: list[JSON],
+        disease_target_ids: list[str],
+    ) -> None:
+        self.paths = paths
+        """Each Candidate's representative paths (stream B's `representatives`)."""
+        self.graph = graph
+        self.symbols = symbols
+        self.string_mappings = string_mappings
+        self.disease_target_ids = disease_target_ids
+        self.coverage: JSON = {}
+        """Filled by the build: the routes left out for a missing symbol or STRING ID."""
+
+
+# ---------------------------------------------------------------------------
+# The STRING protein mapping (A3).
+# ---------------------------------------------------------------------------
+
+STRING_VERSION = "12.5"
+
+
+def string_mapping(protein_info: Path, target_parts: list[Path]) -> JSON:
+    """A3: every human STRING 12.5 protein mapped to an Open Targets 26.09 gene by exact
+    Ensembl protein ID (`pipeline.string_map.build_mapping`), from the downloaded STRING
+    protein list and the Open Targets target Parquet parts."""
+    return cast(
+        JSON,
+        _string_map.build_mapping(
+            _string_map.read_string_ids(protein_info),
+            _string_map.read_targets(target_parts),
+            STRING_VERSION,
+        ),
+    )
 
 
 def direct_shortlist(drugs: list[JSON], scores: dict[str, float]) -> tuple[list[str], int]:
