@@ -188,6 +188,8 @@ def test_recorded_gpt_numeric_text_with_typographic_identifier(hyphen, field):
     ("Association 0.8 and 999.", False),
     ("An invented identifier dose-99.", False),
     ("An invented identifier JAK99.", False),
+    ("JAK-1 is a hyphenated identifier; association 0.80.", True),
+    ("An invented identifier JAK-99.", False),
 ])
 @pytest.mark.parametrize("field", ["rationale", "objection"])
 def test_exact_numbers_in_each_text_field(text, accepted, field):

@@ -363,6 +363,12 @@ def _name_identifiers(packet):
         family = re.fullmatch(r"(.+[A-Za-z])[0-9]+", identifier)
         if family and re.search(r"[0-9]", family[1]):
             identifiers.add(family[1])
+    # Hyphenated spellings of known names: IL-12 for IL12, JAK-1 for JAK1. Labels and
+    # evidence IDs (C12, E12) are not names; an unknown JAK-99 stays checked.
+    for identifier in tuple(identifiers):
+        name = re.fullmatch(r"([A-Za-z]+)([0-9]+[A-Za-z]*)", identifier)
+        if name and not re.fullmatch(r"[CE][0-9]+", identifier):
+            identifiers.add(f"{name[1]}-{name[2]}")
     # Short Disease names and their initials: type 2 diabetes [mellitus], T2D[M].
     words = packet["disease"]["name"].split()
     if any(word.isdigit() for word in words):
