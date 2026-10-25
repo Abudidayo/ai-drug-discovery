@@ -71,7 +71,7 @@ Use sentence case everywhere: no all-caps labels, and no arrows appended to butt
 ## Signature devices
 
 - **Slope chart** (Candidate drugs): network rank on the left joins evidence rank on the right, one line per drug. Closeness sits on the same row, so each drug is named once.
-- **Dot plot** (Model jury): one row per drug and one marker shape per model. A split decision is marked once, in the contested colour.
+- **Ballot board** (Model jury): one row per drug in consensus order and one column per model, headed by its marker shape. Each tile shows the model's rank and is filled (Investigate), outlined (Watch) or light (Set aside); a split decision is marked once, by a bar in the contested colour at the row's edge. Picking a row opens a reading pane with each model's call, case and objection.
 - **Protein network:** one persistent 3D object. Each step highlights only what that step is about: disease proteins, a drug's targets, or the route from a drug to a disease protein.
 - **Binding pose** (3Dmol.js, PDB 6WTO, JAK2 with baricitinib; the same structure is the redock control): a thin backbone trace and the ligand in sticks. Controls cover the pocket surface, the redock overlay, spin and reset. The docking score and redock check always carry their caveat.
 

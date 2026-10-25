@@ -17,6 +17,13 @@ function angstrom(value: number): string {
   return `${String(Number(value.toFixed(2)))} Å`;
 }
 
+/** What a model suggests doing with a drug. */
+const decisions = {
+  investigate: "Investigate",
+  watch: "Watch",
+  deprioritise: "Set aside",
+} satisfies Record<Decision, string>;
+
 /**
  * The copy deck: every sentence the interface says, in one place (docs/design.md, "Plain words").
  *
@@ -233,25 +240,47 @@ export const copy = {
       numbers: "it used numbers that aren’t in the evidence",
     } satisfies Record<FailedCheck, string>,
     invalidBecause: (reason: string) => `Its answers didn’t pass our checks: ${reason}.`,
-    plotLabel: "Each model’s rank and decision for every drug",
+    tableLabel: "Each model’s rank and decision for every drug",
+    /** The board's first column: the drug's place in the consensus. "#" on screen. */
+    consensusHead: "#",
+    consensusHeadLabel: "Consensus rank",
     drug: "Drug",
-    rank: "Rank by each model",
-    rankOf: (model: string, rank: number) => `${model}: rank ${String(rank)}`,
-    decisions: {
-      investigate: "Investigate",
-      watch: "Watch",
-      deprioritise: "Set aside",
-    } satisfies Record<Decision, string>,
+    knownTreatment: "Known treatment",
+    spread: "Rank spread",
+    rankHelp: "The number is each model’s rank.",
+    /** Read by screen readers only, in a model's cell when it didn't rank the drug. */
+    noRank: "Not ranked",
+    decisions,
     agreement: "Agreement",
     agreementHelp:
       "0 means no agreement between the models, 1 means full agreement. It isn’t a chance of success.",
     agreementMissing: "Fewer than two models answered, so agreement can’t be measured.",
-    objectionTitle: (model: string, drug: string) => `${model}’s objection to ${drug}`,
     contestedTitle: "Split decision",
-    contestedNote: (count: number) =>
-      count === 1
-        ? "The models chose different next steps for this drug."
-        : `The models chose different next steps for these ${String(count)} drugs.`,
+    /** The reading pane: one drug, and what each model said about it. */
+    readingLabel: (drug: string) => `What the models said about ${drug}`,
+    consensusRank: (rank: number) => `Consensus #${String(rank)}`,
+    notInConsensus: "Not in the consensus ranking",
+    /**
+     * One drug's verdict in plain words: "All 3 say Investigate", "Both say Watch", or each
+     * decision with how many models made it, "2 say Investigate, 1 says Watch". `everyone` is
+     * true when every counted model ranked the drug.
+     */
+    verdict: (counts: readonly { decision: Decision; count: number }[], everyone: boolean) => {
+      const [only] = counts;
+      if (everyone && counts.length === 1 && only !== undefined && only.count > 1) {
+        const who = only.count === 2 ? "Both" : `All ${String(only.count)}`;
+        return `${who} say ${decisions[only.decision]}`;
+      }
+      return counts
+        .map(
+          ({ decision, count }) =>
+            `${String(count)} ${count === 1 ? "says" : "say"} ${decisions[decision]}`,
+        )
+        .join(", ");
+    },
+    call: (decision: Decision, rank: number) => `${decisions[decision]} · rank ${String(rank)}`,
+    noVote: "Didn’t rank this drug",
+    objection: "Objection.",
     retried: (count: number) =>
       count === 1
         ? "One model’s first answer didn’t pass our checks, so it was asked again."

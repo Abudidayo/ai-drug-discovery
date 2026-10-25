@@ -29,7 +29,7 @@ function expectOnce(...texts: string[]) {
 }
 
 describe("Step 5, Model jury", () => {
-  it("offers one button, then shows the result: one row per drug, one split, agreement and one objection", async () => {
+  it("offers one button, then shows the ballot board and the consensus favourite's reading", async () => {
     serveExperiment(covidExperiment());
     const user = userEvent.setup();
     renderApp(`${E}/jury`);
@@ -38,38 +38,123 @@ describe("Step 5, Model jury", () => {
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
 
     await user.click(ask);
-    const table = await screen.findByRole("table", { name: copy.jury.plotLabel });
+    const table = await screen.findByRole("table", { name: copy.jury.tableLabel });
+    expect(
+      within(table)
+        .getAllByRole("columnheader")
+        .map((header) => header.textContent),
+    ).toEqual([
+      copy.jury.consensusHead + copy.jury.consensusHeadLabel,
+      copy.jury.drug,
+      ...MODELS,
+      copy.jury.spread,
+    ]);
     const rows = within(table).getAllByTestId(/^jury-row-/);
     expect(rows).toHaveLength(15);
-    // Consensus order: the known-answer drug first, thalidomide last.
+    // Consensus order, ties sharing a number: the known-answer drug first, thalidomide last.
+    expect(rows.map((row) => row.querySelector("td")?.textContent)).toEqual([
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "6",
+      "6",
+      "9",
+      "10",
+      "10",
+      "12",
+      "12",
+      "14",
+      "15",
+    ]);
     expect(rows[0]).toHaveAttribute("data-testid", "jury-row-CHEMBL2105759");
     expect(rows.at(-1)).toHaveAttribute("data-testid", "jury-row-CHEMBL468");
-    // Exactly one split decision, marked once, on colchicine.
+    // Exactly one split decision, marked on colchicine and named once in the key.
     const contested = rows.filter((row) => row.hasAttribute("data-contested"));
     expect(contested.map((row) => row.dataset.testid)).toEqual(["jury-row-CHEMBL107"]);
-    const colchicine = screen.getByTestId("jury-row-CHEMBL107");
-    for (const word of ["Investigate", "Watch", "Set aside"]) {
-      expect(within(colchicine).getByText(word)).toBeInTheDocument();
-    }
-    // Model names come from the API, each said once (as its column's heading here).
-    expectOnce(
-      ...MODELS,
-      copy.jury.contestedTitle + ".",
-      copy.jury.agreement,
-      copy.jury.agreementHelp,
-      "0.62",
-      copy.jury.objectionTitle("GLM-5.3", "Baricitinib"),
-      "Blocking JAK1 may also weaken the body's early antiviral defence, so early in infection it could do harm.",
-      copy.jury.retried(1),
-      copy.jury.rank,
-    );
-    // Each row's ranks are readable without the picture.
+    // Each tile reads as the model's rank and decision; the spread is worst minus best.
+    expect(cellsIn("jury-row-CHEMBL107")).toEqual([
+      "6",
+      "Colchicine",
+      "7, Watch",
+      "3, Investigate",
+      "14, Set aside",
+      "11",
+    ]);
     expect(
-      within(screen.getByTestId("jury-row-CHEMBL2105759")).getByRole("cell", {
-        name: "Claude Sonnet 5: rank 1, GPT-5.4: rank 1, GLM-5.3: rank 2",
-      }),
+      within(screen.getByTestId("jury-row-CHEMBL2105759")).getByText(copy.jury.knownTreatment),
     ).toBeInTheDocument();
+    expectOnce(
+      copy.jury.agreement,
+      "0.62",
+      copy.jury.agreementHelp,
+      copy.jury.contestedTitle,
+      copy.jury.rankHelp,
+      copy.jury.knownTreatment,
+      copy.jury.retried(1),
+    );
+
+    // The reading pane opens on the consensus favourite, with every model's case.
+    const reading = screen.getByRole("region", {
+      name: copy.jury.readingLabel("Baricitinib"),
+    });
+    expect(within(reading).getByRole("heading", { level: 2 })).toHaveTextContent("Baricitinib");
+    expect(within(reading).getByText(copy.jury.consensusRank(1))).toBeInTheDocument();
+    expect(within(reading).getByText("All 3 say Investigate")).toBeInTheDocument();
+    expect(
+      within(reading)
+        .getAllByRole("heading", { level: 3 })
+        .map((heading) => heading.textContent),
+    ).toEqual([
+      `Claude Sonnet 5${copy.jury.call("investigate", 1)}`,
+      `GPT-5.4${copy.jury.call("investigate", 1)}`,
+      `GLM-5.3${copy.jury.call("investigate", 2)}`,
+    ]);
+    expectOnce(
+      "Blocking JAK1 may also weaken the body's early antiviral defence, so early in infection it could do harm.",
+    );
+    expect(within(reading).getAllByText(copy.jury.objection)).toHaveLength(3);
     expect(screen.queryByRole("button", { name: copy.jury.ask })).not.toBeInTheDocument();
+  });
+
+  it("reads another drug when it is picked, with the mouse or the arrow keys", async () => {
+    serveExperiment(covidWithJury("done"));
+    const user = userEvent.setup();
+    renderApp(`${E}/jury`);
+    const table = await screen.findByRole("table", { name: copy.jury.tableLabel });
+    const pick = (name: string) =>
+      within(table).getByRole("button", { name: new RegExp(`^${name}`) });
+
+    await user.click(pick("Colchicine"));
+    let reading = screen.getByRole("region", { name: copy.jury.readingLabel("Colchicine") });
+    expect(within(reading).getByText(copy.jury.consensusRank(6))).toBeInTheDocument();
+    expect(
+      within(reading).getByText("1 says Investigate, 1 says Watch, 1 says Set aside"),
+    ).toHaveAttribute("data-contested", "true");
+    expect(pick("Colchicine")).toHaveAttribute("aria-current", "true");
+    // One tab stop for the whole board: the drug being read.
+    expect(
+      within(table)
+        .getAllByRole("button")
+        .filter((button) => button.tabIndex === 0),
+    ).toEqual([pick("Colchicine")]);
+
+    // The arrow keys move through the drugs here, instead of changing step.
+    pick("Colchicine").focus();
+    await user.keyboard("{ArrowDown}");
+    expect(pick("Upadacitinib")).toHaveFocus();
+    reading = screen.getByRole("region", { name: copy.jury.readingLabel("Upadacitinib") });
+    expect(within(reading).getByText(copy.jury.consensusRank(9))).toBeInTheDocument();
+    await user.keyboard("{End}");
+    expect(pick("Thalidomide")).toHaveFocus();
+    expect(screen.getByText("All 3 say Set aside")).toBeInTheDocument();
+    await user.keyboard("{ArrowDown}");
+    expect(pick("Thalidomide")).toHaveFocus();
+    await user.keyboard("{Home}{ArrowUp}");
+    expect(pick("Baricitinib")).toHaveFocus();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Model jury");
   });
 
   it("shows each model's progress in plain words while the jury reviews", async () => {
@@ -141,16 +226,63 @@ describe("Step 5, Model jury", () => {
     };
     serveExperiment(experiment);
     renderApp(`${E}/jury`);
-    const table = await screen.findByRole("table", { name: copy.jury.plotLabel });
-    expect(within(table).getAllByRole("columnheader")).toHaveLength(4);
+    const table = await screen.findByRole("table", { name: copy.jury.tableLabel });
+    expect(within(table).getAllByRole("columnheader")).toHaveLength(5);
     expect(within(table).queryByText("GLM-5.3")).not.toBeInTheDocument();
     expectOnce(copy.jury.excluded.invalid("GLM-5.3"));
-    // No invented votes: two markers per row.
+    // No invented votes: two tiles per row, and two models in the reading.
+    expect(cellsIn("jury-row-CHEMBL2105759")).toEqual([
+      "1",
+      "Baricitinib" + copy.jury.knownTreatment,
+      "1, Investigate",
+      "1, Investigate",
+      "0",
+    ]);
+    const reading = screen.getByRole("region", { name: copy.jury.readingLabel("Baricitinib") });
+    expect(within(reading).getByText("Both say Investigate")).toBeInTheDocument();
+    expect(within(reading).getAllByRole("heading", { level: 3 })).toHaveLength(2);
+  });
+
+  it("shows a drug a model didn't rank as missing, and long names without a known answer", async () => {
+    const experiment = covidWithJury("done");
+    const jury = experiment.jury ?? covidJury();
+    experiment.candidates = experiment.candidates.map((candidate) => ({
+      ...candidate,
+      known_answer: false,
+      name: candidate.candidate_id === "CHEMBL468" ? "ROPEGINTERFERON ALFA-2B" : candidate.name,
+    }));
+    experiment.jury = {
+      ...jury,
+      votes: jury.votes.filter(
+        (vote) => !(vote.model_id === "glm-5.3" && vote.candidate_id === "CHEMBL468"),
+      ),
+      agreement: null,
+    };
+    serveExperiment(experiment);
+    const user = userEvent.setup();
+    renderApp(`${E}/jury`);
+    await screen.findByRole("table", { name: copy.jury.tableLabel });
+    expect(screen.queryByText(copy.jury.knownTreatment)).not.toBeInTheDocument();
+    expectOnce(copy.jury.agreementMissing);
+    expect(screen.queryByText(copy.jury.agreementHelp)).not.toBeInTheDocument();
+    expect(cellsIn("jury-row-CHEMBL468")).toEqual([
+      "15",
+      "Ropeginterferon alfa-2b",
+      "15, Set aside",
+      "14, Set aside",
+      copy.jury.noRank,
+      "1",
+    ]);
+
+    await user.click(screen.getByRole("button", { name: "Ropeginterferon alfa-2b" }));
+    const reading = screen.getByRole("region", {
+      name: copy.jury.readingLabel("Ropeginterferon alfa-2b"),
+    });
+    expect(within(reading).getByText("2 say Set aside")).toBeInTheDocument();
     expect(
-      within(screen.getByTestId("jury-row-CHEMBL2105759")).getByRole("cell", {
-        name: "Claude Sonnet 5: rank 1, GPT-5.4: rank 1",
-      }),
+      within(reading).getByRole("heading", { name: `GLM-5.3${copy.jury.noVote}` }),
     ).toBeInTheDocument();
+    expect(within(reading).getAllByText(copy.jury.objection)).toHaveLength(2);
   });
 
   it("disables asking on an archived experiment, with one short reason", async () => {
@@ -177,6 +309,11 @@ describe("Step 5, Model jury", () => {
     );
   });
 });
+
+/** The text of each cell in one row of the jury's board, left to right. */
+function cellsIn(testId: string): string[] {
+  return [...screen.getByTestId(testId).querySelectorAll("th, td")].map((cell) => cell.textContent);
+}
 
 /** The value of each column's drug picker, left to right. */
 function picked() {

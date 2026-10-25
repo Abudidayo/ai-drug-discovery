@@ -6,11 +6,25 @@ export interface Juror {
   marker: number;
 }
 
-/** One drug's row in the jury's dot plot: each counted model's vote, in jury order. */
+/** One drug's row on the jury's ballot board: each counted model's vote, in jury order. */
 export interface JuryRow {
   candidate: Candidate;
+  /** Its place in the consensus; tied drugs share one. Null when the consensus doesn't list it. */
+  consensusRank: number | null;
+  /** Null where that model didn't rank the drug. */
   votes: (JuryVote | null)[];
   contested: boolean;
+  /** How far apart the models' ranks are, worst minus best; null below two ranks. */
+  spread: number | null;
+}
+
+/** The decisions in the order they are named: the most promising first. */
+export const DECISIONS: readonly Decision[] = ["investigate", "watch", "deprioritise"];
+
+/** How many models made one decision on a drug. */
+export interface DecisionCount {
+  decision: Decision;
+  count: number;
 }
 
 /** One model's view of one drug, for a single cell. */
@@ -77,25 +91,51 @@ function voteOf(jury: JuryRun, modelId: string, candidateId: string): JuryVote |
   );
 }
 
+/** Worst rank minus best rank among the votes cast; null when fewer than two models ranked it. */
+export function rankSpread(votes: readonly (JuryVote | null)[]): number | null {
+  const ranks = votes.flatMap((vote) => (vote === null ? [] : [vote.rank]));
+  return ranks.length < 2 ? null : Math.max(...ranks) - Math.min(...ranks);
+}
+
 /**
- * The dot plot's rows in consensus order (ties keep the API's order). Drugs the consensus
+ * The ballot board's rows in consensus order (ties keep the API's order). Drugs the consensus
  * doesn't list follow in shortlist order, so no Candidate is dropped.
  */
 export function juryRows(jury: JuryRun, candidates: readonly Candidate[]): JuryRow[] {
   const counted = countedJurors(jury);
   const contested = new Set(jury.contested);
-  const order = (jury.consensus?.ranking ?? []).map((entry) => entry.candidate_id);
+  const ranking = jury.consensus?.ranking ?? [];
+  const order = ranking.map((entry) => entry.candidate_id);
   const position = (id: string) => {
     const index = order.indexOf(id);
     return index === -1 ? order.length : index;
   };
   return [...candidates]
     .sort((a, b) => position(a.candidate_id) - position(b.candidate_id))
-    .map((candidate) => ({
-      candidate,
-      votes: counted.map(({ model }) => voteOf(jury, model.id, candidate.candidate_id)),
-      contested: contested.has(candidate.candidate_id),
-    }));
+    .map((candidate) => {
+      const votes = counted.map(({ model }) => voteOf(jury, model.id, candidate.candidate_id));
+      return {
+        candidate,
+        consensusRank:
+          ranking.find((entry) => entry.candidate_id === candidate.candidate_id)?.rank ?? null,
+        votes,
+        contested: contested.has(candidate.candidate_id),
+        spread: rankSpread(votes),
+      };
+    });
+}
+
+/** How many models made each decision on one drug, most promising first; missing votes skipped. */
+export function decisionCounts(votes: readonly (JuryVote | null)[]): DecisionCount[] {
+  return DECISIONS.flatMap((decision) => {
+    const count = votes.filter((vote) => vote?.decision === decision).length;
+    return count === 0 ? [] : [{ decision, count }];
+  });
+}
+
+/** The lowest rank on the board: the number of drugs reviewed, or a model's worst rank if higher. */
+export function lastRank(jury: JuryRun, candidates: readonly Candidate[]): number {
+  return Math.max(candidates.length, ...jury.votes.map((vote) => vote.rank));
 }
 
 /** Each counted model's decision on one drug, in jury order. */
@@ -104,33 +144,4 @@ export function decisionsFor(jury: JuryRun, candidateId: string): JurorDecision[
     const vote = voteOf(jury, juror.model.id, candidateId);
     return vote === null ? [] : [{ juror, decision: vote.decision }];
   });
-}
-
-/** The one objection the jury step shows. */
-export interface FeaturedObjection {
-  juror: Juror;
-  candidate: Candidate;
-  text: string;
-}
-
-/**
- * The objection worth reading first: on the known-answer drug (else the consensus favourite),
- * from the counted model that ranked it lowest, the most sceptical voice on the drug that
- * matters most. Ties go to the earlier model.
- */
-export function featuredObjection(
-  jury: JuryRun,
-  candidates: readonly Candidate[],
-): FeaturedObjection | null {
-  const favourite = jury.consensus?.ranking[0]?.candidate_id;
-  const candidate =
-    candidates.find((c) => c.known_answer) ?? candidates.find((c) => c.candidate_id === favourite);
-  if (candidate === undefined) return null;
-  let featured: { juror: Juror; vote: JuryVote } | null = null;
-  for (const juror of countedJurors(jury)) {
-    const vote = voteOf(jury, juror.model.id, candidate.candidate_id);
-    if (vote === null || vote.objection.trim() === "") continue;
-    if (featured === null || vote.rank > featured.vote.rank) featured = { juror, vote };
-  }
-  return featured && { juror: featured.juror, candidate, text: featured.vote.objection };
 }

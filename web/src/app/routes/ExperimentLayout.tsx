@@ -130,7 +130,7 @@ function ExperimentScreen({ experimentId, step }: { experimentId: string; step: 
 
 function fallbackLayout(step: StepSlug, experiment: Experiment | undefined): FigureLayout {
   if (step === "disease") return "search";
-  // The jury's result is three panels; asking it and following its progress is one.
+  // The jury's result is its ballot board and a reading pane; asking it and its progress are one.
   if (step === "jury" && experiment?.jury?.status === "done") return "jury";
   // The pose takes the stage; the network stays hidden, so it costs no drawing.
   if (step === "pose") return "pose";

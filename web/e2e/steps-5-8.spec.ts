@@ -42,19 +42,43 @@ test("a student asks the jury, compares drugs, then archives and restores", asyn
   await expect(progress.getByRole("listitem")).toHaveCount(3);
   await expect(progress).toContainText("Claude Sonnet 5");
 
-  const plot = page.getByRole("table", { name: "Each model’s rank and decision for every drug" });
-  await expect(plot).toBeVisible({ timeout: 20_000 });
-  await expect(plot.getByTestId(/^jury-row-/)).toHaveCount(15);
-  await expect(plot.locator("[data-contested]")).toHaveCount(1);
+  const board = page.getByRole("table", { name: "Each model’s rank and decision for every drug" });
+  await expect(board).toBeVisible({ timeout: 20_000 });
+  await expect(board.getByTestId(/^jury-row-/)).toHaveCount(15);
+  await expect(board.locator("[data-contested]")).toHaveCount(1);
   await expect(page.getByTestId("jury-row-CHEMBL107")).toHaveAttribute("data-contested", "true");
   for (const model of ["Claude Sonnet 5", "GPT-5.4", "GLM-5.3"]) {
-    await expect(plot.getByRole("columnheader", { name: model })).toHaveCount(1);
+    await expect(board.getByRole("columnheader", { name: model })).toHaveCount(1);
   }
   await expect(page.getByText("Agreement", { exact: true })).toHaveCount(1);
   await expect(page.getByText("0.62", { exact: true })).toHaveCount(1);
-  await expect(page.getByText("GLM-5.3’s objection to Baricitinib")).toHaveCount(1);
-  await expect(page.getByText(/^Blocking JAK1 may also weaken/)).toHaveCount(1);
+  await expect(page.getByText("Split decision", { exact: true })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Ask the Model jury" })).toHaveCount(0);
+
+  // The reading pane opens on the consensus favourite.
+  let reading = page.getByRole("region", { name: "What the models said about Baricitinib" });
+  await expect(reading.getByRole("heading", { level: 2 })).toHaveText("Baricitinib");
+  await expect(reading.getByText("All 3 say Investigate", { exact: true })).toBeVisible();
+  await expect(reading.getByText(/Blocking JAK1 may also weaken/)).toHaveCount(1);
+
+  // Anywhere on a row picks its drug (here its middle, over the tiles); the arrow keys then
+  // move through the drugs, not the steps.
+  await page.getByTestId("jury-row-CHEMBL107").click();
+  reading = page.getByRole("region", { name: "What the models said about Colchicine" });
+  await expect(reading.getByText("Consensus #6", { exact: true })).toBeVisible();
+  await expect(
+    reading.getByText("1 says Investigate, 1 says Watch, 1 says Set aside", { exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expectStep(page, "Model jury");
+  await expect(board.getByRole("button", { name: "Upadacitinib" })).toBeFocused();
+  await expect(
+    page.getByRole("region", { name: "What the models said about Upadacitinib" }),
+  ).toBeVisible();
+  // The board and the reading pane fit the step: the page itself doesn't scroll.
+  expect(
+    await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight),
+  ).toBe(true);
 
   // Step 6: three drugs side by side, the molecules on one shared canvas.
   await page.getByRole("button", { name: "Next", exact: true }).click();

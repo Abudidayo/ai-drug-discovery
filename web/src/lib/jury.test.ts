@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
+import type { Decision, JuryVote } from "../api/types";
 import { covidExperiment, covidJury } from "../test/fixtures";
+import { copy } from "../copy/en";
 import {
   countedJurors,
+  decisionCounts,
   excludedJurors,
   failedCheck,
-  featuredObjection,
   juryRows,
+  lastRank,
+  rankSpread,
   retriedCount,
 } from "./jury";
 
@@ -25,11 +29,29 @@ describe("the recorded COVID-19 jury", () => {
     ]);
   });
 
-  it("features the most sceptical model's objection to the known-answer drug", () => {
-    const objection = featuredObjection(jury, candidates);
-    expect(objection?.juror.model.display_name).toBe("GLM-5.3");
-    expect(objection?.candidate.name).toBe("BARICITINIB");
-    expect(objection?.text).toMatch(/^Blocking JAK1 may also weaken/);
+  it("gives each row its consensus place, tied drugs sharing one, and how far the ranks spread", () => {
+    const rows = juryRows(jury, candidates);
+    expect(rows.map((row) => row.consensusRank)).toEqual([
+      1, 2, 3, 4, 5, 6, 6, 6, 9, 10, 10, 12, 12, 14, 15,
+    ]);
+    const colchicine = rows.find((row) => row.candidate.name === "COLCHICINE");
+    expect(colchicine?.votes.map((vote) => vote?.rank)).toEqual([7, 3, 14]);
+    expect(colchicine?.spread).toBe(11);
+    expect(lastRank(jury, candidates)).toBe(15);
+  });
+
+  it("keeps a drug the consensus doesn't list, last and without a place", () => {
+    const partial = {
+      ...jury,
+      consensus: jury.consensus && {
+        ...jury.consensus,
+        ranking: jury.consensus.ranking.filter((entry) => entry.candidate_id !== "CHEMBL2105759"),
+      },
+    };
+    const rows = juryRows(partial, candidates);
+    expect(rows).toHaveLength(15);
+    expect(rows.at(-1)?.candidate.name).toBe("BARICITINIB");
+    expect(rows.at(-1)?.consensusRank).toBeNull();
   });
 
   it("counts valid jurors only, and the one that needed a retry", () => {
@@ -72,5 +94,39 @@ describe("failedCheck", () => {
     expect(failedCheck(["Attempt 1: refused (provider stop_reason=refusal)"])).toBe("refused");
     expect(failedCheck(["Attempt 1: call failed (TimeoutError)"])).toBeNull();
     expect(failedCheck([])).toBeNull();
+  });
+});
+
+describe("one drug's verdict", () => {
+  const [recorded] = covidJury().votes;
+  if (recorded === undefined) throw new Error("No votes in the fixture");
+  const vote = (rank: number, decision: Decision): JuryVote => ({ ...recorded, rank, decision });
+
+  it("counts each decision, most promising first, skipping missing votes", () => {
+    const votes = [vote(3, "watch"), null, vote(1, "investigate"), vote(9, "watch")];
+    expect(decisionCounts(votes)).toEqual([
+      { decision: "investigate", count: 1 },
+      { decision: "watch", count: 2 },
+    ]);
+    expect(rankSpread(votes)).toBe(8);
+    expect(rankSpread([vote(4, "watch"), null])).toBeNull();
+  });
+
+  it("reads as plain words for every size of jury", () => {
+    const all = (count: number) => [{ decision: "investigate" as const, count }];
+    expect(copy.jury.verdict(all(3), true)).toBe("All 3 say Investigate");
+    expect(copy.jury.verdict(all(2), true)).toBe("Both say Investigate");
+    expect(copy.jury.verdict(all(1), true)).toBe("1 says Investigate");
+    // One model didn't rank it, so the other two aren't "all".
+    expect(copy.jury.verdict(all(2), false)).toBe("2 say Investigate");
+    expect(
+      copy.jury.verdict(
+        [
+          { decision: "investigate", count: 2 },
+          { decision: "deprioritise", count: 1 },
+        ],
+        true,
+      ),
+    ).toBe("2 say Investigate, 1 says Set aside");
   });
 });

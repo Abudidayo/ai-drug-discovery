@@ -58,15 +58,17 @@ Locally it reuses servers already running on ports 8000 and 4173; `E2E_API_PORT`
   draws Compare's molecules side by side on one shared canvas, so a step never needs more than
   three WebGL contexts (the hidden network keeps its own).
 - `src/charts/SlopeChart.tsx`: closeness, network rank and evidence rank on one row per drug.
-- `src/charts/DotPlot.tsx`: the Model jury, one row per drug and one marker shape per model
-  (`Marker.tsx`), with a split decision drawn once in the contested colour. `src/lib/jury.ts`
-  picks the rows, the counted models and the one objection shown.
+- `src/steps/JuryStep.tsx`: the Model jury's ballot board, one row per drug in consensus order
+  and one column per model (marked by its `Marker.tsx` shape), each tile the model's rank styled
+  by its decision, with a reading pane for the picked drug. `src/lib/jury.ts` builds the rows
+  (consensus place, votes, split decision, rank spread) and the counted models.
 - `src/lib/format.ts`: `drugName()` and the other display formatters; use them everywhere.
 - Tests: `src/test/` has the MSW server (handlers typed by the contract via `openapi-msw`), the
   WebGL and layout stand-ins for jsdom, and fixtures read straight from
   `../api/oxhack_api/fixtures` through the `@api-fixtures` alias, so both sides share one copy.
   `e2e/` holds the Playwright tests.
 
-ArrowUp and ArrowDown move between steps, except while typing in a field.
+ArrowUp and ArrowDown move between steps, except while typing in a field or moving through the
+jury's ballot board.
 
 `3dmol` is installed for the binding pose (phase 7) but not used yet.

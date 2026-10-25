@@ -30,12 +30,10 @@
   grid-template-areas: "molecule evidence net";
 }
 
+/* The jury's ballot board, with the drug it is reading beside it. */
 .grid[data-layout="jury"] {
-  grid-template-rows: auto minmax(0, 1fr);
-  grid-template-columns: minmax(0, 7.6fr) minmax(0, 4.4fr);
-  grid-template-areas:
-    "plot agreement"
-    "plot objection";
+  grid-template-columns: minmax(0, 7.4fr) minmax(0, 4.6fr);
+  grid-template-areas: "ballot reading";
 }
 
 /* The binding pose takes the stage; what it means and what is missing sit beside it. */
@@ -116,16 +114,12 @@
   grid-area: evidence;
 }
 
-.panel[data-area="plot"] {
-  grid-area: plot;
+.panel[data-area="ballot"] {
+  grid-area: ballot;
 }
 
-.panel[data-area="agreement"] {
-  grid-area: agreement;
-}
-
-.panel[data-area="objection"] {
-  grid-area: objection;
+.panel[data-area="reading"] {
+  grid-area: reading;
 }
 
 .panel[data-area="pose"] {
@@ -282,7 +276,7 @@
   }
 
   .grid[data-layout="jury"] {
-    grid-template-areas: "plot" "agreement" "objection";
+    grid-template-areas: "ballot" "reading";
   }
 
   .grid[data-layout="pose"] {
