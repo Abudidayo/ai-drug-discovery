@@ -1,4 +1,4 @@
-import { lazy, Suspense, ViewTransition } from "react";
+import { lazy, Suspense } from "react";
 import type { Experiment } from "../api/types";
 import { copy, unscorableReasonText, type StepSlug } from "../copy/en";
 import { focusCandidate, routeSentence } from "../lib/candidates";
@@ -51,18 +51,16 @@ export function NetworkPanel({ experiment, step, view, focusId, hidden }: Networ
     }
   }
 
-  // The network persists across steps; on a step change it glides to its new cell.
+  // Keep the network mounted across steps without capturing the page's live WebGL canvases.
   return (
-    <ViewTransition name="network-panel" default={hidden ? "none" : "auto"}>
-      <Panel area="net" hidden={hidden} title={title} label={copy.network.title}>
-        {lede !== null && <p className={styles.lede}>{lede}</p>}
-        {(!empty || step === "biology") && (
-          <Suspense fallback={<div className={styles.loading} />}>
-            <NetworkFigure graph={graph} view={view} />
-          </Suspense>
-        )}
-        {!empty && <Legend keys={legendFor(step, view)} />}
-      </Panel>
-    </ViewTransition>
+    <Panel area="net" hidden={hidden} title={title} label={copy.network.title}>
+      {lede !== null && <p className={styles.lede}>{lede}</p>}
+      {(!empty || step === "biology") && (
+        <Suspense fallback={<div className={styles.loading} />}>
+          <NetworkFigure graph={graph} view={view} />
+        </Suspense>
+      )}
+      {!empty && <Legend keys={legendFor(step, view)} />}
+    </Panel>
   );
 }

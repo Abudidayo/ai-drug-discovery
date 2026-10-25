@@ -174,7 +174,14 @@ async function trackWebGLContexts(page: Page): Promise<void> {
     };
     track(HTMLCanvasElement.prototype);
     track(OffscreenCanvas.prototype);
+    const start = document.startViewTransition.bind(document);
+    let starts = 0;
+    document.startViewTransition = (options) => {
+      starts += 1;
+      return start(options);
+    };
     Object.assign(window, {
+      nativeTransitionStarts: () => starts,
       liveWebGLContexts: () => contexts.filter((context) => !context.isContextLost()).length,
       webGLContextDiagnostics: () =>
         contexts.map((context) => ({
@@ -329,4 +336,10 @@ test("a student shows baricitinib's binding pose and checks it against the cryst
     ),
     "3Dmol clearing must not render a final protein frame during navigation",
   ).toBe(false);
+  expect(
+    await page.evaluate(() =>
+      (window as unknown as { nativeTransitionStarts: () => number }).nativeTransitionStarts(),
+    ),
+    "3D steps must navigate without snapshotting their live canvases",
+  ).toBe(0);
 });
