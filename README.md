@@ -103,8 +103,8 @@ With drug names shown, models score much higher (MRR about 0.5–0.6 in our pilo
 
 ### Limits
 
-- This tests recovery of known approvals, not whether a drug works.
-- One frozen case used a symptom-measurement ID for multiple sclerosis; dropping it changes no conclusion ([`results/ERRATA.md`](results/ERRATA.md)).
+- Our tests only check whether we rediscover drugs already approved for a disease. They can't show that a new suggestion would work in patients.
+- One test disease was entered by mistake: we used the ID for "multiple sclerosis symptom measurement" instead of multiple sclerosis itself. Removing it didn't change any result ([`results/ERRATA.md`](results/ERRATA.md)).
 
 These are research leads, not treatment advice.
 
