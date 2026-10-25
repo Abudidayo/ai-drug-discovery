@@ -28,12 +28,12 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": { target: API_ORIGIN, changeOrigin: true },
+      "/api": { target: API_ORIGIN, changeOrigin: false },
     },
   },
   preview: {
     proxy: {
-      "/api": { target: API_ORIGIN, changeOrigin: true },
+      "/api": { target: API_ORIGIN, changeOrigin: false },
     },
   },
   test: {

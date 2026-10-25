@@ -1,32 +1,65 @@
-# Test main, then deploy it to the demo codespace (.devcontainer/README.md).
-#
-# Runs on every push to main, and by hand from the Actions tab. The deploy job opens a
-# shell in the codespace and runs scripts/redeploy.sh, which checks out main, migrates
-# the database, builds the web app and restarts the stack; then it checks the public
-# link answers. GitHub lists each run under the repository's "demo" environment.
-#
-# Needs, in Settings -> Secrets and variables -> Actions:
-#   secret   CODESPACE_DEPLOY_TOKEN  classic token of the codespace's owner, `codespace` scope
-#   variable DEMO_CODESPACE          the codespace's name (`gh codespace list`)
-#   variable DEMO_URL                its public web address, ending in /
+# Required branch-protection check: test. Docs-only changes still report this check.
 name: Deploy
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
 
-# One deploy at a time; a newer push waits rather than cancelling one half-way.
-concurrency:
-  group: deploy-demo
-  cancel-in-progress: false
-
 permissions:
   contents: read
 
+# Cancel superseded PR checks, but never interrupt an in-progress deployment.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: diff
+        name: Detect runtime changes
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          code=true
+          if [[ "$EVENT" != workflow_dispatch ]]; then
+            base=${BASE:-$BEFORE}
+            if [[ -n "$base" && ! "$base" =~ ^0+$ ]] && git cat-file -e "$base^{commit}" 2>/dev/null; then
+              git diff --name-only --no-renames -z "$base" HEAD > "$RUNNER_TEMP/changed-paths"
+              code=false
+              while IFS= read -r -d '' path; do
+                case "$path" in
+                  *.md|LICENSE|.trail/*|.agents/*|.claude/*) ;;
+                  *) code=true ;;
+                esac
+              done < "$RUNNER_TEMP/changed-paths"
+            fi
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "Runtime changes: $code" >> "$GITHUB_STEP_SUMMARY"
+
+  python:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:16
@@ -38,67 +71,140 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql://postgres@localhost:5432/postgres
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
         with:
           python-version: "3.11"
-      - uses: actions/setup-node@v4
+          enable-cache: true
+      - run: uv sync --all-packages --frozen
+      - name: API lint, types and tests
+        working-directory: api
+        run: |
+          uv run --no-sync ruff check .
+          uv run --no-sync pyright
+          uv run --no-sync pytest -q
+      - name: Pipeline and ranking tests
+        run: uv run --no-sync pytest tests ranking/tests -q
+      - name: Docking queue tests (no Vina required)
+        working-directory: worker
+        run: uv run --no-sync pytest -q
+      - name: Database migrations
+        run: uv run --no-sync pytest db/tests -q
+      - name: Deployment script regression tests
+        run: uv run --no-sync pytest scripts/tests -q
+
+  web:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      OXHACK_SOURCE: fixture
+      OXHACK_JURY: fixture
+      OXHACK_DOCKING: fixture
+      OXHACK_REPO: memory
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          python-version: "3.11"
+          enable-cache: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
-
-      - name: API and pipeline
-        run: |
-          uv sync --all-packages --frozen
-          (cd api && uv run --no-sync ruff check . && uv run --no-sync pyright)
-          uv run --no-sync pytest api/tests -q
-          uv run --no-sync pytest tests -q
-      - name: Database migrations
-        run: >-
-          uv run --no-project --python 3.12 --with pytest --with "psycopg[binary]>=3.2,<4"
-          pytest db/tests -q
-
-      - name: Web app
+      - run: uv sync --all-packages --frozen
+      - run: npm ci
+        working-directory: web
+      - name: Web checks and unit tests
         working-directory: web
         run: |
-          npm ci
           npm run check:api
           npm run typecheck
           npm run lint
-          npx prettier --check .
+          npm run format:check
           npm test
-          npm run build
+      - name: Install browser
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - name: Browser tests against the real fixture API and built app
+        working-directory: web
+        run: npm run e2e
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: failure()
+        with:
+          name: playwright-failure
+          path: |
+            web/playwright-report/
+            web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # A stable required check succeeds on docs-only changes and fails closed on cancelled jobs.
+  test:
+    needs: [changes, python, web]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require all applicable checks
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          CODE: ${{ needs.changes.outputs.code }}
+          PYTHON: ${{ needs.python.result }}
+          WEB: ${{ needs.web.result }}
+        run: |
+          [[ "$CHANGES" == success ]]
+          if [[ "$CODE" == true ]]; then
+            [[ "$PYTHON" == success && "$WEB" == success ]]
+          else
+            [[ "$CODE" == false && "$PYTHON" == skipped && "$WEB" == skipped ]]
+          fi
 
   deploy:
-    needs: test
-    runs-on: ubuntu-latest
+    needs: [changes, test]
+    if: >-
+      github.ref == 'refs/heads/main' && github.event_name != 'pull_request' &&
+      needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: deploy-demo
+      cancel-in-progress: false
     environment:
       name: demo
       url: ${{ vars.DEMO_URL }}
     steps:
-      - name: Redeploy the codespace
+      - name: Redeploy exactly the tested commit
         env:
           GH_TOKEN: ${{ secrets.CODESPACE_DEPLOY_TOKEN }}
           CODESPACE: ${{ vars.DEMO_CODESPACE }}
-        # Starts the codespace first if it has stopped. Checks out main before running the
-        # script, so the script that runs is always main's own.
+          DEPLOY_SHA: ${{ github.sha }}
         run: |
-          if [ -z "$GH_TOKEN" ] || [ -z "$CODESPACE" ]; then
-            echo "::error::Set the CODESPACE_DEPLOY_TOKEN secret and the DEMO_CODESPACE variable (.devcontainer/README.md, Deploy)."
+          if [[ -z "$GH_TOKEN" || -z "$CODESPACE" ]]; then
+            echo "::error::Set CODESPACE_DEPLOY_TOKEN and DEMO_CODESPACE (.devcontainer/README.md)."
             exit 1
           fi
+          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]
           gh codespace ssh -c "$CODESPACE" -- \
-            'bash -lc "cd /workspaces/ai-drug-discovery && git fetch -q origin main && git checkout -q --force -B main origin/main && scripts/redeploy.sh main"' \
+            "bash -lc 'cd /workspaces/ai-drug-discovery && git fetch -q origin main && git checkout -q --detach --force $DEPLOY_SHA && scripts/redeploy.sh $DEPLOY_SHA'" \
             < /dev/null
-
-      - name: Check the public link answers
+      - name: Check the public API answers
         env:
           URL: ${{ vars.DEMO_URL }}
         run: |
+          [[ "$URL" == https://* ]]
           for _ in $(seq 1 30); do
-            if curl -sf "${URL}api/health" | grep -q '"status":"ok"'; then exit 0; fi
+            if curl --connect-timeout 5 --max-time 10 -fsS "${URL%/}/api/health" | \
+              python3 -c 'import json,sys; assert json.load(sys.stdin)["status"] == "ok"'; then
+              exit 0
+            fi
             sleep 5
           done
-          echo "The demo didn't answer at ${URL}api/health" >&2
+          echo '::error::The public demo API failed its health check.'
           exit 1

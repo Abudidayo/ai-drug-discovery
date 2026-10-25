@@ -62,7 +62,10 @@ TAIL_CHARS = 1500
 def tail(path: Path, lines: int = TAIL_LINES, chars: int = TAIL_CHARS) -> str:
     """The last lines of a text file, at most `chars` long; empty if there is none."""
     try:
-        text = path.read_text(errors="replace")
+        with path.open("rb") as stream:
+            stream.seek(0, os.SEEK_END)
+            stream.seek(max(0, stream.tell() - chars * 4))
+            text = stream.read(chars * 4).decode(errors="replace")
     except FileNotFoundError:
         return ""
     last = "\n".join(text.rstrip().splitlines()[-lines:])

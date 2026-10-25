@@ -262,6 +262,7 @@ def test_a_stale_saved_demo_job_is_refreshed_with_its_followers(
     assert client.get(f"/api/dock/{CONTROL_JOB}").json()["files"] is None
 
     restarted = make_client()
+    restarted.cookies.update(client.cookies)
     assert restarted.get(f"/api/dock/{CONTROL_JOB}").json() == fresh
     refreshed = restarted.get(f"/api/dock/{follower['id']}").json()
     assert refreshed["files"] == fresh["files"]

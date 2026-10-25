@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { copy } from "../copy/en";
 import { covidExperiment, EXPERIMENT_ID } from "../test/fixtures";
 import { renderApp } from "../test/render";
@@ -54,15 +54,27 @@ describe("Choosing a disease", () => {
   });
 
   it("shows the build on step 2 while it runs", async () => {
+    // Hold the build until its progress is observed, independently of polling or CPU speed.
+    let finished = false;
+    server.use(
+      http.untyped.get("*/api/experiments/:id", ({ params }) =>
+        HttpResponse.json(
+          covidExperiment(
+            finished ? "ready" : "building",
+            finished ? null : "ranking",
+            String(params.id),
+          ),
+        ),
+      ),
+    );
     const user = userEvent.setup();
     const { router } = renderApp("/");
     await waitFor(() => {
       expect(router.state.location.pathname).toMatch(/^\/e\/[0-9a-f-]+\/disease$/);
     });
-    // Keep it building for a few polls, so the stages can be read on step 2.
-    const id = router.state.location.pathname.split("/")[2] ?? "";
-    const building = covidExperiment("building", "ranking", id);
-    fakeApi.experiments.set(id, [building, building, covidExperiment("ready", null, id)]);
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: copy.next })).toBeEnabled();
+    });
     await user.click(screen.getByRole("button", { name: copy.next }));
 
     // Queued, then building (polled each second): the stages in plain words, the current one
@@ -83,6 +95,7 @@ describe("Choosing a disease", () => {
     expect(within(screen.getByRole("banner")).getByText("COVID-19")).toBeInTheDocument();
 
     // Polling picks up the finished build.
+    finished = true;
     expect(
       await screen.findByRole("list", { name: copy.biology.targetsLabel }, { timeout: 3000 }),
     ).toBeInTheDocument();
@@ -173,7 +186,14 @@ describe("Choosing a disease", () => {
     );
     const created = fakeApi.created;
     const user = userEvent.setup();
-    const { router } = renderApp(`${E}/disease`);
+    const { router, queryClient } = renderApp(`${E}/disease`);
+    // A prefetched response stays fresh even when the route commits on a later clock tick.
+    const systemTime = Date.now;
+    let elapsed = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => systemTime() + elapsed);
+    const unsubscribe = router.subscribe((state) => {
+      if (state.location.pathname === `/e/${psoriasisId}/disease`) elapsed = 1000;
+    });
     const box = await loadedSearchbox();
     const network = await screen.findByRole("img", { name: copy.network.label });
     const option = screen.getByRole("button", { name: /psoriasis/ });
@@ -183,6 +203,9 @@ describe("Choosing a disease", () => {
     expect(option).toHaveAttribute("aria-busy", "true");
     await waitFor(() => {
       expect(option).toHaveAttribute("aria-current", "true");
+    });
+    await waitFor(() => {
+      expect(queryClient.isFetching()).toBe(0);
     });
 
     // Its screen showed the saved Experiment at once, fetched before it opened: the same search
@@ -196,6 +219,7 @@ describe("Choosing a disease", () => {
     expect(box).toHaveValue("psoriasis");
     expect(network).toBeInTheDocument();
     expect(fakeApi.created).toBe(created);
+    unsubscribe();
   });
 
   it("marks the current Experiment's disease, and choosing it again changes nothing", async () => {

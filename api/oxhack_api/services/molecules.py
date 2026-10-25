@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
+from uuid import uuid4
 
 import httpx
 
@@ -47,7 +49,11 @@ class MoleculeSource(Protocol):
 def parse_sdf(sdf: str) -> tuple[list[dict[str, object]], list[dict[str, int]]]:
     """Atoms and bonds from the first record of a V2000 SDF file."""
     lines = sdf.splitlines()
+    if len(lines) < 4 or not lines[3].rstrip().endswith("V2000"):
+        raise ValueError("Expected a V2000 conformer")
     n_atoms, n_bonds = int(lines[3][:3]), int(lines[3][3:6])
+    if n_atoms <= 0 or n_bonds < 0 or len(lines) < 4 + n_atoms + n_bonds:
+        raise ValueError("Incomplete conformer")
     atoms: list[dict[str, object]] = [
         {
             "element": line[31:34].strip(),
@@ -61,6 +67,14 @@ def parse_sdf(sdf: str) -> tuple[list[dict[str, object]], list[dict[str, int]]]:
         {"a": int(line[:3]) - 1, "b": int(line[3:6]) - 1, "order": int(line[6:9])}
         for line in lines[4 + n_atoms : 4 + n_atoms + n_bonds]
     ]
+    if any(
+        not math.isfinite(float(line[start : start + 10]))
+        for line in lines[4 : 4 + n_atoms]
+        for start in (0, 10, 20)
+    ):
+        raise ValueError("Conformer coordinates must be finite")
+    if any(not (0 <= bond["a"] < n_atoms and 0 <= bond["b"] < n_atoms) for bond in bonds):
+        raise ValueError("Conformer bond refers to a missing atom")
     return atoms, bonds
 
 
@@ -125,11 +139,22 @@ class PubChemMolecules:
             if response.status_code != 200:
                 log.warning("PubChem conformer %s: HTTP %s", pubchem_cid, response.status_code)
                 raise MoleculesUnavailable(f"PubChem answered HTTP {response.status_code}.")
-            atoms, bonds = parse_sdf(response.text)
-            conformer = Conformer.model_validate(
-                {"pubchem_cid": pubchem_cid, "source_url": url, "atoms": atoms, "bonds": bonds}
-            )
-            path.write_text(json.dumps(conformer.model_dump(mode="json"), separators=(",", ":")))
+            try:
+                atoms, bonds = parse_sdf(response.text)
+                conformer = Conformer.model_validate(
+                    {"pubchem_cid": pubchem_cid, "source_url": url, "atoms": atoms, "bonds": bonds}
+                )
+            except (ValueError, IndexError) as error:
+                raise MoleculesUnavailable("PubChem returned an invalid conformer.") from error
+            # Readers must never observe a partly written cache entry, including across processes.
+            temporary = path.with_suffix(f".{uuid4().hex}.tmp")
+            try:
+                temporary.write_text(
+                    json.dumps(conformer.model_dump(mode="json"), separators=(",", ":"))
+                )
+                temporary.replace(path)
+            finally:
+                temporary.unlink(missing_ok=True)
             return conformer
 
     def _get(self, url: str, pubchem_cid: int) -> httpx.Response:

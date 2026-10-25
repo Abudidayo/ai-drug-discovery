@@ -26,6 +26,16 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="OXHACK_", extra="ignore", populate_by_name=True)
 
+    session_cookie_secure: bool = False
+    requests_per_minute: int = Field(default=240, ge=1)
+    writes_per_minute: int = Field(default=30, ge=1)
+    max_active_requests: int = Field(default=32, ge=1, le=128)
+    experiments_per_hour: int = Field(default=6, ge=1)
+    experiments_per_day: int = Field(default=100, ge=1)
+    jury_per_hour: int = Field(default=3, ge=1)
+    cortex_calls_per_minute: int = Field(default=12, ge=1)
+    cortex_calls_per_day: int = Field(default=180, ge=1)
+
     source: Literal["fixture", "live"] = Field(
         default="fixture",
         description=(

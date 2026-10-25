@@ -411,7 +411,7 @@ def test_sdk_endpoint_auth_config_model_and_no_hidden_retries(monkeypatch):
 
 
 @pytest.mark.parametrize("model", ["claude-opus-5-5", "claude-sonnet-5", "openai-gpt-5.4", "glm-5.3"])
-@pytest.mark.parametrize("candidate_count", [0, 15])
+@pytest.mark.parametrize("candidate_count", [0, 15, 100])
 def test_endpoint_routing_structured_output_and_usage(monkeypatch, model, candidate_count):
     monkeypatch.setenv("SNOWFLAKE_ACCOUNT", "test-account")
     monkeypatch.setenv("SNOWFLAKE_PAT", "fake-test-token")
@@ -437,7 +437,7 @@ def test_endpoint_routing_structured_output_and_usage(monkeypatch, model, candid
         if model.startswith("claude-"):
             assert str(request.url) == "https://test-account.snowflakecomputing.com/api/v2/cortex/v1/messages"
             assert request.headers["anthropic-version"] == "2023-06-01"
-            assert body["max_tokens"] == max(4096, 1024 * candidate_count)
+            assert body["max_tokens"] == min(32768, max(4096, 1024 * candidate_count))
             assert "temperature" not in body  # Opus 5.5 rejects sampling parameters.
             assert "response_format" not in body
             assert body["output_config"] == {"effort": "low", "format": {
@@ -451,6 +451,7 @@ def test_endpoint_routing_structured_output_and_usage(monkeypatch, model, candid
             assert 'temperature' not in body
         else:
             assert body["temperature"] == 0
+        assert body["max_completion_tokens"] == 32768
         assert "anthropic-version" not in request.headers
         assert body["response_format"] == RESPONSE_FORMAT
         assert "output_config" not in body
@@ -467,7 +468,7 @@ def test_endpoint_routing_structured_output_and_usage(monkeypatch, model, candid
     finally:
         client.close()
     assert result == ModelReply(raw, input_tokens=123, output_tokens=456,
-        max_output_tokens=max(4096, 1024 * candidate_count) if model.startswith("claude-") else None,
+        max_output_tokens=min(32768, max(4096, 1024 * candidate_count)) if model.startswith("claude-") else None,
         stop_reason="end_turn" if model.startswith("claude-") else None)
     assert validate_reply(result.text, PACKET)[0] is not None
     assert len(calls) == 1

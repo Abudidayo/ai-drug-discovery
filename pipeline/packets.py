@@ -9,18 +9,18 @@ beyond that cache. PubChem snapshots use their retrieval date as the release.
 
 from __future__ import annotations
 
-from collections import Counter, defaultdict
-from copy import deepcopy
-from datetime import datetime, timezone
-from hashlib import sha256
 import json
 import math
-from pathlib import Path
 import random
 import re
 import time
+from collections import Counter, defaultdict
+from copy import deepcopy
+from datetime import UTC, datetime
+from hashlib import sha256
+from pathlib import Path
 from urllib.parse import urlencode, urljoin
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import duckdb
 import httpx
@@ -208,11 +208,15 @@ class EvidenceSources:
             if owned:
                 client.close()
         path.parent.mkdir(parents=True, exist_ok=True)
-        saved = {"release": release, "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        saved = {"release": release, "retrieved_at": datetime.now(UTC).isoformat(),
                  "request": json.loads(signature), "response": payload}
-        temporary = path.with_suffix(".tmp")
-        temporary.write_text(json.dumps(saved, allow_nan=False))
-        temporary.replace(path)
+        # Each experiment owns its temporary file; only complete entries become visible.
+        temporary = path.with_suffix(f".{uuid4().hex}.tmp")
+        try:
+            temporary.write_text(json.dumps(saved, allow_nan=False))
+            temporary.replace(path)
+        finally:
+            temporary.unlink(missing_ok=True)
         return payload
 
     def chembl(self, endpoint):
@@ -319,7 +323,7 @@ class EvidenceSources:
         if not re.fullmatch(r"[A-Z]{14}-[A-Z]{10}-[A-Z]", key):
             raise ValueError("Invalid ChEMBL InChIKey")
         # PubChem has no numbered release; each response is a dated snapshot.
-        payload = self.request(f"{PUBCHEM_URL}{key}/cids/JSON", "pubchem-" + datetime.now(timezone.utc).date().isoformat(), missing=True)
+        payload = self.request(f"{PUBCHEM_URL}{key}/cids/JSON", "pubchem-" + datetime.now(UTC).date().isoformat(), missing=True)
         cids = sorted(set(payload["IdentifierList"]["CID"])) if payload else []
         if len(cids) > 1:
             self.reject("pubchem", key, "ambiguous_cid")

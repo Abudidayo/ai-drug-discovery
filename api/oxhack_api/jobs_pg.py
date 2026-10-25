@@ -38,6 +38,7 @@ import psycopg
 from psycopg import errors
 from psycopg.types.json import Jsonb
 
+from .errors import Unavailable
 from .jobs import Job, JobFactory, JobRef, Progress, save_dock_job
 from .repo import AlreadyExists
 from .repo.postgres import Conn, PostgresRepo
@@ -59,6 +60,18 @@ class PostgresQueue:
 
     def submit(self, ref: JobRef) -> None:
         with self._repo.connection() as conn:
+            # Serialize admission, not execution, across API processes. The
+            # Experiment lock is already held by callers that mutate an Experiment.
+            conn.execute("select pg_advisory_xact_lock(%s)", (0x0A11_0040,))
+            counts = conn.execute(
+                """select
+                  (select count(*) from jobs where status in ('queued', 'running')) +
+                  (select count(*) from dock_jobs where status in ('queued', 'running')
+                    and cached_from is null) as pending"""
+            ).fetchone()
+            assert counts is not None
+            if counts["pending"] >= 64 + (ref.kind == "dock"):
+                raise Unavailable("The server's job queue is full. Please try again later.")
             if ref.kind != "dock":  # a docking job's own row is its queue entry
                 try:
                     with conn.transaction():

@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import type { GLViewer } from "3dmol";
 import { expect, test } from "./console";
 
 /*
@@ -145,6 +146,10 @@ test("the jury has started on its own; a student compares drugs, then archives a
 async function trackWebGLContexts(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const contexts: WebGLRenderingContext[] = [];
+    const origins = new Map<
+      WebGLRenderingContext,
+      { stack: string; lossRequests: number; lostOnStep?: string }
+    >();
     interface HasContext {
       getContext: (this: unknown, ...args: never[]) => unknown;
     }
@@ -154,14 +159,53 @@ async function trackWebGLContexts(page: Page): Promise<void> {
         const context = original.apply(this, args);
         const isGL =
           context instanceof WebGLRenderingContext || context instanceof WebGL2RenderingContext;
-        if (isGL && !contexts.includes(context)) contexts.push(context);
+        if (isGL && !contexts.includes(context)) {
+          contexts.push(context);
+          const origin: { stack: string; lossRequests: number; lostOnStep?: string } = {
+            stack: new Error().stack ?? "unknown",
+            lossRequests: 0,
+          };
+          origins.set(context, origin);
+          const extension = context.getExtension("WEBGL_lose_context");
+          if (extension !== null) {
+            const lose = extension.loseContext.bind(extension);
+            extension.loseContext = () => {
+              origin.lossRequests += 1;
+              origin.lostOnStep ??= document.querySelector("h1")?.textContent ?? "";
+              lose();
+            };
+          }
+        }
         return context;
       };
     };
     track(HTMLCanvasElement.prototype);
     track(OffscreenCanvas.prototype);
+    const start = document.startViewTransition.bind(document);
+    let starts = 0;
+    document.startViewTransition = (options) => {
+      starts += 1;
+      return start(options);
+    };
     Object.assign(window, {
+      nativeTransitionStarts: () => starts,
       liveWebGLContexts: () => contexts.filter((context) => !context.isContextLost()).length,
+      lostOnSteps: () =>
+        contexts.flatMap((context) => {
+          const step = origins.get(context)?.lostOnStep;
+          return step === undefined ? [] : [step];
+        }),
+      webGLContextDiagnostics: () =>
+        contexts.map((context) => ({
+          ...origins.get(context),
+          lost: context.isContextLost(),
+          canvas: context.canvas.constructor.name,
+          connected:
+            context.canvas instanceof HTMLCanvasElement ? context.canvas.isConnected : null,
+          className: context.canvas instanceof HTMLCanvasElement ? context.canvas.className : null,
+          width: context.canvas.width,
+          height: context.canvas.height,
+        })),
     });
   });
 }
@@ -172,9 +216,45 @@ function liveContexts(page: Page): Promise<number> {
   );
 }
 
-test("a student shows baricitinib's binding pose and checks it against the crystal", async ({
+test("a hidden network cannot delay leaving a pose while native snapshot capture stalls", async ({
   page,
 }) => {
+  const id = await readyExperiment(page);
+  await page.goto(`/e/${id}/pose`);
+  const view = page.getByRole("img", {
+    name: "Baricitinib in JAK2, in 3D. Drag to rotate, scroll to zoom.",
+  });
+  await expect(view).toHaveAttribute("data-ready", "true", { timeout: 15_000 });
+  await expect(view).toHaveAttribute("data-surface", "on", { timeout: 20_000 });
+  await page.evaluate(() => {
+    const start = document.startViewTransition.bind(document);
+    let starts = 0;
+    Object.assign(window, { nativeTransitionStarts: () => starts });
+    document.startViewTransition = (options) => {
+      starts += 1;
+      const update = typeof options === "function" ? options : options?.update;
+      return start({
+        update: async () => {
+          // Slow GPU snapshot capture must never hold up a step whose network is hidden.
+          await new Promise<void>((resolve) => setTimeout(resolve, 10_000));
+          await update?.();
+        },
+      });
+    };
+  });
+  await page.getByRole("link", { name: "History", exact: true }).click();
+  await expectStep(page, "History");
+  await expect(view).toHaveCount(0);
+  expect(
+    await page.evaluate(() =>
+      (window as unknown as { nativeTransitionStarts: () => number }).nativeTransitionStarts(),
+    ),
+  ).toBe(0);
+});
+
+test("a student shows baricitinib's binding pose and checks it against the crystal", async ({
+  page,
+}, testInfo) => {
   await trackWebGLContexts(page);
   const id = await readyExperiment(page);
 
@@ -235,9 +315,50 @@ test("a student shows baricitinib's binding pose and checks it against the cryst
   expect(await page.locator("canvas").count()).toBeLessThanOrEqual(3);
   expect(await liveContexts(page)).toBe(2);
 
+  await view.locator("canvas").evaluate((canvas) => {
+    const viewer = (canvas as HTMLCanvasElement & { _3dmol_viewer: GLViewer })._3dmol_viewer;
+    const gl = viewer.getRenderer().getContext();
+    const clear = viewer.clear.bind(viewer);
+    Object.assign(window, { poseClearedWhileLive: false });
+    viewer.clear = () => {
+      if (!gl.isContextLost()) Object.assign(window, { poseClearedWhileLive: true });
+      return clear();
+    };
+  });
+
   // Leaving the step releases the pose's context, once the step's transition has played.
   await page.getByRole("link", { name: "History", exact: true }).click();
   await expectStep(page, "History");
   await expect(view).toHaveCount(0);
-  await expect.poll(() => liveContexts(page)).toBe(1);
+  try {
+    // Released after History is drawn, once the GPU has caught up: seconds on a software GPU.
+    await expect.poll(() => liveContexts(page), { timeout: 30_000 }).toBe(1);
+  } catch (error) {
+    const diagnostics = await page.evaluate(() =>
+      (window as unknown as { webGLContextDiagnostics: () => unknown }).webGLContextDiagnostics(),
+    );
+    await testInfo.attach("webgl-contexts", {
+      body: JSON.stringify(diagnostics, null, 2),
+      contentType: "application/json",
+    });
+    throw error;
+  }
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { poseClearedWhileLive: boolean }).poseClearedWhileLive,
+    ),
+    "3Dmol clearing must not render a final protein frame during navigation",
+  ).toBe(false);
+  expect(
+    await page.evaluate(() =>
+      (window as unknown as { lostOnSteps: () => string[] }).lostOnSteps().at(-1),
+    ),
+    "losing the pose's context waits for the GPU, so it must not hold up the next step",
+  ).toBe("History");
+  expect(
+    await page.evaluate(() =>
+      (window as unknown as { nativeTransitionStarts: () => number }).nativeTransitionStarts(),
+    ),
+    "3D steps must navigate without snapshotting their live canvases",
+  ).toBe(0);
 });

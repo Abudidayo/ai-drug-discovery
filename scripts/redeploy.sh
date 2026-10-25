@@ -1,26 +1,37 @@
 #!/usr/bin/env bash
-# Deploy the demo codespace from a branch (main by default): check out exactly what
+# Deploy the demo codespace from a commit or branch (main by default): check out what
 # GitHub has, migrate the database, build the web app, then restart the API, the
 # pipeline and docking workers (scripts/serve.sh, log /workspaces/serve.log) and the
 # built web app on port 5173 (log /workspaces/web.log). Safe after a codespace restart.
 #
 #   scripts/redeploy.sh            # in the codespace
-#   scripts/redeploy.sh some-branch
+#   scripts/redeploy.sh <commit-sha-or-branch>
 #
 # The Deploy workflow (.github/workflows/deploy.yml) runs it over `gh codespace ssh`
-# on every push to main. The codespace is a deploy target, not a place to edit: local
+# after code changes pass on main. The codespace is a deploy target: local
 # changes to tracked files are overwritten.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-branch=${1:-main}
+ref=${1:-main}
+log_dir=${DEPLOY_LOG_DIR:-/workspaces}
 
-git fetch -q origin "$branch"
-git checkout -q --force -B "$branch" "origin/$branch"
+# CI passes the immutable SHA it tested; manual use may still name a branch.
+if [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+  git fetch -q origin main
+  git cat-file -e "$ref^{commit}"
+  git checkout -q --detach --force "$ref"
+else
+  git check-ref-format --branch "$ref" > /dev/null
+  git fetch -q origin "$ref"
+  git checkout -q --detach --force FETCH_HEAD
+fi
 git log --oneline -1
 
-uv sync --all-packages --quiet
-uv run --no-sync db/migrate.py 2>&1 | grep -v "no-op" || true
-(cd web && npm ci --silent && npm run build --silent > /workspaces/web-build.log 2>&1)
+uv sync --all-packages --frozen --quiet
+# Build before touching the database or stopping a healthy stack.
+(cd web && npm ci --silent && npm run build --silent > "$log_dir/web-build.log" 2>&1)
+# A failed migration must abort deployment, with its original error visible.
+uv run --no-sync db/migrate.py
 
 pkill -f "[s]cripts/serve.sh" || true
 pkill -f "[u]vicorn oxhack_api" || true
@@ -30,13 +41,13 @@ pkill -f "[v]ite preview" || true
 sleep 1
 
 # Detached from this shell, so an ssh session that runs this script can end.
-setsid nohup scripts/serve.sh > /workspaces/serve.log 2>&1 < /dev/null &
+setsid nohup scripts/serve.sh > "$log_dir/serve.log" 2>&1 < /dev/null &
 cd web
 setsid nohup npx vite preview --host 0.0.0.0 --port 5173 --strictPort \
-  > /workspaces/web.log 2>&1 < /dev/null &
+  > "$log_dir/web.log" 2>&1 < /dev/null &
 cd ..
 
-for _ in $(seq 1 60); do curl -sf localhost:8000/api/health > /dev/null && break; sleep 2; done
-for _ in $(seq 1 30); do curl -sf localhost:5173/api/health > /dev/null && break; sleep 1; done
-curl -sf localhost:5173/api/health
+for _ in $(seq 1 60); do curl --connect-timeout 2 --max-time 5 -sf localhost:8000/api/health > /dev/null && break; sleep 2; done
+for _ in $(seq 1 30); do curl --connect-timeout 2 --max-time 5 -sf localhost:5173/api/health > /dev/null && break; sleep 1; done
+curl --connect-timeout 2 --max-time 5 -sf localhost:5173/api/health
 echo

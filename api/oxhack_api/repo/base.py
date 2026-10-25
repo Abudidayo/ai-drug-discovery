@@ -70,14 +70,22 @@ class Repo(Protocol):
 
     # Experiments ------------------------------------------------------------
 
-    def add_experiment(self, experiment: Experiment) -> None: ...
+    def add_experiment(
+        self, experiment: Experiment, *, owner_session: str | None = None
+    ) -> None: ...
+
+    def owns_experiment(self, experiment_id: UUID, owner_session: str) -> bool: ...
+
+    def consume_quota(self, key: str, limit: int, seconds: int) -> None:
+        """Atomically reserve one use, or raise TooManyRequests. Never wait for capacity."""
+        ...
 
     def get_experiment(self, experiment_id: UUID) -> Experiment | None:
         """The full Experiment, with its jury run and docking jobs, or None."""
         ...
 
     def list_experiments(
-        self, *, archived: bool, include_building: bool
+        self, *, archived: bool, include_building: bool, owner_session: str | None = None
     ) -> list[ExperimentSummary]:
         """Archived or active Experiments, newest first; only ready ones unless asked."""
         ...

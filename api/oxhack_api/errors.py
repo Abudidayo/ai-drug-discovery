@@ -4,6 +4,9 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from psycopg import OperationalError
+from psycopg_pool import PoolTimeout
+from psycopg_pool import TooManyRequests as PoolBusy
 
 from .schemas import ErrorResponse, UnprocessableResponse
 
@@ -40,12 +43,33 @@ class Unavailable(ApiError):
     status_code = 503
 
 
+class TooManyRequests(ApiError):
+    status_code = 429
+
+    def __init__(self, retry_after: int) -> None:
+        super().__init__("Too many requests. Please wait before trying again.")
+        self.retry_after = retry_after
+
+
 def install_error_handlers(app: FastAPI) -> None:
     async def handle(_request: Request, exc: Exception) -> JSONResponse:
         assert isinstance(exc, ApiError)
-        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+        headers = {"Retry-After": str(exc.retry_after)} if isinstance(exc, TooManyRequests) else {}
+        return JSONResponse(
+            status_code=exc.status_code, content={"detail": exc.detail}, headers=headers
+        )
 
     app.add_exception_handler(ApiError, handle)
+
+    async def database_busy(_request: Request, _exc: Exception) -> JSONResponse:
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "The database is busy or unavailable. Please try again shortly."},
+            headers={"Retry-After": "5"},
+        )
+
+    for error in (OperationalError, PoolTimeout, PoolBusy):
+        app.add_exception_handler(error, database_busy)
 
 
 def responses(*codes: int) -> dict[int | str, dict[str, Any]]:
