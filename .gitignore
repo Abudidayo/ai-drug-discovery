@@ -1,19 +1,23 @@
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
-# Local secrets (see .env.example).
-.env
 
-# Downloaded source data (Open Targets, ChEMBL, STRING) and generated
-# graph/distance artifacts: cached locally, never committed.
+# Downloaded releases, graph/distance matrices and generated evaluation outputs.
 /data/
 /ranking/artifacts/
+/workstream_b/.tools/
 
-# Python caches, local virtual environments and tools.
-__pycache__/
-*.py[cod]
-*.egg-info/
+# Local Python environments, build products and caches.
 .venv/
 /.venv-ranking/
-/workstream_b/.tools/
+__pycache__/
 .pytest_cache/
 .ruff_cache/
+*.py[cod]
+*.egg-info/
+
+# Local credentials; keep the example environment template available to Git.
+.env
+/.env.*
+!/.env.example
+/.aws/
+/secrets/
