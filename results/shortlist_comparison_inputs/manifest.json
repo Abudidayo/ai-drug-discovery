@@ -31,9 +31,10 @@
     "path": "data/a6/stage1"
   },
   "cohort_id": "experiment-b-independent-replication-14-v1",
-  "compare_command": "PYTHONDONTWRITEBYTECODE=1 ranking/.venv/bin/python -B -m ranking.shortlist_comparison compare \\\n  --seal ../w17/results/shortlist_comparison_inputs/implementation.local.json \\\n  --cases ../w17/results/shortlist_comparison_inputs/cases.json \\\n  --targets-dir ../w17/results/shortlist_comparison_inputs/targets \\\n  --references ../w17/results/shortlist_comparison_inputs/references.json \\\n  --protocol ../w17/results/shortlist_comparison_inputs/protocol.md \\\n  --drugs ../w17/data/drug_targets.json \\\n  --artifacts ../w17/data/a6/stage1 \\\n  --out ../w17/data/shortlist-comparison-v1/official-run-v1",
-  "compare_working_directory": "/Users/jessicamak/oxhack-workers/zaid-ro",
+  "compare_command": "PYTHONDONTWRITEBYTECODE=1 ranking/.venv/bin/python -B -m ranking.shortlist_comparison compare \\\n  --seal data/evaluation/shortlist-comparison-v1/implementation.json \\\n  --cases results/shortlist_comparison_inputs/cases.json \\\n  --targets-dir results/shortlist_comparison_inputs/targets \\\n  --references results/shortlist_comparison_inputs/references.json \\\n  --protocol results/experiment_b_replication/protocol.md \\\n  --drugs data/drug_targets.json \\\n  --artifacts data/ranking/string-12.5-c700-e400 \\\n  --out data/evaluation/shortlist-comparison-v1/official-run-v1",
+  "compare_working_directory": ".",
   "comparison_run": false,
+  "data_provenance": "data/ files come from the stream-a-data-v1 release or a local build; historical validation hashes remain pinned below.",
   "disease_order": [
     "EFO_0803536",
     "MONDO_0007915",
@@ -62,16 +63,12 @@
   },
   "files": {
     "README.md": {
-      "bytes": 4379,
-      "sha256": "6a47190cbb8e6fb596a6dc7dbcfadbcce9a2f831051773af63e579ab365ced57"
+      "bytes": 1938,
+      "sha256": "78a9808e8fc704f1c75a315e46c689e73d628db0763df598ee43f55182e60d78"
     },
     "cases.json": {
       "bytes": 1514,
       "sha256": "890baa3632cc688cc06a536a8c0d2069ada57f8256146878c9b129520eca25b0"
-    },
-    "implementation.local.json": {
-      "bytes": 4603,
-      "sha256": "638cf1294bca3d29a1b73947cb2e9ae75cac355d4a4341d6b256f139ec727469"
     },
     "protocol.md": {
       "bytes": 22616,
@@ -84,10 +81,6 @@
     "references.json": {
       "bytes": 75742,
       "sha256": "b8bbc09fb1d6fa3366627aaac9ac97dccc50db7964775c079d7ed994f60f8cbc"
-    },
-    "replication.preregistered.json": {
-      "bytes": 1181053,
-      "sha256": "d57b11620952e87e9a64ead80b3054728fea6f0cb50038cf6085c51968cf6cf7"
     },
     "targets/targets-EFO_0803536.json": {
       "bytes": 7352,
@@ -146,17 +139,17 @@
       "sha256": "e65f6c408e6602ef6096ae10ab3da1da2a7f33e3ea305629d712b0513a7acbb8"
     },
     "validate_inputs.py": {
-      "bytes": 6369,
-      "sha256": "6552f9e379876062484582b1196189665ab63b5a30cca795cc24abce5b5a8399"
+      "bytes": 6859,
+      "sha256": "558e893d29e1480c90bdce360c3cec484e45f816e83e52fc1d2a2b105e779c8d"
     }
   },
   "format_version": 1,
   "implementation_seal": {
-    "file": "implementation.local.json",
-    "limitation": "Generated during this input-export task after published labels were accessible; does not establish original pre-label sealing. Different dependency versions can yield a different implementation hash.",
+    "file": "data/evaluation/shortlist-comparison-v1/implementation.json",
+    "limitation": "No seal is supplied or verified by this bundle. Zaid must use his own original pre-label seal; its timing and hash equivalence remain unverified.",
     "original_handoff_implementation_sha256": "a58bad6a56b692ef64164d19d1a974915bd03d929af410be2ae9fa9efad04647",
     "original_handoff_seal_available": false,
-    "status": "new_local_environment_seal_verified"
+    "status": "requires_zaid_original_pre_label_seal"
   },
   "limitations": [
     "Exact approval.disease_ids membership in the pinned A2 release; no name, symbol, ontology expansion or new label curation.",
@@ -206,7 +199,8 @@
     "cases.json wraps the ordered Disease IDs as format_version/cohort_id/cases with relative targets_file paths.",
     "references.json uses Stage 3 known_candidate_ids; approved_drugs and override_inventory retain provenance.",
     "Target files are copied byte-for-byte in the existing fixture shape; no regeneration or score changes.",
-    "Drug sidecar output checksum is stale: 5eeee1eab279a74ea4267dfd67c68f6e5fb55fe55023f1cb26b8ba46423a02b8; use replication.preregistered.json and the verified actual SHA256 bf133936221f124ec77877fdfb8a23dc26dd1b14aeb11735ee71540668cd7d24."
+    "Drug sidecar output checksum is stale: 5eeee1eab279a74ea4267dfd67c68f6e5fb55fe55023f1cb26b8ba46423a02b8; use results/experiment_b_replication/preregistered.json and the verified actual SHA256 bf133936221f124ec77877fdfb8a23dc26dd1b14aeb11735ee71540668cd7d24.",
+    "protocol.md is a relative symlink to the unchanged historical protocol; file hashes follow the link."
   ],
   "source_files": [
     {
@@ -458,12 +452,10 @@
     "unmapped_items": 5715
   },
   "validation": {
-    "command_from_w17": "PYTHONDONTWRITEBYTECODE=1 ../zaid-ro/ranking/.venv/bin/python -B results/shortlist_comparison_inputs/validate_inputs.py",
+    "command_from_repo_root": "PYTHONDONTWRITEBYTECODE=1 ranking/.venv/bin/python -B results/shortlist_comparison_inputs/validate_inputs.py --ranking-venv ranking/.venv",
     "comparison_run": false,
     "failed": 0,
-    "implementation_sha256": "4bd5d2d6d217321f1922459fe06b22ca1f40af15f243bb1dc421d47c84ad535f",
     "passed": 7,
-    "seal_verify": "passed",
-    "verify_command_from_zaid_ro": "PYTHONDONTWRITEBYTECODE=1 ranking/.venv/bin/python -B -m ranking.shortlist_comparison verify --seal ../w17/results/shortlist_comparison_inputs/implementation.local.json"
+    "seal_verify": "not performed; requires Zaid original pre-label seal"
   }
 }

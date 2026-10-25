@@ -1,20 +1,31 @@
 """Offline input checks only; imports Zaid's loaders without scoring anything."""
 
+import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 import unittest
 
 BUNDLE = Path(__file__).resolve().parent
 ROOT = BUNDLE.parents[1]
-ZAID = ROOT.parent / "zaid-ro"
+PUBLISHED = ROOT / "results/experiment_b_replication"
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--ranking-venv", type=Path, default=os.environ.get("RANKING_VENV"),
+                    help="Zaid's ranking/.venv directory (or set RANKING_VENV)")
+args, test_args = parser.parse_known_args()
+if args.ranking_venv is None:
+    parser.error("pass --ranking-venv or set RANKING_VENV")
+ranking_venv = args.ranking_venv.resolve()
+ZAID = ranking_venv.parent.parent
+if not (ranking_venv / "bin/python").is_file() or not (ZAID / "ranking/data.py").is_file():
+    parser.error("--ranking-venv must point to Zaid's ranking/.venv directory")
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(ZAID))
 
 from ranking.data import APPROVAL_SOURCES, DISEASE_ID, load_disease, load_drugs
 from ranking.references import parse_references
-from ranking.shortlist_comparison import verify_implementation
 
 
 def read(path):
@@ -43,7 +54,7 @@ class InputTests(unittest.TestCase):
             self.assertTrue((BUNDLE / "targets" / relative).resolve().is_relative_to(BUNDLE / "targets"))
 
     def test_targets_with_zaid_loader(self):
-        frozen = read(BUNDLE / "replication.preregistered.json")["declaration"]["inputs_sha256"]
+        frozen = read(PUBLISHED / "preregistered.json")["declaration"]["inputs_sha256"]
         fixture = read(ROOT / "fixtures/disease_targets.json")
         for case in read(BUNDLE / "cases.json")["cases"]:
             with self.subTest(disease=case["disease_id"]):
@@ -61,7 +72,7 @@ class InputTests(unittest.TestCase):
 
     def test_drugs_with_zaid_loader(self):
         path = ROOT / "data/drug_targets.json"
-        frozen = read(BUNDLE / "replication.preregistered.json")["declaration"]["inputs_sha256"]
+        frozen = read(PUBLISHED / "preregistered.json")["declaration"]["inputs_sha256"]
         self.assertEqual(sha(path), frozen["data/drug_targets.json"])
         pool = load_drugs(path)
         self.assertEqual(len(pool.drugs), len(read(path)["drugs"]))
@@ -91,16 +102,14 @@ class InputTests(unittest.TestCase):
         self.assertEqual(refs["unmapped_count"], 0)
 
     def test_protocol_and_freeze(self):
-        published = ROOT / "results/experiment_b_replication"
         for name in ("protocol.md", "protocol_frozen.json"):
-            self.assertEqual((BUNDLE / name).read_bytes(), (published / name).read_bytes())
-        self.assertEqual((BUNDLE / "replication.preregistered.json").read_bytes(),
-                         (published / "preregistered.json").read_bytes())
+            self.assertEqual((BUNDLE / name).read_bytes(), (PUBLISHED / name).read_bytes())
+        record = next(r for r in read(BUNDLE / "manifest.json")["source_files"]
+                      if r["path"] == "results/experiment_b_replication/preregistered.json")
+        self.assertEqual(sha(PUBLISHED / "preregistered.json"), record["sha256"])
         self.assertEqual(sha(BUNDLE / "protocol.md"), read(BUNDLE / "protocol_frozen.json")["protocol_sha256"])
 
-    def test_local_implementation_seal(self):
-        seal = verify_implementation(BUNDLE / "implementation.local.json")
-        self.assertEqual(seal["settings"]["expected_case_count"], 14)
+    def test_ranking_loader_environment(self):
         self.assertEqual(Path(sys.modules["ranking"].__file__).resolve(), ZAID / "ranking/__init__.py")
 
     def test_manifest_and_pinned_graph(self):
@@ -113,7 +122,7 @@ class InputTests(unittest.TestCase):
         for name, record in manifest["files"].items():
             self.assertEqual(sha(BUNDLE / name), record["sha256"])
             self.assertEqual((BUNDLE / name).stat().st_size, record["bytes"])
-        frozen = read(BUNDLE / "replication.preregistered.json")["declaration"]["inputs_sha256"]
+        frozen = read(PUBLISHED / "preregistered.json")["declaration"]["inputs_sha256"]
         for name, record in manifest["artifacts"]["files"].items():
             self.assertEqual(sha(ROOT / name), frozen[name])
             self.assertEqual(record["sha256"], frozen[name])
@@ -121,4 +130,4 @@ class InputTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    unittest.main(argv=[sys.argv[0], *test_args], verbosity=2)
