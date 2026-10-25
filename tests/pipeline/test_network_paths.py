@@ -59,7 +59,7 @@ def test_paths_are_id_resolved_and_scores_never_enter_packet():
     for forbidden in ['mean_distance','degree_matched_z','rank','path_count','987.65','-765.43']:
         assert forbidden not in text
     prompt = build_prompt(enriched,[c['label'] for c in enriched['candidates']])
-    assert PROMPT_VERSION == 'jury-v6'
+    assert PROMPT_VERSION == 'jury-v7'
     assert 'graph is undirected' in prompt and 'not a proven mechanism' in prompt
 
 

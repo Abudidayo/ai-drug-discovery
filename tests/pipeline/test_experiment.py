@@ -11,7 +11,7 @@ import runpy
 import duckdb
 import pytest
 
-from jury.client import consensus, validate_packet, validate_reply
+from jury.client import ModelReply, consensus, run_jury, validate_packet, validate_reply
 from pipeline import disease_targets as a1
 from pipeline.experiment import (
     ExperimentSources, FALLBACK, REASON, ROOT,
@@ -25,6 +25,9 @@ SAMPLES = Path(__file__).parent / "data/packets"
 
 def shape(actual, examples, key=""):
     """Same keys/types as A0, considering every fixture variant and nullability."""
+    if key == "reason":
+        assert actual in (None, "fewer_than_two_valid_jurors")
+        return
     if key in {"supporting_evidence_ids", "contradicting_evidence_ids", "evidence_ids"}:
         # The fixture's contradiction arrays are all empty; the contract permits
         # populated E-ID arrays too (validated against the Candidate below).
@@ -51,7 +54,10 @@ def shape(actual, examples, key=""):
         assert all(type(v) in (int, float) and math.isfinite(v) for v in actual.values())
         return
     if actual is None:
-        assert None in examples or key in {"pubchem_cid", "toxicity_class", "kendalls_w"}
+        assert None in examples or key in {
+            "pubchem_cid", "toxicity_class", "kendalls_w", "consensus",
+            "schema", "unique_ranks", "evidence_ids_exist", "numbers_match",
+        }
     elif isinstance(actual, dict):
         variants = [e for e in examples if isinstance(e, dict)]
         assert any(e.keys() == actual.keys() for e in variants), (key, actual.keys())
@@ -81,6 +87,11 @@ def assert_outputs(out, drugs, string_map, *, legacy_jury=False):
         example = read_json(ROOT / "fixtures" / f"{name}.json")
         if name == "jury_result" and legacy_jury:
             # Historical artifacts predate these additive contract fields.
+            if "consensus_status" not in actual:
+                example.pop("consensus_status")
+            for key in ("failed_jurors", "reason"):
+                if key not in actual["consensus"]:
+                    example["consensus"].pop(key)
             if "reasoning_effort" not in actual["jury"]:
                 example["jury"].pop("reasoning_effort")
             if all("token_usage" not in j for j in actual["jurors"]):
@@ -174,7 +185,32 @@ def assert_outputs(out, drugs, string_map, *, legacy_jury=False):
                 assert juror["raw_output"]
                 assert (juror["attempts"] == result["jury"]["max_attempts"]
                         or "Total jury call budget exhausted; no further retry" in juror["validation"]["errors"])
-    assert result["consensus"] == consensus(packet, result["jurors"])
+    summary = consensus(packet, result["jurors"])
+    if legacy_jury:
+        # Verify the stored historical rule, which allowed one valid ballot.
+        # Do not migrate or rewrite historical rankings to the future-run rule.
+        stored = result["consensus"]
+        valid = [j["reviews"] for j in result["jurors"] if j["status"] == "valid"]
+        n, m = len(panel), len(valid)
+        points = {c["label"]: sum(n - r["rank"] for reviews in valid
+                                 for r in reviews if r["label"] == c["label"])
+                  for c in panel.values()}
+        assert stored["method"] == "borda" and stored["jurors_counted"] == m
+        assert {r["label"] for r in stored["ranking"]} == (set(points) if m else set())
+        assert len(stored["ranking"]) == (n if m else 0)
+        assert [r["label"] for r in stored["ranking"]] == (
+            sorted(points, key=lambda label: (-points[label], int(label[1:]))) if m else [])
+        ids = {c["label"]: c["candidate_id"] for c in panel.values()}
+        for row in stored["ranking"]:
+            assert row["candidate_id"] == ids[row["label"]]
+            assert row["borda_points"] == points[row["label"]]
+            assert row["rank"] == 1 + sum(p > row["borda_points"] for p in points.values())
+        assert stored["kendalls_w"] == summary["kendalls_w"]
+        assert stored["contested"] == summary["contested"]
+    else:
+        assert result["consensus"] == (summary if summary["reason"] is None else None)
+        assert result["consensus_status"] == {key: summary[key] for key in
+                                              ("jurors_counted", "failed_jurors", "reason")}
     sources = ExperimentSources(ROOT / "data", out / "cache", offline=True)
     # The recorded test uses its own source Parquet files instead of local data/.
     if (out.parent / "input").exists():
@@ -183,6 +219,15 @@ def assert_outputs(out, drugs, string_map, *, legacy_jury=False):
     assert read_json(out / "consistency.json")["differences"] == differences
     assert FALLBACK in (out / "run.md").read_text()
     return files
+
+
+def test_current_jury_contract_accepts_null_consensus_with_refusal_metadata():
+    packet = read_json(ROOT / "fixtures/evidence_packet.json")
+    config = {**read_json(ROOT / "jury/config.json"), "max_attempts": 1}
+    result = run_jury(packet, config, lambda *args: ModelReply("", stop_reason="refusal"))
+    shape(result, [read_json(ROOT / "fixtures/jury_result.json")])
+    assert result["consensus"] is None
+    assert result["consensus_status"]["reason"] == "fewer_than_two_valid_jurors"
 
 
 def test_recorded_end_to_end(tmp_path, monkeypatch):

@@ -174,3 +174,30 @@ Source: [Reactome release 97 mapping](https://reactome.org/download/97/Ensembl2R
 [data licence: CC0](https://reactome.org/license), checked 2026-10-25.
 The complete raw download hash and human-filtered hash, retrieval timestamp,
 URL, version and licence are in `data/reactome/97/manifest.json`.
+
+
+### Jury reliability contract (future runs)
+
+`jury-v7` clarifies retrospective public-data evidence review, no advice for any
+patient, and investigation priorities rather than recommendations. The validators
+and `valid` / `invalid` / `failed` status enum are unchanged. A provider refusal
+is recorded as `Attempt N: refused (provider stop_reason=refusal)` in validation
+errors; its flags are null because its output was not validated. It supplies no
+reviews. Per-attempt token usage may additionally include `max_output_tokens`
+and `stop_reason`, independently when supplied.
+
+Consensus uses every valid juror; at least two are required. Both Borda points
+and Kendall's W use only those valid ballots. `jurors_counted` records their
+number; `failed_jurors` lists excluded model IDs; `reason` is null when a
+consensus exists. The top-level `consensus_status` object always records those
+three metadata fields, including when `consensus` is null. Below two valid
+ballots `run_jury` writes `consensus: null` and reason
+`fewer_than_two_valid_jurors` in `consensus_status`. It supplies no ranking from
+a lone vote. The internal summary helper retains an empty ranking and null W
+for legacy callers; persisted future jury results use the nullable contract.
+The fixture already has two valid jurors and one invalid juror: its existing
+Borda points, ranks, contested Candidates and W (0.9) are unchanged.
+
+This is a design change for future runs only. Historical results retain their
+published schema and frozen combining/scoring rules; they must not be migrated
+or rescored to make them conform to this newer fixture.
