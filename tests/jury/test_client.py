@@ -1,9 +1,11 @@
+from collections import Counter
 from copy import deepcopy
 import json
 import os
 from pathlib import Path
 import random
 import subprocess
+import threading
 
 import httpx
 import openai
@@ -69,6 +71,54 @@ def test_seeded_orders_and_output_shape():
     again = run_jury(PACKET, CONFIG, mock_model)
     assert [j["presented_order"] for j in again["jurors"]] == [j["presented_order"] for j in result["jurors"]]
     assert len({tuple(j["presented_order"]) for j in result["jurors"]}) == 3
+
+
+
+def test_on_juror_reports_each_juror_as_it_finishes():
+    events = []
+
+    def call(model, prompt, temperature):
+        events.append(("asked", model))
+        return mock_model(model, prompt, temperature)
+
+    result = run_jury(PACKET, CONFIG, call, on_juror=lambda juror: events.append(("finished", juror)))
+    expected = []
+    for juror in result["jurors"]:
+        expected += [("asked", juror["model"]), ("finished", juror)]
+    assert events == expected
+
+def test_concurrent_jurors_are_asked_at_the_same_time():
+    """Each call waits until all three jurors have been asked: a juror-by-juror run
+    would never get past the first call."""
+    everyone_asked = threading.Barrier(len(CONFIG["models"]), timeout=5)
+    finished = []
+
+    def call(model, prompt, temperature):
+        everyone_asked.wait()
+        return mock_model(model, prompt, temperature)
+
+    result = run_jury(PACKET, CONFIG, call, on_juror=finished.append, concurrent=True)
+    assert [j["status"] for j in result["jurors"]] == ["valid"] * 3
+    # Reported as each finished; returned in the configured order.
+    assert sorted(j["model"] for j in finished) == sorted(CONFIG["models"])
+    assert [j["model"] for j in result["jurors"]] == CONFIG["models"]
+    sequential = run_jury(PACKET, CONFIG, mock_model)
+    assert ([j["presented_order"] for j in result["jurors"]]
+            == [j["presented_order"] for j in sequential["jurors"]])
+
+
+def test_concurrent_jurors_share_the_call_budget_before_any_call():
+    calls = []
+    lock = threading.Lock()
+
+    def invalid(model, prompt, temperature):
+        with lock:
+            calls.append(model)
+        return 'incomplete JSON'
+
+    result = run_jury(PACKET, CONFIG, invalid, max_calls=4, concurrent=True)
+    assert Counter(calls) == Counter([CONFIG['models'][0], *CONFIG['models']])
+    assert [j['attempts'] for j in result['jurors']] == [2, 1, 1]
 
 
 def test_fixture_consensus_exactly():
@@ -174,6 +224,8 @@ def test_recorded_gpt_numeric_text_with_typographic_identifier(hyphen, field):
     ("Association 0.8 and 999.", False),
     ("An invented identifier dose-99.", False),
     ("An invented identifier JAK99.", False),
+    ("JAK-1 is a hyphenated identifier; association 0.80.", True),
+    ("An invented identifier JAK-99.", False),
 ])
 @pytest.mark.parametrize("field", ["rationale", "objection"])
 def test_exact_numbers_in_each_text_field(text, accepted, field):
@@ -183,6 +235,23 @@ def test_exact_numbers_in_each_text_field(text, accepted, field):
     assert (reviews is not None) is accepted
     assert flags["numbers_match"] is accepted
 
+
+
+@pytest.mark.parametrize("text,accepted", [
+    # Kimi K3's live myeloma reply (25 Oct) for mirdametinib, a MAP2K1 and MAP2K2 inhibitor.
+    ("A MAP2K1/2 inhibitor; association 0.80.", True),
+    ("A MAP2K1/9 inhibitor; association 0.80.", False),  # MAP2K9 is not one of its Targets
+    ("A MAP2K1/2/3 inhibitor; association 0.80.", False),
+])
+def test_slashed_family_names_whose_prefix_ends_in_digits_and_letters(text, accepted):
+    packet = deepcopy(PACKET)
+    targets = packet["candidates"][0]["targets"]
+    targets[0]["name"], targets[1]["name"] = "MAP2K1", "MAP2K2"
+    value = reply()
+    value["reviews"][0]["rationale"] = text
+    reviews, flags = validate_reply(json.dumps(value), packet)
+    assert (reviews is not None) is accepted
+    assert flags["numbers_match"] is accepted
 
 def test_bioactivity_numbers():
     value = reply()

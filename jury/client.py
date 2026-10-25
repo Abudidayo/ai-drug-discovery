@@ -1,6 +1,7 @@
 """Blinded Cortex reviews; only validated, complete ballots enter consensus."""
 
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from dataclasses import dataclass
 from decimal import Decimal, DecimalException
@@ -304,7 +305,9 @@ def _numbers(text, identifiers):
                 (prefix + member).casefold() in known for member in members.split("/")):
             return " "
         return match[0]
-    text = re.sub(r"(?<!\w)([A-Za-z]+-?|[0-9]+-[A-Za-z]+)([0-9]+[A-Za-z]*(?:/[0-9]+[A-Za-z]*)+)(?!\w)",
+    # A prefix may hold digits when it ends in a letter: MAP2K1/2 is MAP2K1 and MAP2K2.
+    text = re.sub(r"(?<!\w)([A-Za-z][A-Za-z0-9]*[A-Za-z]-?|[A-Za-z]-?|[0-9]+-[A-Za-z]+)"
+                  r"([0-9]+[A-Za-z]*(?:/[0-9]+[A-Za-z]*)+)(?!\w)",
                   family_list, text)
     def family_range(match):
         prefix, start, end = match.groups()
@@ -363,6 +366,12 @@ def _name_identifiers(packet):
         family = re.fullmatch(r"(.+[A-Za-z])[0-9]+", identifier)
         if family and re.search(r"[0-9]", family[1]):
             identifiers.add(family[1])
+    # Hyphenated spellings of known names: IL-12 for IL12, JAK-1 for JAK1. Labels and
+    # evidence IDs (C12, E12) are not names; an unknown JAK-99 stays checked.
+    for identifier in tuple(identifiers):
+        name = re.fullmatch(r"([A-Za-z]+)([0-9]+[A-Za-z]*)", identifier)
+        if name and not re.fullmatch(r"[CE][0-9]+", identifier):
+            identifiers.add(f"{name[1]}-{name[2]}")
     # Short Disease names and their initials: type 2 diabetes [mellitus], T2D[M].
     words = packet["disease"]["name"].split()
     if any(word.isdigit() for word in words):
@@ -626,7 +635,14 @@ def validate_config(config):
         raise ValueError("temperature must be a finite number")
 
 
-def run_jury(packet, config, model_call, *, max_calls=None):
+def run_jury(packet, config, model_call, *, max_calls=None, on_juror=None, concurrent=False):
+    """Ask each juror in turn, or with `concurrent=True` all at once, each on its own
+    thread. `on_juror`, when given, receives each juror's result as soon as that juror
+    finishes (in finishing order when concurrent); the returned jurors always keep the
+    configured order. In turn, a juror may use retries an earlier one left unspent;
+    concurrently, the call budget is shared out before any call, so the outcome never
+    depends on which juror answers first. Research runs that number their calls
+    (pipeline/a6.py) stay in turn."""
     validate_packet(packet)
     validate_config(config)
     effort = (model_call.reasoning_effort if isinstance(model_call, CortexModel)
@@ -638,8 +654,8 @@ def run_jury(packet, config, model_call, *, max_calls=None):
     if max_calls is not None and (type(max_calls) is not int or max_calls < len(config["models"])):
         raise ValueError("Call budget must allow at least one attempt per juror")
     remaining = max_calls if max_calls is not None else len(config["models"]) * config["max_attempts"]
-    jurors = []
-    for index, model in enumerate(config["models"]):
+
+    def ask(index, model, attempt_limit):
         order = [c["label"] for c in packet["candidates"]]
         random.Random(config["shuffle_seed"] + index).shuffle(order)
         prompt = build_prompt(packet, order)
@@ -649,10 +665,7 @@ def run_jury(packet, config, model_call, *, max_calls=None):
                           numbers_match=None, errors=[])
         status = "failed"
         started = perf_counter()
-        # Reserve one attempt for every remaining juror before spending retries.
-        attempt_limit = min(config["max_attempts"], remaining - (len(config["models"]) - index - 1))
         for attempt in range(1, attempt_limit + 1):
-            remaining -= 1
             usage = {"attempt": attempt, "input_tokens": None, "output_tokens": None}
             token_usage.append(usage)
             try:
@@ -690,11 +703,36 @@ def run_jury(packet, config, model_call, *, max_calls=None):
         if status != "valid" and attempt_limit < config["max_attempts"]:
             errors.append("Total jury call budget exhausted; no further retry")
         validation["errors"] = errors
-        jurors.append({"model": model, "status": status, "attempts": attempt,
-                       "token_usage": token_usage,
-                       "latency_ms": round((perf_counter() - started) * 1000),
-                       "presented_order": order, "reviews": reviews,
-                       "validation": validation, "raw_output": None if status == "valid" else raw})
+        juror = {"model": model, "status": status, "attempts": attempt,
+                 "token_usage": token_usage,
+                 "latency_ms": round((perf_counter() - started) * 1000),
+                 "presented_order": order, "reviews": reviews,
+                 "validation": validation, "raw_output": None if status == "valid" else raw}
+        if on_juror is not None:
+            on_juror(deepcopy(juror))
+        return juror
+
+    jurors = []
+    if concurrent:
+        # One attempt for every juror first; retries go to jurors in configured order.
+        spare, limits = remaining - len(config["models"]), []
+        for _ in config["models"]:
+            extra = min(config["max_attempts"] - 1, spare)
+            spare -= extra
+            limits.append(1 + extra)
+        with ThreadPoolExecutor(max_workers=len(config["models"]),
+                                thread_name_prefix="jury") as pool:
+            futures = [pool.submit(ask, index, model, limits[index])
+                       for index, model in enumerate(config["models"])]
+            jurors = [future.result() for future in futures]
+    else:
+        for index, model in enumerate(config["models"]):
+            # Reserve one attempt for every remaining juror before spending retries.
+            attempt_limit = min(config["max_attempts"],
+                                remaining - (len(config["models"]) - index - 1))
+            juror = ask(index, model, attempt_limit)
+            remaining -= len(juror["token_usage"])
+            jurors.append(juror)
     summary = consensus(packet, jurors)
     return {"experiment_id": packet["experiment_id"], "jury": deepcopy(config),
             "jurors": jurors,

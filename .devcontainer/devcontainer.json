@@ -4,7 +4,9 @@
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers/features/node:1": { "version": "lts" },
-    "ghcr.io/va-h/devcontainers-features/uv:1": {}
+    "ghcr.io/va-h/devcontainers-features/uv:1": {},
+    // Lets `gh codespace ssh` open a terminal from a laptop.
+    "ghcr.io/devcontainers/features/sshd:1": {}
   },
   // Picks the 4-core / 16 GB codespace: the distance matrix and Vina need it.
   "hostRequirements": { "cpus": 4, "memory": "16gb" },

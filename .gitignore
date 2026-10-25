@@ -11,11 +11,12 @@
 /.venv-ranking/
 __pycache__/
 .pytest_cache/
+.ruff_cache/
 *.py[cod]
 *.egg-info/
 
 # Local credentials; keep the example environment template available to Git.
-/.env
+.env
 /.env.*
 !/.env.example
 /.aws/
