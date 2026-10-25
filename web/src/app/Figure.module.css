@@ -261,7 +261,9 @@
     grid-template-areas: "molecule" "evidence" "net";
   }
 
+  /* As specific as the two-column evidence-only rule above, so phones still get one column. */
   .grid[data-network="none"][data-layout="evidence"] {
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "molecule" "evidence";
   }
 
