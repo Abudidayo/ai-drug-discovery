@@ -6,7 +6,14 @@ import json
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import Field, SecretStr, ValidationInfo, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    Field,
+    SecretStr,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -15,7 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="OXHACK_", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="OXHACK_", extra="ignore", populate_by_name=True)
 
     source: Literal["fixture", "live"] = Field(
         default="fixture",
@@ -61,7 +68,12 @@ class Settings(BaseSettings):
     )
     database_url: str | None = Field(
         default=None,
-        description="Postgres connection string, used when repo is postgres. Migrate it first.",
+        # DATABASE_URL is the name the codespace secret, .env.example and db/migrate.py use.
+        validation_alias=AliasChoices("OXHACK_DATABASE_URL", "DATABASE_URL"),
+        description=(
+            "Postgres connection string (OXHACK_DATABASE_URL or DATABASE_URL), used when "
+            "repo is postgres. Migrate it first."
+        ),
     )
     database_pool_size: int = Field(
         default=10, ge=1, description="Most Postgres connections one process opens."
@@ -111,7 +123,7 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _postgres_needs_a_url(self) -> Settings:
         if self.repo == "postgres" and not self.database_url:
-            raise ValueError("OXHACK_REPO=postgres needs OXHACK_DATABASE_URL")
+            raise ValueError("OXHACK_REPO=postgres needs DATABASE_URL (or OXHACK_DATABASE_URL)")
         if self.job_heartbeat_s >= self.job_stale_after_s:
             raise ValueError("OXHACK_JOB_HEARTBEAT_S must be shorter than OXHACK_JOB_STALE_AFTER_S")
         return self

@@ -158,3 +158,14 @@ def test_snowflake_json_settings_fail_plainly(monkeypatch: pytest.MonkeyPatch) -
     settings = SnowflakeSettings()
     assert settings.models == ["a", "b", "c"]
     assert settings.reasoning_effort == {}
+
+
+def test_database_url_accepts_the_codespace_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    from oxhack_api.settings import Settings
+
+    monkeypatch.delenv("OXHACK_DATABASE_URL", raising=False)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example/db")
+    assert Settings().database_url == "postgresql://example/db"
+    monkeypatch.setenv("OXHACK_DATABASE_URL", "postgresql://preferred/db")
+    assert Settings().database_url == "postgresql://preferred/db"
+    assert Settings(database_url="postgresql://kwarg/db").database_url == "postgresql://kwarg/db"
