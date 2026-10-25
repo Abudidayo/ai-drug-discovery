@@ -27,7 +27,7 @@ import logging
 import queue
 import random
 import threading
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
@@ -247,10 +247,12 @@ class StreamAJury:
         models: list[str] | None = None,
         reasoning_effort: dict[str, str | None] | None = None,
         audit_dir: Path | None = None,
+        before_call: Callable[[], None] | None = None,
     ) -> None:
         shared = jury_settings()
         self.mode: LiveJuryMode = mode
         self._audit_dir = audit_dir
+        self._before_call = before_call
         if mode == "mock":
             ids = cast(list[str], shared["models"])
             self._models = [
@@ -331,6 +333,8 @@ class StreamAJury:
                 inner = client
 
                 def call(model: str, prompt: str, temperature: float) -> object:
+                    if self.mode == "cortex" and self._before_call is not None:
+                        self._before_call()
                     if model not in started:
                         started.add(model)
                         events.put(model)

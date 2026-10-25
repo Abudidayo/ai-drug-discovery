@@ -1,5 +1,12 @@
 import { useQueries } from "@tanstack/react-query";
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { dockFileQuery } from "../api/queries";
 import type { DockFiles } from "../api/types";
 import { copy } from "../copy/en";
@@ -87,7 +94,8 @@ export function PoseViewer({ files, label }: PoseViewerProps) {
   const posesText = texts?.poses;
   const crystalText = texts?.crystal;
 
-  useEffect(() => {
+  // Release the GPU during the removal commit, before passive effects can be delayed by rendering.
+  useLayoutEffect(() => {
     const host = hostRef.current;
     if (!webgl || !host || receptorText === undefined || posesText === undefined) return;
     if (crystalText === undefined) return;

@@ -15,6 +15,7 @@ dependencies = [
   "psycopg[binary]>=3.2,<4",
   "pydantic>=2.9",
   "pydantic-settings>=2.6",
+  "starlette>=1.10,<2",
   "typing-extensions>=4.12",
   "uvicorn[standard]>=0.32",
 ]
@@ -23,7 +24,6 @@ dependencies = [
 dev = [
   # The test client. Starlette 1.2+ uses httpx2 and deprecates plain httpx.
   "httpx2>=2.16",
-  "starlette>=1.2",
   "pyright>=1.1.390",
   "pytest>=8.3",
   "ruff>=0.8",

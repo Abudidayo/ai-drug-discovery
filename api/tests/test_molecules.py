@@ -135,3 +135,16 @@ def test_an_unreachable_pubchem_is_503_not_404(make_client: Callable[..., TestCl
     response = make_client(molecules=OfflineMolecules()).get("/api/molecules/7/conformer")
     assert response.status_code == 503
     assert "PubChem" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("sdf", ["upstream returned HTML", SDF.replace("  1  2  1", "  1  9  1")])
+def test_invalid_upstream_conformer_is_unavailable_and_not_cached(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, sdf: str
+) -> None:
+    def invalid_get(url: str, timeout: float) -> httpx.Response:
+        return httpx.Response(200, text=sdf)
+
+    monkeypatch.setattr(httpx, "get", invalid_get)
+    with pytest.raises(MoleculesUnavailable):
+        PubChemMolecules(tmp_path, sleep=lambda _: None).conformer(7)
+    assert not list(tmp_path.glob("*.json"))

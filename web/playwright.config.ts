@@ -2,20 +2,23 @@ import { defineConfig, devices } from "@playwright/test";
 
 /*
  * End-to-end tests against the real API in fixture mode and the built app (`vite preview`), as a
- * student would use them. Both servers start on their own; locally, running ones are reused.
+ * student would use them. Both servers start on their own; E2E_REUSE_SERVER=1 opts into reuse.
  * E2E_API_PORT and E2E_WEB_PORT move them off the defaults when those ports are busy.
  */
-const apiPort = process.env.E2E_API_PORT ?? "8000";
-const webPort = process.env.E2E_WEB_PORT ?? "4173";
+const apiPort = process.env.E2E_API_PORT ?? "18001";
+const webPort = process.env.E2E_WEB_PORT ?? "14174";
 const apiOrigin = `http://127.0.0.1:${apiPort}`;
-const reuse = process.env.CI === undefined;
+const ci = process.env.CI !== undefined;
+const reuse = !ci && process.env.E2E_REUSE_SERVER === "1";
 
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
-  forbidOnly: !reuse,
-  retries: reuse ? 0 : 1,
-  reporter: reuse ? "list" : [["list"], ["html", { open: "never" }]],
+  // Software WebGL is CPU intensive; keep local and CI runs within a predictable budget.
+  workers: 2,
+  forbidOnly: ci,
+  retries: ci ? 1 : 0,
+  reporter: ci ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: `http://127.0.0.1:${webPort}`,
     viewport: { width: 1440, height: 900 },

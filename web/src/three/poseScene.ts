@@ -370,13 +370,20 @@ export class PoseScene {
     const internals = this.viewer as unknown as ViewerInternals;
     internals.divwatcher?.disconnect();
     internals.intwatcher?.disconnect();
-    this.viewer.clear();
-    // Free the WebGL context now rather than whenever the browser gets round to it. 3Dmol 2.5
-    // draws every viewer through one shared offscreen context (its canvas only shows the
-    // result), and makes a fresh one for the next viewer once this one is lost.
-    const gl = this.viewer.getRenderer().getContext() as WebGLRenderingContext | null;
-    gl?.getExtension("WEBGL_lose_context")?.loseContext();
     // Detached, the viewer measures 0 × 0 and never tries to restore its lost context.
     this.holder.remove();
+    // Free the WebGL context soon rather than whenever the browser gets round to it. 3Dmol 2.5
+    // draws every viewer through one shared offscreen context (its canvas only shows the
+    // result), and makes a fresh one for the next viewer once this one is lost. Losing it waits
+    // for the GPU to finish the frames already queued, seconds on a software GPU, so it waits
+    // until the next step has been drawn instead of holding up the navigation's commit.
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const gl = this.viewer.getRenderer().getContext() as WebGLRenderingContext | null;
+        gl?.getExtension("WEBGL_lose_context")?.loseContext();
+        // clear() draws the remaining protein while removing surfaces. Stop GPU work first.
+        this.viewer.clear();
+      });
+    });
   }
 }

@@ -27,6 +27,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal, Protocol, TypeVar
 from uuid import UUID
 
+from .errors import Unavailable
 from .repo import Repo
 from .schemas import BuildStage, DockJob, Juror, JuryModel, JuryRun
 from .services.docking import DockingBackend, DockingFailed, DockResult
@@ -104,14 +105,25 @@ class JobFactory:
 class ThreadRunner:
     """Runs each job on a worker thread, pausing between its steps."""
 
-    def __init__(self, factory: JobFactory, delay_ms: int, threads: int) -> None:
+    def __init__(
+        self, factory: JobFactory, delay_ms: int, threads: int, max_pending: int = 64
+    ) -> None:
         self._factory = factory
         self._delay = delay_ms / 1000
         self._pool = ThreadPoolExecutor(max_workers=threads, thread_name_prefix="oxhack-job")
         self._stopping = threading.Event()
+        self._slots = threading.BoundedSemaphore(max_pending)
 
     def submit(self, ref: JobRef) -> None:
-        self._pool.submit(self._run, self._factory.start(ref))
+        if not self._slots.acquire(blocking=False):
+            self._factory.abandon(ref, "The server's job queue is full. Please try again later.")
+            raise Unavailable("The server's job queue is full. Please try again later.")
+        try:
+            future = self._pool.submit(self._run, self._factory.start(ref))
+        except Exception:
+            self._slots.release()
+            raise
+        future.add_done_callback(lambda _: self._slots.release())
 
     def _run(self, job: Job) -> None:
         try:

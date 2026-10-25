@@ -30,12 +30,14 @@ from ..schemas import (
     DiseaseRef,
     DiseaseSearchResult,
     DockFileName,
+    DockFiles,
     DockJob,
     DockRequest,
     Experiment,
     ExperimentSummary,
     JuryRun,
 )
+from ..settings import Settings
 from .docking import DockingBackend, cache_key, structure_for, unsupported_reason
 from .jury import JuryBackend, JuryUnavailable
 from .source import ExperimentSource, SourceError
@@ -57,16 +59,28 @@ class ExperimentService:
         jury: JuryBackend,
         docking: DockingBackend,
         runner: Runner,
+        session_id: str | None = None,
+        client_id: str | None = None,
+        settings: Settings | None = None,
     ) -> None:
         self.repo = repo
         self.source = source
         self.jury = jury
         self.docking = docking
         self.runner = runner
+        self.session_id = session_id
+        self.client_id = client_id
+        self.settings = settings or Settings()
+
+    def _quota(self, kind: str, limit: int) -> None:
+        if self.session_id is not None:
+            self.repo.consume_quota(f"{kind}:session:{self.session_id}", limit, 3600)
+            self.repo.consume_quota(f"{kind}:ip:{self.client_id}", limit * 3, 3600)
 
     # Experiments ------------------------------------------------------------
 
     def create(self, disease_id: str) -> Experiment:
+        self._quota("experiment", self.settings.experiments_per_hour)
         try:
             plan = self.source.plan(disease_id)
         except SourceError as exc:
@@ -100,15 +114,35 @@ class ExperimentService:
             archived_at=None,
         )
         with self.repo.transaction():
-            self.repo.add_experiment(experiment)
+            self.repo.consume_quota("experiment:day", self.settings.experiments_per_day, 86400)
+            self.repo.add_experiment(experiment, owner_session=self.session_id)
             self.runner.submit(JobRef("experiment_build", experiment.id))
         return experiment
 
     def get(self, experiment_id: UUID) -> Experiment:
+        if self.session_id is not None and not self.repo.owns_experiment(
+            experiment_id, self.session_id
+        ):
+            raise NotFound("There is no saved Experiment with this ID.")
         experiment = self.repo.get_experiment(experiment_id)
         if experiment is None:
             raise NotFound("There is no saved Experiment with this ID.")
-        return experiment
+        return experiment.model_copy(
+            update={"dock_jobs": [self._present_dock(job) for job in experiment.dock_jobs]}
+        )
+
+    def _present_dock(self, job: DockJob) -> DockJob:
+        # A reused private computation must be downloaded through this browser's
+        # own job. Public redocking controls keep their shared URLs.
+        if job.files is None or job.cached_from is None:
+            return job
+        original = self.repo.get_dock_job(job.cached_from)
+        if original is None or original.experiment_id is None:
+            return job
+        files = job.files.model_dump()
+        for field, name in DOCK_FILE_NAMES.items():
+            files[field]["url"] = f"/api/files/{job.id}/{name}"
+        return job.model_copy(update={"files": DockFiles.model_validate(files)})
 
     def search(self, query: str, limit: int) -> list[DiseaseSearchResult]:
         try:
@@ -123,7 +157,9 @@ class ExperimentService:
             raise Unavailable(str(exc)) from exc
 
     def history(self, *, archived: bool, include_building: bool) -> list[ExperimentSummary]:
-        return self.repo.list_experiments(archived=archived, include_building=include_building)
+        return self.repo.list_experiments(
+            archived=archived, include_building=include_building, owner_session=self.session_id
+        )
 
     def archive(self, experiment_id: UUID) -> Experiment:
         with self.repo.locked(experiment_id):
@@ -162,6 +198,9 @@ class ExperimentService:
         with self.repo.locked(experiment_id):
             experiment = self.get(experiment_id)
             self._require_active_and_ready(experiment, "ask the Model jury")
+            if experiment.jury is not None:
+                raise Conflict("The Model jury has already reviewed this Experiment.")
+            self._quota("jury", self.settings.jury_per_hour)
             models = experiment.jury_config.models
             run = JuryRun(
                 status="queued",
@@ -243,6 +282,8 @@ class ExperimentService:
         follow-ups queue each dockable drug once, so they need no cap."""
         experiment = self.get(request.experiment_id)
         self._require_active_and_ready(experiment, "compute a binding pose")
+        if len(experiment.dock_jobs) >= 60:
+            raise Conflict("This Experiment has reached its limit of 60 binding-pose requests.")
         candidate = next(
             (c for c in experiment.candidates if c.candidate_id == request.candidate_id), None
         )
@@ -289,6 +330,7 @@ class ExperimentService:
                     f"This Experiment already has {len(computing)} binding poses waiting "
                     "or being computed. Request another once one has finished."
                 )
+            self.repo.consume_quota("dock:day", 200, 86400)
             try:
                 self.repo.add_dock_job(job, inputs)
                 self.runner.submit(JobRef("dock", job.id))
@@ -311,13 +353,15 @@ class ExperimentService:
             }
         )
         self.repo.add_dock_job(job, inputs)
-        return job
+        return self._present_dock(job)
 
     def get_dock_job(self, job_id: UUID) -> DockJob:
         job = self.repo.get_dock_job(job_id)
         if job is None:
             raise NotFound("There is no docking job with this ID.")
-        return job
+        if job.experiment_id is not None:
+            self.get(job.experiment_id)
+        return self._present_dock(job)
 
     def dock_file(self, job_id: UUID, name: str) -> tuple[Path, DockFileName]:
         """Where one of a docking job's result files is stored, and its name. A job that

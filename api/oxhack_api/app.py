@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
+from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 
 from . import __version__, stream_b
 from .deps import Components
@@ -18,6 +19,7 @@ from .jobs_pg import PostgresQueue, PostgresWorker
 from .repo import AlreadyExists, MemoryRepo, Repo
 from .repo.postgres import PostgresRepo
 from .routes.api import router
+from .security import BrowserSecurity
 from .services.docking import DockingBackend, FixtureDocking, VinaDocking
 from .services.evaluation import EvaluationSource, FixtureEvaluation
 from .services.jury import FixtureJury, JuryBackend
@@ -54,10 +56,10 @@ def build_components(
     """Fixture-mode pieces by default; any piece can be replaced. Opens the database
     when the settings say postgres and no repo is given."""
     fixtures = settings.fixtures_dir
-    jury = jury or open_jury(settings)
     opened = repo is None
     repo = repo or open_repo(settings)
     try:
+        jury = jury or open_jury(settings, repo)
         # Vina mode reads each structure's measured control from the repo.
         docking = docking or open_docking(settings, repo)
         source = source or open_source(settings, docking)
@@ -141,7 +143,7 @@ def open_ranking(settings: Settings) -> RankingBackend:
     return ranking
 
 
-def open_jury(settings: Settings) -> JuryBackend:
+def open_jury(settings: Settings, repo: Repo | None = None) -> JuryBackend:
     """The Model jury the settings name. Cortex refuses to start without its settings."""
     if settings.jury == "fixture":
         return FixtureJury(settings.fixtures_dir)
@@ -150,11 +152,19 @@ def open_jury(settings: Settings) -> JuryBackend:
         return StreamAJury("mock", audit_dir=audit_dir)
     snowflake = SnowflakeSettings()
     snowflake.require_complete()
+
+    def before_call() -> None:
+        if repo is None:
+            raise RuntimeError("Cortex requires a shared quota store")
+        repo.consume_quota("cortex:minute", settings.cortex_calls_per_minute, 60)
+        repo.consume_quota("cortex:day", settings.cortex_calls_per_day, 86400)
+
     return StreamAJury(
         "cortex",
         models=snowflake.models,
         reasoning_effort=snowflake.reasoning_effort,
         audit_dir=audit_dir,
+        before_call=before_call,
     )
 
 
@@ -230,6 +240,9 @@ def create_app(settings: Settings | None = None, components: Components | None =
     )
     if components is not None:
         app.state.components = components
+    current_settings = components.settings if components else settings or Settings()
+    app.add_middleware(RequestBodyLimitMiddleware, max_body_size=16_384)
+    app.add_middleware(BrowserSecurity, settings=current_settings)
     install_error_handlers(app)
     app.include_router(router)
     return app

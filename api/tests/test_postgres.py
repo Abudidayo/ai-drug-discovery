@@ -117,11 +117,13 @@ def test_history_survives_an_app_restart(pg_settings: Settings, pg_repo: Postgre
         before = client.get(f"/api/experiments/{kept}").json()
         history = client.get("/api/experiments").json()
         archive = client.get("/api/experiments", params={"archived": True}).json()
+        cookies = client.cookies
     pg_repo.close()
 
     # A new app, a new connection pool, the same database.
     restarted = build_components(pg_settings)
     with client_for(restarted) as client:
+        client.cookies.update(cookies)
         assert client.get(f"/api/experiments/{kept}").json() == before
         assert client.get("/api/experiments").json() == history
         assert client.get("/api/experiments", params={"archived": True}).json() == archive
@@ -197,6 +199,7 @@ def test_two_workers_claim_different_jobs(queued: Components) -> None:
 
 
 def test_concurrent_workers_never_share_a_job(queued: Components) -> None:
+    queued.settings.experiments_per_hour = 20
     client = client_for(queued)
     ids = {UUID(create(client)["id"]) for _ in range(12)}
     workers = [worker_for(queued) for _ in range(4)]
