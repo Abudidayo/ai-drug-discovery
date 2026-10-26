@@ -1,3 +1,4 @@
+from conftest import FIXTURES
 from collections import Counter
 from copy import deepcopy
 import json
@@ -10,8 +11,7 @@ from jury.client import ModelReply, mock_model, validate_reply
 from jury.pilot import (MAX_CALLS, MODELS, freeze, leakage_matches, recovery,
                         run_pilot, score)
 
-ROOT = Path(__file__).resolve().parents[2]
-PACKET = json.loads((ROOT / "tests/fixtures/evidence_packet.json").read_text())
+PACKET = json.loads((FIXTURES / "evidence_packet.json").read_text())
 
 
 def prepare(tmp_path):

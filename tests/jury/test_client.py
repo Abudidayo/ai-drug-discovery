@@ -1,3 +1,4 @@
+from conftest import FIXTURES
 from collections import Counter
 from copy import deepcopy
 import json
@@ -19,8 +20,8 @@ from jury.client import (
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PACKET = json.loads((ROOT / "tests/fixtures/evidence_packet.json").read_text())
-FIXTURE = json.loads((ROOT / "tests/fixtures/jury_result.json").read_text())
+PACKET = json.loads((FIXTURES / "evidence_packet.json").read_text())
+FIXTURE = json.loads((FIXTURES / "jury_result.json").read_text())
 CONFIG = json.loads((ROOT / "jury/config.json").read_text())
 RECORDED = json.loads((Path(__file__).parent / "data/live_recording.json").read_text())
 
@@ -563,7 +564,7 @@ def test_invalid_timeout(monkeypatch, timeout):
 def test_cli_mock(tmp_path):
     out = tmp_path / "new-directory" / "result.json"
     process = subprocess.run([sys.executable, "-m", "jury",
-                              "tests/fixtures/evidence_packet.json", "--out", str(out), "--mock"],
+                              str(FIXTURES / "evidence_packet.json"), "--out", str(out), "--mock"],
                              cwd=ROOT, capture_output=True, text=True)
     assert process.returncode == 0, process.stderr
     result = json.loads(out.read_text())
@@ -870,12 +871,12 @@ def test_a6_receipts_and_comparison_handle_refusal_and_null_consensus(tmp_path, 
         assert receipt['validation']['errors'] == ['refused (provider stop_reason=refusal)']
     result = a6.read(tmp_path / a6.DISEASES[0] / 'jury_result.json')
     assert result['consensus'] is None
-    candidates = a6.read(ROOT / 'tests/fixtures/candidates.json')['candidates']
+    candidates = a6.read(FIXTURES / 'candidates.json')['candidates']
     network = {'disease': PACKET['disease'], 'candidates': candidates,
                'shortlist': [c['candidate_id'] for c in candidates]}
     before = deepcopy(result)
     comparison = a6.compare(network, PACKET, result,
-                            a6.read(ROOT / 'tests/fixtures/drug_targets.json'))
+                            a6.read(FIXTURES / 'drug_targets.json'))
     assert result == before
     assert comparison['jurors_counted'] == valid_count
     assert comparison['failed_jurors'] == CONFIG['models'][valid_count:]
@@ -885,4 +886,4 @@ def test_a6_receipts_and_comparison_handle_refusal_and_null_consensus(tmp_path, 
                for r in comparison['rows'])
     result['consensus_status']['jurors_counted'] = 2
     with pytest.raises(ValueError, match='metadata'):
-        a6.compare(network, PACKET, result, a6.read(ROOT / 'tests/fixtures/drug_targets.json'))
+        a6.compare(network, PACKET, result, a6.read(FIXTURES / 'drug_targets.json'))

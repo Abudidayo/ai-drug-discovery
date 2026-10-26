@@ -1,7 +1,7 @@
 """Offline packet projection checks; graph reconstruction belongs to ranking."""
+from conftest import FIXTURES
 from copy import deepcopy
 import json
-from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -9,12 +9,11 @@ import pytest
 from jury.client import PROMPT_VERSION, build_prompt, validate_packet
 from pipeline.packets import add_network_paths
 
-ROOT = Path(__file__).resolve().parents[2]
 GENE = 'ENSG00000068078'
 
 
 def base_packet():
-    packet = json.loads((ROOT/'tests/fixtures/evidence_packet.json').read_text())
+    packet = json.loads((FIXTURES / 'evidence_packet.json').read_text())
     removed = {e['id'] for e in packet['evidence'] if e['kind']=='pathway'}
     packet['evidence'] = [e for e in packet['evidence'] if e['id'] not in removed]
     packet['releases'] = [r for r in packet['releases'] if not r.startswith('reactome-')]

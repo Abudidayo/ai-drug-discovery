@@ -1,5 +1,6 @@
 """Offline tests use projected, recorded OT 26.09 / ChEMBL 37 source rows."""
 
+from conftest import FIXTURES
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -43,7 +44,7 @@ def test_regulator_universe_and_contract(recorded):
     assert "CHEMBL443684" not in drugs
     assert any(row["drugId"] == "CHEMBL443684" and row["maxClinicalStage"] == "APPROVAL"
                for row in recorded["tables"]["clinical_indication"])
-    fixture = json.loads((Path(__file__).parents[2] / "tests/fixtures/drug_targets.json").read_text())
+    fixture = json.loads((FIXTURES / "drug_targets.json").read_text())
     assert result.keys() == fixture.keys()
     assert result["rules"] == fixture["rules"]
     assert result["releases"] == fixture["releases"]

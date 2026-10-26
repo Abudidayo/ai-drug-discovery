@@ -1,5 +1,6 @@
 """Offline integration and fixture-contract checks, including saved real runs."""
 
+from conftest import FIXTURES
 from copy import deepcopy
 from hashlib import sha256
 import json
@@ -84,7 +85,7 @@ def assert_outputs(out, drugs, string_map, *, legacy_jury=False):
     names = ("disease_targets", "candidates", "evidence_packet", "jury_result")
     files = {name: read_json(out / f"{name}.json") for name in names}
     for name, actual in files.items():
-        example = read_json(ROOT / "tests/fixtures" / f"{name}.json")
+        example = read_json(FIXTURES / f"{name}.json")
         if name == "jury_result" and legacy_jury:
             # Historical artifacts predate these additive contract fields.
             if "consensus_status" not in actual:
@@ -222,10 +223,10 @@ def assert_outputs(out, drugs, string_map, *, legacy_jury=False):
 
 
 def test_current_jury_contract_accepts_null_consensus_with_refusal_metadata():
-    packet = read_json(ROOT / "tests/fixtures/evidence_packet.json")
+    packet = read_json(FIXTURES / "evidence_packet.json")
     config = {**read_json(ROOT / "jury/config.json"), "max_attempts": 1}
     result = run_jury(packet, config, lambda *args: ModelReply("", stop_reason="refusal"))
-    shape(result, [read_json(ROOT / "tests/fixtures/jury_result.json")])
+    shape(result, [read_json(FIXTURES / "jury_result.json")])
     assert result["consensus"] is None
     assert result["consensus_status"]["reason"] == "fewer_than_two_valid_jurors"
 
@@ -252,7 +253,7 @@ def test_recorded_end_to_end(tmp_path, monkeypatch, jury_failure):
         parquet = input_dir / "ot" / name / "sample.parquet"
         parquet.parent.mkdir(parents=True)
         duckdb.read_json(str(path)).write_parquet(str(parquet))
-    drugs = read_json(ROOT / "tests/fixtures/drug_targets.json")
+    drugs = read_json(FIXTURES / "drug_targets.json")
     # One recorded real mechanism drug, not the fictional bioactivity examples.
     drugs["drugs"] = [d for d in drugs["drugs"] if d["drug_id"] == "CHEMBL3545376"]
     # Reproduce the two real integration failures at the source boundary.
@@ -274,7 +275,7 @@ def test_recorded_end_to_end(tmp_path, monkeypatch, jury_failure):
     monkeypatch.setattr(ExperimentSources, "approval", lambda self, ids:
                         None if "CHEMBL1201557" in ids else original_approval(self, ids))
     write_json(input_dir / "drug_targets.json", drugs)
-    string_map = read_json(ROOT / "tests/fixtures/string_id_map.json")
+    string_map = read_json(FIXTURES / "string_id_map.json")
     write_json(input_dir / "string_id_map.json", string_map)
     disease_cache = tmp_path / "exists.parquet"
     disease_cache.touch()

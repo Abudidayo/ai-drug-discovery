@@ -1,4 +1,5 @@
 """Offline budget and strict-validation checks; no provider calls."""
+from conftest import FIXTURES
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -8,7 +9,6 @@ import pytest
 from jury import pilot
 from jury.client import ModelReply, mock_model
 
-ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture
@@ -51,7 +51,7 @@ def test_b_budget_reserves_before_dispatch_and_caps_retries(tmp_path, monkeypatc
 
 
 def test_b_attempt_retains_strict_numeric_and_citation_checks(tmp_path):
-    packet=json.loads((ROOT/'tests/fixtures/evidence_packet.json').read_text())
+    packet=json.loads((FIXTURES / 'evidence_packet.json').read_text())
     order=[c['label'] for c in packet['candidates']]
     from jury.client import build_prompt
     prompt=build_prompt(packet,order)
@@ -162,7 +162,7 @@ def test_amended_experiment_scores_all_methods_and_paired_panels_offline(tmp_pat
 
 def test_b_provider_refusal_never_parses_a_complete_ballot(tmp_path, monkeypatch):
     from jury.client import build_prompt
-    packet = json.loads((ROOT / 'tests/fixtures/evidence_packet.json').read_text())
+    packet = json.loads((FIXTURES / 'evidence_packet.json').read_text())
     prompt = build_prompt(packet, [c['label'] for c in packet['candidates']])
     raw = mock_model('offline', prompt, 0)
     path = tmp_path / 'run.json'

@@ -1,3 +1,4 @@
+from conftest import FIXTURES
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -48,7 +49,7 @@ def test_excludes_unmapped_unapproved_and_worked_examples():
 
 
 def test_packet_indication_screen():
-    packet = json.loads((Path(__file__).resolve().parents[2] / "tests/fixtures/evidence_packet.json").read_text())
+    packet = json.loads((FIXTURES / "evidence_packet.json").read_text())
     assert packet_leakage(packet) == []
     leaked = deepcopy(packet)
     leaked["evidence"][0]["statement"] = "Approved for the panel's Disease in a clinical trial."
