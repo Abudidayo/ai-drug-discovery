@@ -36,7 +36,7 @@ const decisions = {
  */
 
 export const copy = {
-  product: "Drug repurposing explorer",
+  product: "Half Life",
   back: "Back",
   next: "Next",
   stepsLabel: "Steps",
@@ -90,6 +90,38 @@ export const copy = {
       intro: "Each search is saved with the data it used, so you can come back to it.",
     },
   ],
+
+  /** The introduction at `/`: the approach, its four steps, and the way into the app. */
+  intro: {
+    title: "Repurposing existing drugs for diseases",
+    tagline: "A second life for existing medicines",
+    solution:
+      "Half Life integrates biological network analysis and AI evidence review to prioritise existing drugs for further research.",
+    start: "Start exploring",
+    limit: "Research hypotheses, not proven treatments.",
+    method: [
+      {
+        title: "Disease proteins",
+        text: "Proteins linked to the disease, from published genetic and clinical evidence.",
+      },
+      {
+        title: "Network ranking",
+        text: "Approved drugs ranked by how closely their targets connect to those proteins.",
+      },
+      {
+        title: "Evidence review",
+        text: "Three AI models weigh the evidence for each candidate, independently.",
+      },
+      {
+        title: "Shortlist",
+        text: "Drugs worth further research, each with the reasons behind it.",
+      },
+    ],
+    workflow: {
+      title: "Workflow",
+      lede: "Find existing medicines worth investigating.",
+    },
+  },
 
   search: {
     placeholder: "Search diseases",

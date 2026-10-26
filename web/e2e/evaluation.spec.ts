@@ -9,7 +9,7 @@ import { expect, test } from "./console";
 test("the steps don't link to the evaluation, which still opens at its own address", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/explore");
   await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}\/disease$/);
   await expect(page.getByRole("link", { name: "How well the ranking works" })).toHaveCount(0);
 

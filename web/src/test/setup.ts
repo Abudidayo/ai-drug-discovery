@@ -4,9 +4,10 @@ import { afterAll, afterEach, beforeAll, vi } from "vitest";
 import { fakeApi, server } from "./server";
 
 /*
- * jsdom has no WebGL and no layout. These stand-ins let the 3D figures and the charts run their
- * real code paths in tests: three's renderer draws nothing, a canvas reports a WebGL context,
- * and observed elements report a fixed size.
+ * jsdom has no WebGL, no layout and no Web Animations. These stand-ins let the 3D figures, the
+ * charts and the intro's animations run their real code paths in tests: three's renderer draws
+ * nothing, a canvas reports a WebGL context, observed elements report a fixed size, and
+ * animations hold still.
  */
 const noop = () => undefined;
 
@@ -116,6 +117,35 @@ class AlwaysVisibleIntersectionObserver {
   takeRecords = () => [];
 }
 
+/** An identity 2D matrix, enough for the lab's camera to compare one frame with the next. */
+class IdentityDOMMatrix {
+  a = 1;
+  b = 0;
+  c = 0;
+  d = 1;
+  e = 0;
+  f = 0;
+}
+
+/** A Web Animation that never runs: it pauses, plays and cancels, and never finishes. */
+function stillAnimation(): Animation {
+  return {
+    currentTime: 0,
+    finished: new Promise<Animation>(noop),
+    play: noop,
+    pause: noop,
+    cancel: noop,
+  } as unknown as Animation;
+}
+
+/** SVG paths have no geometry in jsdom: every path is a single point at the origin. */
+Object.assign(SVGElement.prototype, {
+  getTotalLength: () => 0,
+  getPointAtLength: () => ({ x: 0, y: 0 }) as DOMPoint,
+});
+Element.prototype.animate = stillAnimation;
+
+vi.stubGlobal("DOMMatrix", IdentityDOMMatrix);
 vi.stubGlobal("ResizeObserver", FixedSizeResizeObserver);
 vi.stubGlobal("IntersectionObserver", AlwaysVisibleIntersectionObserver);
 vi.stubGlobal(

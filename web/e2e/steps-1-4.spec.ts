@@ -19,7 +19,7 @@ async function expectStep(page: Page, title: string) {
 
 test("a student walks from choosing COVID-19 to the evidence for baricitinib", async ({ page }) => {
   // Step 1 opens the first common disease, marks it in the list and draws its network.
-  await page.goto("/");
+  await page.goto("/explore");
   await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}\/disease$/);
   await expectStep(page, "Choose a disease");
   await expect(page.getByText("Common diseases", { exact: true })).toBeVisible();
@@ -102,7 +102,7 @@ test("a student walks from choosing COVID-19 to the evidence for baricitinib", a
 });
 
 test("the network persists across steps instead of being rebuilt", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/explore");
   // Wait for the build: until then the later steps show its progress in place of the network.
   await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}\/disease$/);
   const id = new URL(page.url()).pathname.split("/")[2] ?? "";

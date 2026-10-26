@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { copy } from "../copy/en";
+import { BrandMark } from "./BrandMark";
 import styles from "./PageFrame.module.css";
 
 interface PageFrameProps {
@@ -22,6 +23,7 @@ export function PageFrame({ header, footer, flow = "fit", children }: PageFrameP
     <div className={styles.page} data-flow={flow}>
       <header className={styles.header}>
         <Link to="/" className={styles.product}>
+          <BrandMark className={styles.productMark} />
           {copy.product}
         </Link>
         {header}

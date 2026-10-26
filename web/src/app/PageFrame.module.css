@@ -22,12 +22,20 @@
 }
 
 .product {
+  display: inline-flex;
   flex: none;
+  gap: var(--space-8);
+  align-items: center;
   font-size: var(--text-body-lg);
   font-weight: var(--weight-bold);
   letter-spacing: -0.01em;
   white-space: nowrap;
   text-decoration: none;
+}
+
+.productMark {
+  width: 24px;
+  height: 24px;
 }
 
 .main {

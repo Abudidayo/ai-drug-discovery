@@ -2,7 +2,7 @@ import { Link } from "react-router";
 import type { BuildStage, Experiment } from "../api/types";
 import { copy } from "../copy/en";
 import styles from "./ExperimentStatus.module.css";
-import { HOME_PATH } from "./steps";
+import { EXPLORE_PATH } from "./steps";
 
 const STAGES: readonly BuildStage[] = ["targets", "ranking", "evidence", "saving"];
 
@@ -56,7 +56,7 @@ export function BuildFailed({ experiment }: { experiment: Experiment }) {
     <div className={styles.status} role="alert">
       <p className={styles.headline}>{copy.experiment.failed}</p>
       {experiment.error !== null && <p className={styles.detail}>{experiment.error}</p>}
-      <Link to={HOME_PATH} className={styles.action}>
+      <Link to={EXPLORE_PATH} className={styles.action}>
         {copy.experiment.chooseAnother}
       </Link>
     </div>
