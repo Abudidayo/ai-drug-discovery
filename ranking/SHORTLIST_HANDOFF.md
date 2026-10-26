@@ -7,15 +7,15 @@ association is not treatment-success probability.
 
 ## Application selection
 
-The thin application entry point lives in the existing `workstream_b` directory;
+The thin application entry point lives in `ranking/application/shortlist.py`;
 it calls `project_shortlist`, `adapt_ranking` and `ranking.paths.explain_files`.
-Every existing `ranking/*.py` file is covered by the original seal, so those
-files and their benchmark defaults stay byte-identical. No new package, scoring
+Every top-level `ranking/*.py` file is covered by the original seal, so those
+files and their benchmark defaults stay byte-identical. No new scoring
 algorithm, graph builder or path implementation is introduced. No jury
 integration, historical output, frozen replication or seal is changed.
 
 ```powershell
-& .\.venv-ranking\Scripts\python.exe -m workstream_b.application_shortlist `
+& .\.venv-ranking\Scripts\python.exe -m ranking.application.shortlist `
   --ranking data/ranking/shortlist-methods-v1/integration-examples/MONDO_0009693/ranking.json `
   --artifacts data/ranking/string-12.5-c700-e400 `
   --out data/ranking/application-shortlists-v1/MONDO_0009693

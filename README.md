@@ -114,8 +114,7 @@ Large downloads stay out of Git. Each source keeps its own licence.
 ```text
 pipeline/      Data: diseases, drugs, protein mapping, evidence packets
 jury/          Model jury client and checks
-ranking/       Network, scoring, shortlist, evaluation
-workstream_b/  App-facing shortlist and paths
+ranking/       Network, scoring, shortlist, evaluation (app shortlist in ranking/application/)
 api/           Backend API
 web/           Website and app
 worker/        Docking worker

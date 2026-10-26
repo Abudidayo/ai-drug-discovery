@@ -14,7 +14,7 @@ from ranking.paths import explain_ranking
 from ranking.scoring import RankingSettings, assign_ranks, make_shortlist
 from ranking.shortlist import ShortlistSettings
 from ranking.tests import test_paths
-from workstream_b.application_shortlist import generate_shortlist, main
+from ranking.application.shortlist import generate_shortlist, main
 
 
 class ApplicationShortlistTests(unittest.TestCase):

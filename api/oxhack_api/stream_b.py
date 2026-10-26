@@ -51,7 +51,7 @@ RwrSettings = _rwr.RWRSettings
 iterations, top 50 Disease Targets (`ranking/rwr_protocol.json`)."""
 
 SHORTLIST_METHOD = "physical_rwr"
-"""Stream B's application default (`workstream_b/application_shortlist.py`): the random
+"""Stream B's application default (`ranking/application/shortlist.py`): the random
 walk on the physical network fills the 10 network places. `zscore` is the original
 closeness policy, kept for the frozen replays."""
 
