@@ -13,7 +13,7 @@ It is for checking what the APIs return before building the real pipeline. It is
 Requires Node 18 or newer. There are no dependencies to install and no API keys: all three APIs are public.
 
 ```sh
-node demos/data-sources/server.mjs
+node docs/data-sources-demo/server.mjs
 ```
 
 Open <http://127.0.0.1:8787>. Set `PORT` to use another port. The server only listens on this machine.
@@ -35,7 +35,7 @@ PubChem is looked up by the InChIKey from ChEMBL, not by drug name, so the struc
 If one source fails, the others still return and the failed block explains which source failed and why. A request fails as a whole (HTTP 502) only when every source fails. To try the failure states, point a source at a host that does not exist:
 
 ```sh
-PUBCHEM_BASE=https://invalid.example node demos/data-sources/server.mjs
+PUBCHEM_BASE=https://invalid.example node docs/data-sources-demo/server.mjs
 ```
 
 `CHEMBL_BASE` and `OPEN_TARGETS_URL` work the same way.

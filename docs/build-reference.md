@@ -6,7 +6,7 @@
 - the approval and bioactivity rules;
 - docking.
 
-IDs follow `plan.md` section 3, and terms follow `CONTEXT.md`. The research behind these recipes is in `research_notes/OxHack 26 drug repurposing plan/`.
+IDs follow `plan.md` section 3, and terms follow `CONTEXT.md`. The research behind these recipes is in `docs/research-notes/OxHack 26 drug repurposing plan/`.
 
 ## 1. Account setup
 

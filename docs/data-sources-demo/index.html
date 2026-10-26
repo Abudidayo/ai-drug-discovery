@@ -75,7 +75,7 @@
   <div class="tag">LOCAL DATA-SOURCE TEST BENCH</div>
   <h1>Pull live data from Open Targets, ChEMBL and PubChem</h1>
   <p class="muted">Search a disease, pick it to see linked proteins and drugs from Open Targets, then pick a drug to load its ChEMBL record and PubChem structure. All data is live from the public APIs; nothing is saved. Results are research evidence, not treatment advice.</p>
-  <p class="error" id="file-warning" role="alert" hidden>This page was opened as a file, so it cannot reach its local server. In a terminal, run <code>node demos/data-sources/server.mjs</code>, then open <a href="http://127.0.0.1:8787">http://127.0.0.1:8787</a>.</p>
+  <p class="error" id="file-warning" role="alert" hidden>This page was opened as a file, so it cannot reach its local server. In a terminal, run <code>node docs/data-sources-demo/server.mjs</code>, then open <a href="http://127.0.0.1:8787">http://127.0.0.1:8787</a>.</p>
 
   <section class="panel" aria-labelledby="search-title">
     <h2 id="search-title">1. Find a disease <span class="muted small">Open Targets</span></h2>
@@ -116,7 +116,7 @@ const openedAsFile = location.protocol === "file:";
 $("file-warning").hidden = !openedAsFile;
 const serverUnreachable = openedAsFile
   ? "Searching needs the local server. Start it as described above, then use the page at http://127.0.0.1:8787."
-  : "The local server did not answer. Check that node demos/data-sources/server.mjs is still running, then try again.";
+  : "The local server did not answer. Check that node docs/data-sources-demo/server.mjs is still running, then try again.";
 
 // Each request carries a token so a slow, superseded response never overwrites a newer one.
 const latest = {};

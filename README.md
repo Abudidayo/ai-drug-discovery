@@ -113,12 +113,20 @@ Large downloads stay out of Git. Each source keeps its own licence.
 
 ```text
 pipeline/      Data: diseases, drugs, protein mapping, evidence packets
+jury/          Model jury client and checks
 ranking/       Network, scoring, shortlist, evaluation
 workstream_b/  App-facing shortlist and paths
-jury/          Model jury client and checks
+api/           Backend API
+web/           Website and app
+worker/        Docking worker
+db/            Database migrations
+scripts/       Start and redeploy the demo
 fixtures/      Sample data formats
+tests/         Tests for pipeline and jury
 results/       Experiments, protocols, errata
+docs/          Build reference, research notes, primer, data-source demo
 plan.md        Project specification
+CONTEXT.md     Glossary
 ```
 
 ## Run the tests

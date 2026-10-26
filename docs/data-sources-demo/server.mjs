@@ -1,5 +1,5 @@
 // Local test bench for the three public data sources behind the evidence pipeline.
-// Zero dependencies: run with `node demos/data-sources/server.mjs` (Node 18+).
+// Zero dependencies: run with `node docs/data-sources-demo/server.mjs` (Node 18+).
 
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -364,7 +364,7 @@ server.on("error", (error) => {
   if (error.code !== "EADDRINUSE") throw error;
   console.error(
     `Port ${PORT} is already in use. The demo may already be running at http://${HOST}:${PORT}; ` +
-      `otherwise start it on another port, for example PORT=${PORT + 1} node demos/data-sources/server.mjs`,
+      `otherwise start it on another port, for example PORT=${PORT + 1} node docs/data-sources-demo/server.mjs`,
   );
   process.exit(1);
 });
