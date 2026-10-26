@@ -121,6 +121,18 @@ results/       Experiments, protocols, errata
 plan.md        Project specification
 ```
 
+## Deployment
+
+Every push to `main` runs the applicable checks, then deploys that exact commit
+to Oracle over SSH once Oracle setup is enabled. Pull requests run checks only.
+Failed checks prevent deployment; a failed migration or health check restores
+the previous release and database.
+
+The one-time setup, migration and recovery procedure is in
+[`infra/oracle/README.md`](infra/oracle/README.md). Start with
+`scripts/oracle/setup.sh`. While account setup is pending, CI reports that Oracle
+deployment is disabled. The existing Codespace stays available during cutover.
+
 ## Run the tests
 
 ```bash

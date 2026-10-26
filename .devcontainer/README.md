@@ -40,13 +40,13 @@ This folder defines the environment that runs the whole stack: Python 3.11, uv, 
 
 ## Deploy
 
-Every push to `main` deploys: the Deploy workflow (`.github/workflows/deploy.yml`) runs the tests, then opens a shell in the codespace and runs `scripts/redeploy.sh main`, then checks the public link answers. Runs appear under Actions and the repository's **demo** environment; Actions → Deploy → Run workflow deploys by hand. It needs, in Settings → Secrets and variables → Actions:
+GitHub Actions deploys `main` to Oracle after checks pass. The one-time setup,
+migration and activation steps are in [the Oracle guide](../infra/oracle/README.md).
+Until Oracle is enabled, CI reports that deployment is waiting for setup.
 
-- secret `CODESPACE_DEPLOY_TOKEN`: a classic personal access token of the codespace's owner with the `codespace` scope;
-- variable `DEMO_CODESPACE`: the codespace's name (`gh codespace list`);
-- variable `DEMO_URL`: its public web address, ending in `/`.
-
-A stopped codespace is started by the deploy. The workflow doesn't keep it awake: see "Before judging".
+The existing Codespace remains usable during migration. Run `scripts/redeploy.sh`
+there manually when needed; the Actions workflow no longer starts or deploys to
+Codespaces. See "Before judging" for keeping a manual demo available.
 
 ## Change the docking packages
 
