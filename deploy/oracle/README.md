@@ -9,6 +9,11 @@ The source was inspected on 26 October 2026: Codespace
 `half-life-v6rwgp49g76cpx6p`, PostgreSQL **18**, live source, Cortex jury,
 `RESULTS_DIR=/workspaces/results`. Recheck these before exporting.
 
+**Folder move (26 Oct 2026).** The app moved to `app/`, `core/` and `deploy/`. A VM
+bootstrapped before then still starts `scripts/serve.sh` and serves `web/dist`;
+`deploy.sh` links those old paths inside each release, so it keeps working. Rerun
+step 3 when convenient to switch the VM to the new paths.
+
 ## 1. Identity setup
 
 From the repository root:

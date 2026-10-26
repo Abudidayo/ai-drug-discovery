@@ -124,6 +124,9 @@ exit 0
     if failure == "none":
         assert result.returncode == 0, result.stderr
         assert (root / "current").resolve().name.startswith(SHA + ".")
+        # Servers bootstrapped before the folder move still start these paths.
+        assert os.readlink(root / "current/scripts/serve.sh") == "../deploy/serve.sh"
+        assert os.readlink(root / "current/web") == "app/web"
         assert not (root / "shared/maintenance").exists()
     else:
         assert result.returncode != 0

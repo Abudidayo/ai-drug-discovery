@@ -29,7 +29,11 @@ cd "$release"
 uv sync --all-packages --frozen --python 3.11 --quiet
 (cd app/web && npm ci --silent && npm run build)
 printf '{"sha":"%s"}\n' "$sha" > app/web/dist/release.json
-PYTHONPATH=worker "$DOCKING_VENV/bin/python" -m oxhack_worker.dock --toolchain
+# Servers bootstrapped before the folder move start scripts/serve.sh and serve
+# web/dist. These links let each release run there unchanged; bootstrap.sh now
+# uses the new paths, so rerunning it makes them unused.
+mkdir scripts && ln -s ../deploy/serve.sh scripts/serve.sh && ln -s app/web web
+PYTHONPATH=app/worker "$DOCKING_VENV/bin/python" -m oxhack_worker.dock --toolchain
 # Validate credentials, paths and DB connectivity before interrupting readers.
 uv run --no-sync python -c 'from oxhack_api.settings import Settings, SnowflakeSettings; import psycopg; s=Settings(); SnowflakeSettings(); c=psycopg.connect(s.database_url); c.execute("select 1")'
 [[ -d $OXHACK_DATA_DIR && -f $OXHACK_STRUCTURES_DIR/settings.json ]]
