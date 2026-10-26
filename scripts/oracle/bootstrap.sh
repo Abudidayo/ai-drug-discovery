@@ -16,7 +16,7 @@ repo=$(cd "$(dirname "$0")/../.." && pwd)
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends ca-certificates curl gnupg build-essential \
-  libboost-all-dev swig pkg-config rsync ufw iptables-persistent python3-venv debian-keyring debian-archive-keyring
+  libboost-all-dev swig pkg-config rsync iptables-persistent python3-venv debian-keyring debian-archive-keyring
 install -d -m 755 /etc/apt/keyrings
 curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /etc/apt/keyrings/postgresql.asc
 printf 'deb [signed-by=/etc/apt/keyrings/postgresql.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main\n' > /etc/apt/sources.list.d/pgdg.list
@@ -174,16 +174,25 @@ chown root:caddy /etc/caddy/Caddyfile
 chmod 640 /etc/caddy/Caddyfile
 chmod 644 /etc/systemd/system/half-life.service /etc/systemd/system/half-life-backup.service /etc/systemd/system/half-life-backup.timer
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
-# OCI Ubuntu images have an existing iptables REJECT. Insert only web accepts
-# ahead of it, then persist; SSH already works through the image firewall.
-for port in 80 443; do
-  iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null || iptables -I INPUT 1 -p tcp --dport "$port" -j ACCEPT
+# Preserve OCI's egress rules, including metadata protections, while enforcing
+# one persisted inbound policy. UFW conflicts with iptables-persistent on Ubuntu.
+for firewall in iptables ip6tables; do
+  "$firewall" -N HALF-LIFE-IN 2>/dev/null || true
+  "$firewall" -F HALF-LIFE-IN
+  "$firewall" -A HALF-LIFE-IN -i lo -j ACCEPT
+  "$firewall" -A HALF-LIFE-IN -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+  if [[ $firewall == iptables ]]; then
+    "$firewall" -A HALF-LIFE-IN -p icmp --icmp-type 3 -j ACCEPT
+  else
+    "$firewall" -A HALF-LIFE-IN -p ipv6-icmp -j ACCEPT
+  fi
+  for port in 22 80 443; do
+    "$firewall" -A HALF-LIFE-IN -p tcp --dport "$port" -j ACCEPT
+  done
+  "$firewall" -A HALF-LIFE-IN -j REJECT
+  "$firewall" -C INPUT -j HALF-LIFE-IN 2>/dev/null || "$firewall" -I INPUT 1 -j HALF-LIFE-IN
 done
 netfilter-persistent save
-ufw allow 22/tcp
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw --force enable
 cat > /etc/ssh/sshd_config.d/half-life.conf <<'SSH'
 PasswordAuthentication no
 KbdInteractiveAuthentication no

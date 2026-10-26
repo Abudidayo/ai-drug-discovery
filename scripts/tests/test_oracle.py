@@ -306,3 +306,43 @@ exit 0
         assert "variable set DEMO_URL" not in calls and not enabled
         if mode == "ssh-failure":
             assert "secret set" not in calls
+
+
+def test_host_firewall_accepts_only_ssh_and_web_ports(tmp_path):
+    bootstrap = (ORACLE / "bootstrap.sh").read_text()
+    start = bootstrap.index("for firewall in iptables ip6tables;")
+    end = bootstrap.index("netfilter-persistent save", start)
+    rules = bootstrap[start:end] + "netfilter-persistent save\n"
+    commands = tmp_path / "bin"
+    commands.mkdir()
+    log = tmp_path / "firewall.log"
+    for command in ("iptables", "ip6tables", "netfilter-persistent"):
+        path = commands / command
+        path.write_text(
+            '#!/bin/bash\nprintf "%s %s\\n" "${0##*/}" "$*" >> "$COMMAND_LOG"\n'
+            '[[ "$1" != -C ]]\n'
+        )
+        path.chmod(0o755)
+    subprocess.run(
+        ["bash", "-euc", rules],
+        env={
+            **os.environ,
+            "PATH": f"{commands}:{os.environ['PATH']}",
+            "COMMAND_LOG": str(log),
+        },
+        check=True,
+    )
+    calls = log.read_text().splitlines()
+    for firewall in ("iptables", "ip6tables"):
+        ports = [
+            call.split("--dport ")[1].split()[0]
+            for call in calls
+            if call.startswith(firewall + " ") and "--dport" in call
+        ]
+        assert ports == ["22", "80", "443"]
+        assert f"{firewall} -A HALF-LIFE-IN -j REJECT" in calls
+        assert calls.index(f"{firewall} -A HALF-LIFE-IN -j REJECT") < calls.index(
+            f"{firewall} -I INPUT 1 -j HALF-LIFE-IN"
+        )
+    assert calls[-1] == "netfilter-persistent save"
+    assert not any("OUTPUT" in call for call in calls)
