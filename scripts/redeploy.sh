@@ -7,15 +7,15 @@
 #   scripts/redeploy.sh            # in the codespace
 #   scripts/redeploy.sh <commit-sha-or-branch>
 #
-# The Deploy workflow (.github/workflows/deploy.yml) runs it over `gh codespace ssh`
-# after code changes pass on main. The codespace is a deploy target: local
-# changes to tracked files are overwritten.
+# Manual Codespaces deployment during development or migration. GitHub Actions
+# deploys to Oracle using scripts/oracle/deploy.sh. Local tracked changes in
+# this Codespace are overwritten.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ref=${1:-main}
 log_dir=${DEPLOY_LOG_DIR:-/workspaces}
 
-# CI passes the immutable SHA it tested; manual use may still name a branch.
+# An immutable SHA pins a release; manual use may also name a branch.
 if [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
   git fetch -q origin main
   git cat-file -e "$ref^{commit}"

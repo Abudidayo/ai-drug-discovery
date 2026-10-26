@@ -93,7 +93,10 @@ jobs:
       - name: Database migrations
         run: uv run --no-sync pytest db/tests -q
       - name: Deployment script regression tests
-        run: uv run --no-sync pytest scripts/tests -q
+        run: |
+          uv run --no-sync ruff check scripts/oracle scripts/tests/test_oracle.py db/tests/test_oracle_restore.py
+          uv run --no-sync ruff format --check scripts/oracle scripts/tests/test_oracle.py db/tests/test_oracle_restore.py
+          uv run --no-sync pytest scripts/tests -q
 
   web:
     needs: changes
@@ -145,9 +148,30 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  oracle:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.13.5
+          terraform_wrapper: false
+      - name: Validate free resource guards without cloud credentials
+        run: |
+          terraform -chdir=infra/oracle init -backend=false -input=false -lockfile=readonly
+          terraform -chdir=infra/oracle fmt -check
+          terraform -chdir=infra/oracle validate
+          terraform -chdir=infra/oracle test
+          shellcheck -e SC1091 scripts/oracle/*.sh
+
   # A stable required check succeeds on docs-only changes and fails closed on cancelled jobs.
   test:
-    needs: [changes, python, web]
+    needs: [changes, python, web, oracle]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -158,21 +182,35 @@ jobs:
           CODE: ${{ needs.changes.outputs.code }}
           PYTHON: ${{ needs.python.result }}
           WEB: ${{ needs.web.result }}
+          ORACLE: ${{ needs.oracle.result }}
         run: |
           [[ "$CHANGES" == success ]]
           if [[ "$CODE" == true ]]; then
-            [[ "$PYTHON" == success && "$WEB" == success ]]
+            [[ "$PYTHON" == success && "$WEB" == success && "$ORACLE" == success ]]
           else
-            [[ "$CODE" == false && "$PYTHON" == skipped && "$WEB" == skipped ]]
+            [[ "$CODE" == false && "$PYTHON" == skipped && "$WEB" == skipped && "$ORACLE" == skipped ]]
           fi
 
-  deploy:
-    needs: [changes, test]
+  deployment-status:
+    needs: test
     if: >-
       github.ref == 'refs/heads/main' && github.event_name != 'pull_request' &&
-      needs.changes.outputs.code == 'true'
+      vars.ORACLE_DEPLOY_ENABLED != 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 5
+    steps:
+      - name: Report pending Oracle setup
+        run: |
+          echo '::notice::Checks passed. Oracle deployment is waiting for one-time account and server setup.'
+          echo 'Oracle deployment is disabled until scripts/oracle/configure-ci.sh is run with --enable. See infra/oracle/README.md.' >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: test
+    if: >-
+      github.ref == 'refs/heads/main' && github.event_name != 'pull_request' &&
+      vars.ORACLE_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     concurrency:
       group: deploy-demo
       cancel-in-progress: false
@@ -180,20 +218,45 @@ jobs:
       name: demo
       url: ${{ vars.DEMO_URL }}
     steps:
-      - name: Redeploy exactly the tested commit
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Deploy the tested archive to Oracle
         env:
-          GH_TOKEN: ${{ secrets.CODESPACE_DEPLOY_TOKEN }}
-          CODESPACE: ${{ vars.DEMO_CODESPACE }}
           DEPLOY_SHA: ${{ github.sha }}
+          ORACLE_HOST: ${{ vars.ORACLE_HOST }}
+          ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+          ORACLE_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
         run: |
-          if [[ -z "$GH_TOKEN" || -z "$CODESPACE" ]]; then
-            echo "::error::Set CODESPACE_DEPLOY_TOKEN and DEMO_CODESPACE (.devcontainer/README.md)."
+          set -euo pipefail
+          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]
+          if [[ ! "$ORACLE_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ || -z "$ORACLE_SSH_KEY" || -z "$ORACLE_KNOWN_HOSTS" ]]; then
+            echo '::error::Oracle SSH settings are incomplete. Run scripts/oracle/configure-ci.sh (infra/oracle/README.md).'
             exit 1
           fi
-          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]
-          gh codespace ssh -c "$CODESPACE" -- \
-            "bash -lc 'cd /workspaces/ai-drug-discovery && git fetch -q origin main && git checkout -q --detach --force $DEPLOY_SHA && scripts/redeploy.sh $DEPLOY_SHA'" \
-            < /dev/null
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$ORACLE_SSH_KEY" > ~/.ssh/oracle
+          printf '%s\n' "$ORACLE_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          trap 'rm -f ~/.ssh/oracle' EXIT
+          ssh_opts=(-i ~/.ssh/oracle -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
+          git archive --format=tar.gz --output="$RUNNER_TEMP/release.tgz" "$DEPLOY_SHA"
+          digest=$(sha256sum "$RUNNER_TEMP/release.tgz" | cut -d ' ' -f 1)
+          scp "${ssh_opts[@]}" "$RUNNER_TEMP/release.tgz" \
+            "halflife@$ORACLE_HOST:/srv/half-life/incoming/$DEPLOY_SHA.tgz"
+          scp "${ssh_opts[@]}" scripts/oracle/deploy.sh \
+            "halflife@$ORACLE_HOST:/srv/half-life/incoming/deploy-$DEPLOY_SHA.sh"
+          ssh "${ssh_opts[@]}" "halflife@$ORACLE_HOST" \
+            "bash /srv/half-life/incoming/deploy-$DEPLOY_SHA.sh $DEPLOY_SHA /srv/half-life/incoming/$DEPLOY_SHA.tgz $digest" < /dev/null
+      - name: Verify the public release SHA
+        env:
+          URL: ${{ vars.DEMO_URL }}
+          DEPLOY_SHA: ${{ github.sha }}
+        run: |
+          [[ "$URL" == https://* ]]
+          curl --connect-timeout 5 --max-time 15 -fsS "${URL%/}/release.json" | \
+            python3 -c 'import json,sys; assert json.load(sys.stdin)["sha"]==sys.argv[1]' "$DEPLOY_SHA"
       - name: Check the public API answers
         env:
           URL: ${{ vars.DEMO_URL }}
