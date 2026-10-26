@@ -43,7 +43,7 @@ return safe 503 responses. Application health checks remain available under load
 Some reverse proxies hide client addresses, so browsers behind them share IP quotas.
 
 Migration `0009_anonymous_sessions.sql` must be applied before starting this
-version against Postgres. Deploy scripts run `uv run db/migrate.py` and abort on
+version against Postgres. Deploy scripts run `uv run deploy/db/migrate.py` and abort on
 failure. Previously saved experiments without ownership remain stored but hidden
 from browser sessions. After the review, migration 0009 was applied to the
 configured `oxhack` database at the user's request; the migration record, ownership

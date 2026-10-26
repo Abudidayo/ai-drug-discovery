@@ -75,4 +75,4 @@ Trail stays active, with its closing lines hidden by default.
 
 Each teammate can tell their agent: **Read `skills.md` and set everything up.**
 
-[Sources and technical details](.agents/README.md)
+[Sources and technical details](README.md)

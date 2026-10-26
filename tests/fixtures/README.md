@@ -27,7 +27,7 @@ computed from the other files. In particular, BCL2 is deliberately absent
 from the fictional network despite having a verified STRING mapping; this
 lets venetoclax exercise the evidence-only, `not_scorable` path.
 
-Use the ID and mapping rules in [plan §3](../../plan.md#identifiers): current
+Use the ID and mapping rules in plan §3 (the removed `plan.md`, in the Git history): current
 Open Targets Disease IDs with underscores, ENSG Target IDs, ChEMBL parent
 Candidate IDs, Experiment UUIDs, Experiment-local `E#` evidence IDs, packet-local
 `C#` labels and `source-version` releases. STRING `9606.ENSP…` IDs are lookup

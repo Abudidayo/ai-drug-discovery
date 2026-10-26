@@ -224,7 +224,7 @@ def assert_outputs(out, drugs, string_map, *, legacy_jury=False):
 
 def test_current_jury_contract_accepts_null_consensus_with_refusal_metadata():
     packet = read_json(FIXTURES / "evidence_packet.json")
-    config = {**read_json(ROOT / "jury/config.json"), "max_attempts": 1}
+    config = {**read_json(ROOT / "core/jury/config.json"), "max_attempts": 1}
     result = run_jury(packet, config, lambda *args: ModelReply("", stop_reason="refusal"))
     shape(result, [read_json(FIXTURES / "jury_result.json")])
     assert result["consensus"] is None

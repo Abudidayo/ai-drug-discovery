@@ -43,7 +43,7 @@ The red dot is the walker. Glow shows how often each protein is visited. Drug B'
 
 Unlike a single shortest path, the walk counts every route between a drug and the disease.
 
-**More detail:** the maths, settings and test results are in [`ranking/RWR.md`](ranking/RWR.md).
+**More detail:** the maths, settings and test results are in [`docs/ranking/RWR.md`](docs/ranking/RWR.md).
 
 **The shortlist.** The top 10 drugs by walk score, plus the top 5 by direct evidence (their targets are themselves disease proteins), make 15. Shortest paths from each drug's targets to the disease's proteins are saved as the explanation.
 
@@ -112,19 +112,22 @@ Large downloads stay out of Git. Each source keeps its own licence.
 ## Repository
 
 ```text
-pipeline/      Data: diseases, drugs, protein mapping, evidence packets
-jury/          Model jury client and checks
-ranking/       Network, scoring, shortlist, evaluation (app shortlist in ranking/application/)
-api/           Backend API
-web/           Website and app
-worker/        Docking worker
-db/            Database migrations
-scripts/       Start and redeploy the demo
-tests/         Tests for pipeline and jury; sample data formats in tests/fixtures/
-results/       Experiments, protocols, errata
-docs/          Build reference, research notes, primer, data-source demo
-plan.md        Project specification
-CONTEXT.md     Glossary
+app/           The product
+  web/           Website and app
+  api/           Backend API
+  worker/        Docking worker
+core/          The science
+  pipeline/      Data: diseases, drugs, protein mapping, evidence packets
+  jury/          Model jury client and checks
+  ranking/       Network, scoring, shortlist, evaluation
+deploy/        Running it
+  db/            Database migrations
+  oracle/        Oracle cloud setup and deploy scripts
+  serve.sh       Start the API and workers
+  redeploy.sh    Redeploy the Codespace demo
+docs/          Glossary, build reference, ranking method notes, research notes
+results/       Sealed experiments, protocols, errata
+tests/         Pipeline and jury tests; sample data formats in tests/fixtures/
 ```
 
 ## Deployment
@@ -135,8 +138,8 @@ Failed checks prevent deployment; a failed migration or health check restores
 the previous release and database.
 
 The one-time setup, migration and recovery procedure is in
-[`infra/oracle/README.md`](infra/oracle/README.md). Start with
-`scripts/oracle/setup.sh`. While account setup is pending, CI reports that Oracle
+[`deploy/oracle/README.md`](deploy/oracle/README.md). Start with
+`deploy/oracle/setup.sh`. While account setup is pending, CI reports that Oracle
 deployment is disabled. The existing Codespace stays available during cutover.
 
 ## Run the tests
@@ -144,11 +147,11 @@ deployment is disabled. The existing Codespace stays available during cutover.
 ```bash
 uv sync
 uv run pytest                                   # pipeline and jury
-python -m pip install -e ./ranking
-python -m unittest discover -s ranking/tests    # network ranking
+python -m pip install -e ./core/ranking
+python -m unittest discover -s core/ranking/tests    # network ranking
 ```
 
-The jury has a mock mode, so no Snowflake account is needed for tests. Building real rankings needs the source data; see [`ranking/README.md`](ranking/README.md).
+The jury has a mock mode, so no Snowflake account is needed for tests. Building real rankings needs the source data; see [`core/ranking/README.md`](core/ranking/README.md).
 
 ## Team
 

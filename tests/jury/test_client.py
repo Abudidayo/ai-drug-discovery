@@ -22,7 +22,7 @@ from jury.client import (
 ROOT = Path(__file__).resolve().parents[2]
 PACKET = json.loads((FIXTURES / "evidence_packet.json").read_text())
 FIXTURE = json.loads((FIXTURES / "jury_result.json").read_text())
-CONFIG = json.loads((ROOT / "jury/config.json").read_text())
+CONFIG = json.loads((ROOT / "core/jury/config.json").read_text())
 RECORDED = json.loads((Path(__file__).parent / "data/live_recording.json").read_text())
 
 

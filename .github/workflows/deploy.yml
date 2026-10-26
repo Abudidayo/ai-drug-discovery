@@ -80,23 +80,23 @@ jobs:
           enable-cache: true
       - run: uv sync --all-packages --frozen
       - name: API lint, types and tests
-        working-directory: api
+        working-directory: app/api
         run: |
           uv run --no-sync ruff check .
           uv run --no-sync pyright
           uv run --no-sync pytest -q
       - name: Pipeline and ranking tests
-        run: uv run --no-sync pytest tests ranking/tests -q
+        run: uv run --no-sync pytest tests core/ranking/tests -q
       - name: Docking queue tests (no Vina required)
-        working-directory: worker
+        working-directory: app/worker
         run: uv run --no-sync pytest -q
       - name: Database migrations
-        run: uv run --no-sync pytest db/tests -q
+        run: uv run --no-sync pytest deploy/db/tests -q
       - name: Deployment script regression tests
         run: |
-          uv run --no-sync ruff check scripts/oracle scripts/tests/test_oracle.py db/tests/test_oracle_restore.py
-          uv run --no-sync ruff format --check scripts/oracle scripts/tests/test_oracle.py db/tests/test_oracle_restore.py
-          uv run --no-sync pytest scripts/tests -q
+          uv run --no-sync ruff check deploy/oracle deploy/tests/test_oracle.py deploy/db/tests/test_oracle_restore.py
+          uv run --no-sync ruff format --check deploy/oracle deploy/tests/test_oracle.py deploy/db/tests/test_oracle_restore.py
+          uv run --no-sync pytest deploy/tests -q
 
   web:
     needs: changes
@@ -120,12 +120,12 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: app/web/package-lock.json
       - run: uv sync --all-packages --frozen
       - run: npm ci
-        working-directory: web
+        working-directory: app/web
       - name: Web checks and unit tests
-        working-directory: web
+        working-directory: app/web
         run: |
           npm run check:api
           npm run typecheck
@@ -133,18 +133,18 @@ jobs:
           npm run format:check
           npm test
       - name: Install browser
-        working-directory: web
+        working-directory: app/web
         run: npx playwright install --with-deps chromium
       - name: Browser tests against the real fixture API and built app
-        working-directory: web
+        working-directory: app/web
         run: npm run e2e
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: failure()
         with:
           name: playwright-failure
           path: |
-            web/playwright-report/
-            web/test-results/
+            app/web/playwright-report/
+            app/web/test-results/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -163,11 +163,11 @@ jobs:
           terraform_wrapper: false
       - name: Validate free resource guards without cloud credentials
         run: |
-          terraform -chdir=infra/oracle init -backend=false -input=false -lockfile=readonly
-          terraform -chdir=infra/oracle fmt -check
-          terraform -chdir=infra/oracle validate
-          terraform -chdir=infra/oracle test
-          shellcheck -e SC1091 scripts/oracle/*.sh
+          terraform -chdir=deploy/oracle init -backend=false -input=false -lockfile=readonly
+          terraform -chdir=deploy/oracle fmt -check
+          terraform -chdir=deploy/oracle validate
+          terraform -chdir=deploy/oracle test
+          shellcheck -e SC1091 deploy/oracle/*.sh
 
   # A stable required check succeeds on docs-only changes and fails closed on cancelled jobs.
   test:
@@ -202,7 +202,7 @@ jobs:
       - name: Report pending Oracle setup
         run: |
           echo '::notice::Checks passed. Oracle deployment is waiting for one-time account and server setup.'
-          echo 'Oracle deployment is disabled until scripts/oracle/configure-ci.sh is run with --enable. See infra/oracle/README.md.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Oracle deployment is disabled until deploy/oracle/configure-ci.sh is run with --enable. See deploy/oracle/README.md.' >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     needs: test
@@ -232,7 +232,7 @@ jobs:
           set -euo pipefail
           [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]
           if [[ ! "$ORACLE_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ || -z "$ORACLE_SSH_KEY" || -z "$ORACLE_KNOWN_HOSTS" ]]; then
-            echo '::error::Oracle SSH settings are incomplete. Run scripts/oracle/configure-ci.sh (infra/oracle/README.md).'
+            echo '::error::Oracle SSH settings are incomplete. Run deploy/oracle/configure-ci.sh (deploy/oracle/README.md).'
             exit 1
           fi
           umask 077
@@ -245,7 +245,7 @@ jobs:
           digest=$(sha256sum "$RUNNER_TEMP/release.tgz" | cut -d ' ' -f 1)
           scp "${ssh_opts[@]}" "$RUNNER_TEMP/release.tgz" \
             "halflife@$ORACLE_HOST:/srv/half-life/incoming/$DEPLOY_SHA.tgz"
-          scp "${ssh_opts[@]}" scripts/oracle/deploy.sh \
+          scp "${ssh_opts[@]}" deploy/oracle/deploy.sh \
             "halflife@$ORACLE_HOST:/srv/half-life/incoming/deploy-$DEPLOY_SHA.sh"
           ssh "${ssh_opts[@]}" "halflife@$ORACLE_HOST" \
             "bash /srv/half-life/incoming/deploy-$DEPLOY_SHA.sh $DEPLOY_SHA /srv/half-life/incoming/$DEPLOY_SHA.tgz $digest" < /dev/null

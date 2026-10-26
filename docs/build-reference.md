@@ -1,12 +1,12 @@
 # Build reference
 
-**Reference only. Design decisions live in [`plan.md`](../plan.md); this file has none.** It keeps recipes checked live on 24 Oct 2026 against Open Targets 26.09, ChEMBL 37 and RCSB:
+**Reference only. Design decisions lived in `plan.md`, which was removed on 26 Oct 2026 and stays in the Git history; this file has none.** It keeps recipes checked live on 24 Oct 2026 against Open Targets 26.09, ChEMBL 37 and RCSB:
 - account setup;
 - Open Targets, ChEMBL and PubChem queries;
 - the approval and bioactivity rules;
 - docking.
 
-IDs follow `plan.md` section 3, and terms follow `CONTEXT.md`. The research behind these recipes is in `docs/research-notes/OxHack 26 drug repurposing plan/`.
+IDs follow `plan.md` section 3, and terms follow [`glossary.md`](glossary.md). The research behind these recipes is in `docs/research-notes/OxHack 26 drug repurposing plan/`.
 
 ## 1. Account setup
 
@@ -278,7 +278,7 @@ POST it to `https://search.rcsb.org/rcsbsearch/v2/query`.
 
 Avoid the 20S proteasome (5LF3 and similar), XPO1, and any entry where the drug is bound covalently.
 
-**C3. Prepare a receptor** with `worker/prepare.py`. Run it once per structure and commit the outputs to `worker/structures/{PDB}/`.
+**C3. Prepare a receptor** with `app/worker/oxhack_worker/prepare.py`. Run it once per structure and commit the outputs to `app/worker/structures/{PDB}/`.
 
 1. Download `https://files.rcsb.org/download/{PDB}.pdb`.
 2. Keep the chosen chain. Remove waters, ions, all ligands and alternate conformations with gemmi.
