@@ -45,8 +45,9 @@ migration and activation steps are in [the Oracle guide](../deploy/oracle/README
 Until Oracle is enabled, CI reports that deployment is waiting for setup.
 
 The existing Codespace remains usable during migration. Run `deploy/redeploy.sh`
-there manually when needed (after the 26 Oct folder move, a Codespace still on the
-old layout must run `git pull` first, because `scripts/redeploy.sh` no longer exists); the Actions workflow no longer starts or deploys to
+there manually when needed (a Codespace still on the layout before the 26 Oct folder move
+runs `git fetch origin main && git checkout --detach FETCH_HEAD` first, then
+`deploy/redeploy.sh`); the Actions workflow no longer starts or deploys to
 Codespaces. See "Before judging" for keeping a manual demo available.
 
 ## Change the docking packages
