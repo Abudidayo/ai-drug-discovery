@@ -10,7 +10,7 @@ from uuid import UUID
 import pytest
 
 
-ROOT = Path(__file__).resolve().parents[1] / "fixtures"
+ROOT = Path(__file__).resolve().parent / "fixtures"
 FILES = {
     name: json.loads((ROOT / f"{name}.json").read_text(encoding="utf-8"))
     for name in (

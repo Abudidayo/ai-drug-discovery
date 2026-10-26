@@ -33,9 +33,9 @@ def test_known_parent_override_retains_raw_source_and_original_mechanism_ids(tmp
 
 
 def inputs():
-    packet = a6.read(ROOT / "fixtures/evidence_packet.json")
-    result = a6.read(ROOT / "fixtures/jury_result.json")
-    drugs = a6.read(ROOT / "fixtures/drug_targets.json")
+    packet = a6.read(ROOT / "tests/fixtures/evidence_packet.json")
+    result = a6.read(ROOT / "tests/fixtures/jury_result.json")
+    drugs = a6.read(ROOT / "tests/fixtures/drug_targets.json")
     candidates = [dict(candidate_id=c["candidate_id"], name=c["name"],
                        network={"rank": rank, "degree_matched_z": -1.5} if rank else None,
                        direct_evidence_rank=direct, unscorable_reason=None)
@@ -64,8 +64,8 @@ def test_id_join_scopes_ties_and_contested():
 
 
 def test_candidate_projection_matches_fixture_without_changing_stream_b():
-    fixture = a6.read(ROOT / "fixtures/candidates.json")
-    packet = a6.read(ROOT / "fixtures/evidence_packet.json")
+    fixture = a6.read(ROOT / "tests/fixtures/candidates.json")
+    packet = a6.read(ROOT / "tests/fixtures/evidence_packet.json")
     network = {"candidates": deepcopy(fixture["candidates"]),
                "shortlist": [c["candidate_id"] for c in fixture["candidates"]]}
     for c in network["candidates"]:
@@ -178,8 +178,8 @@ def test_live_budget_and_no_repeated_calls_on_completed_run(tmp_path, monkeypatc
 
 
 def test_distance_only_candidate_retains_distance_without_a_z_score():
-    fixture = a6.read(ROOT / 'fixtures/candidates.json')
-    packet = a6.read(ROOT / 'fixtures/evidence_packet.json')
+    fixture = a6.read(ROOT / 'tests/fixtures/candidates.json')
+    packet = a6.read(ROOT / 'tests/fixtures/evidence_packet.json')
     network = {'candidates': deepcopy(fixture['candidates']),
                'shortlist': [c['candidate_id'] for c in fixture['candidates']]}
     candidate = next(c for c in network['candidates'] if c['status'] == 'scored')
@@ -210,8 +210,8 @@ def test_prepare_cli_uses_configured_scorer_root(tmp_path, monkeypatch):
 @pytest.mark.parametrize('warning,status', [('unknown_warning', 'distance_only'),
                                           ('zero_null_variance', 'scored')])
 def test_candidate_projection_rejects_invalid_network_warning(warning, status):
-    fixture = a6.read(ROOT / 'fixtures/candidates.json')
-    packet = a6.read(ROOT / 'fixtures/evidence_packet.json')
+    fixture = a6.read(ROOT / 'tests/fixtures/candidates.json')
+    packet = a6.read(ROOT / 'tests/fixtures/evidence_packet.json')
     network = {'candidates': deepcopy(fixture['candidates']),
                'shortlist': [c['candidate_id'] for c in fixture['candidates']]}
     candidate = next(c for c in network['candidates'] if c['network'])

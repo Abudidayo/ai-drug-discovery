@@ -14,7 +14,7 @@ GENE = 'ENSG00000068078'
 
 
 def base_packet():
-    packet = json.loads((ROOT/'fixtures/evidence_packet.json').read_text())
+    packet = json.loads((ROOT/'tests/fixtures/evidence_packet.json').read_text())
     removed = {e['id'] for e in packet['evidence'] if e['kind']=='pathway'}
     packet['evidence'] = [e for e in packet['evidence'] if e['id'] not in removed]
     packet['releases'] = [r for r in packet['releases'] if not r.startswith('reactome-')]

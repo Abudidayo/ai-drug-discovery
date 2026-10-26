@@ -17,7 +17,7 @@ from oxhack_api.services.ranking import EvidenceRanking, RankingInput
 from oxhack_api.settings import REPO_ROOT
 from oxhack_api.stream_a import DISEASE_PARQUET, EvidenceSources
 
-FIXTURES = REPO_ROOT / "fixtures"
+FIXTURES = REPO_ROOT / "tests" / "fixtures"
 DATA = REPO_ROOT / "data"
 
 

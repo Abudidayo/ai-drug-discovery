@@ -120,8 +120,7 @@ web/           Website and app
 worker/        Docking worker
 db/            Database migrations
 scripts/       Start and redeploy the demo
-fixtures/      Sample data formats
-tests/         Tests for pipeline and jury
+tests/         Tests for pipeline and jury; sample data formats in tests/fixtures/
 results/       Experiments, protocols, errata
 docs/          Build reference, research notes, primer, data-source demo
 plan.md        Project specification

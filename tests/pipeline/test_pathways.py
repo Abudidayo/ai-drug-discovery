@@ -19,7 +19,7 @@ def test_recorded_real_membership_and_blind_projection():
     ps, rejected = load_pathways(SAMPLE)
     assert len(ps['R-HSA-9006335']['genes']) == 5 and G in ps['R-HSA-9006335']['genes']
     assert rejected == {}
-    packet = json.loads((ROOT / 'fixtures/evidence_packet.json').read_text())
+    packet = json.loads((ROOT / 'tests/fixtures/evidence_packet.json').read_text())
     ids = {e['id'] for e in packet['evidence'] if e['kind']=='pathway'}
     packet['evidence'] = [e for e in packet['evidence'] if e['id'] not in ids]
     packet['releases'].remove('reactome-97')
@@ -27,10 +27,10 @@ def test_recorded_real_membership_and_blind_projection():
         c['evidence_ids'] = [e for e in c['evidence_ids'] if e not in ids]
     original = deepcopy(packet)
     coverage = {}
-    result = add_pathways(packet, json.loads((ROOT/'fixtures/disease_targets.json').read_text()), ps,
+    result = add_pathways(packet, json.loads((ROOT/'tests/fixtures/disease_targets.json').read_text()), ps,
                           release='reactome-97', coverage=coverage)
     assert packet == original
-    assert result == json.loads((ROOT / 'fixtures/evidence_packet.json').read_text())
+    assert result == json.loads((ROOT / 'tests/fixtures/evidence_packet.json').read_text())
     validate_packet(result)
     prompt = build_prompt(result, [c['label'] for c in result['candidates']])
     assert 'shared membership does not establish effect' in prompt

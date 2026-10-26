@@ -29,8 +29,8 @@ def read(path):
 
 @pytest.fixture
 def inputs():
-    disease_targets = read(ROOT / 'fixtures/disease_targets.json')
-    drug_targets = read(ROOT / 'fixtures/drug_targets.json')
+    disease_targets = read(ROOT / 'tests/fixtures/disease_targets.json')
+    drug_targets = read(ROOT / 'tests/fixtures/drug_targets.json')
     recorded = read(Path(__file__).parent / 'data/drugs/recorded.json')
     recorded.pop('provenance')
     for name in ('clinical_indication', 'clinical_report'):
@@ -42,7 +42,7 @@ def inputs():
             if 'bioactivity' in target['support']:
                 for key in ('median_pchembl', 'n_activities'):
                     target[key] = real_targets[target['target_id']][key]
-    candidates = read(ROOT / 'fixtures/candidates.json')
+    candidates = read(ROOT / 'tests/fixtures/candidates.json')
     return disease_targets, drug_targets, candidates
 
 
@@ -76,7 +76,7 @@ def build(inputs, sources, ids=None, **kwargs):
 def test_fixture_shapes_and_real_measurements(inputs, sources):
     before = deepcopy(inputs)
     updates, packet = build(inputs, sources)
-    fixture_packet = read(ROOT / 'fixtures/evidence_packet.json')
+    fixture_packet = read(ROOT / 'tests/fixtures/evidence_packet.json')
     assert inputs == before
     assert packet.keys() == fixture_packet.keys()
     assert len(packet['candidates']) == 4

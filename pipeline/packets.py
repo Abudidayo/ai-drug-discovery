@@ -336,8 +336,8 @@ def build_evidence_packet(disease, candidate_ids, disease_targets, drug_targets,
                           pathways=None, pathway_release=None):
     """Return fixture-shaped Candidate enrichments and the stored jury packet.
 
-    disease is {id, name}; inputs use fixtures/disease_targets.json and
-    fixtures/drug_targets.json's shape. Supply real A2 output: its bioactivity
+    disease is {id, name}; inputs use tests/fixtures/disease_targets.json and
+    tests/fixtures/drug_targets.json's shape. Supply real A2 output: its bioactivity
     values are authoritative; only associations are fetched independently. The
     caller supplies the Experiment UUID; no files are written except caches.
     Sources.coverage exposes unmapped records without adding packet keys.

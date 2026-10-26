@@ -3,7 +3,7 @@
 Offline demonstration (all votes are explicitly labelled mock reviews):
 
 ```sh
-.venv/bin/python -m jury fixtures/evidence_packet.json --out /tmp/jury-mock.json --mock
+.venv/bin/python -m jury tests/fixtures/evidence_packet.json --out /tmp/jury-mock.json --mock
 ```
 
 Live use requires `SNOWFLAKE_ACCOUNT` (account identifier only), `SNOWFLAKE_PAT`,
@@ -14,7 +14,7 @@ remaining fixture-shaped settings. Availability, family diversity and cost must
 be checked in the account before freezing an Experiment.
 
 ```sh
-.venv/bin/python -m jury fixtures/evidence_packet.json --out /tmp/jury-live.json
+.venv/bin/python -m jury tests/fixtures/evidence_packet.json --out /tmp/jury-live.json
 .venv/bin/python -m pytest tests/jury -q
 .venv/bin/python -m pytest tests/jury -q -m network
 ```

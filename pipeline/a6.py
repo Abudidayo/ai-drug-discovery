@@ -83,7 +83,7 @@ def digest(path):
 
 
 def candidate_payload(network, updates, packet):
-    """Project enriched display rows to fixtures/candidates.json, leaving B frozen."""
+    """Project enriched display rows to tests/fixtures/candidates.json, leaving B frozen."""
     by_id = {c["candidate_id"]: c for c in network["candidates"]}
     if {u["candidate_id"] for u in updates} != set(network["shortlist"]):
         raise ValueError("Candidate enrichments differ from the shortlist")
