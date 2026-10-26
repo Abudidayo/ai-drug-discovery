@@ -538,7 +538,7 @@ wheels = [
 [[package]]
 name = "oxhack-api"
 version = "0.1.0"
-source = { editable = "api" }
+source = { editable = "app/api" }
 dependencies = [
     { name = "fastapi" },
     { name = "oxhack-drug-repurposing" },
@@ -564,7 +564,7 @@ dev = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "oxhack-drug-repurposing", editable = "." },
-    { name = "oxhack-ranking", editable = "ranking" },
+    { name = "oxhack-ranking", editable = "core/ranking" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "psycopg-pool", specifier = ">=3.2,<4" },
     { name = "pydantic", specifier = ">=2.9" },
@@ -610,7 +610,7 @@ dev = [{ name = "pytest", specifier = ">=8" }]
 [[package]]
 name = "oxhack-ranking"
 version = "0.3.0"
-source = { editable = "ranking" }
+source = { editable = "core/ranking" }
 dependencies = [
     { name = "numpy" },
     { name = "scipy" },
@@ -634,7 +634,7 @@ provides-extras = ["benchmark"]
 [[package]]
 name = "oxhack-worker"
 version = "0.1.0"
-source = { editable = "worker" }
+source = { editable = "app/worker" }
 dependencies = [
     { name = "oxhack-api" },
 ]
@@ -648,7 +648,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "oxhack-api", editable = "api" }]
+requires-dist = [{ name = "oxhack-api", editable = "app/api" }]
 
 [package.metadata.requires-dev]
 dev = [

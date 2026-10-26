@@ -3,8 +3,7 @@
 
 # Downloaded releases, graph/distance matrices and generated evaluation outputs.
 /data/
-/ranking/artifacts/
-/workstream_b/.tools/
+/core/ranking/artifacts/
 
 # Local Python environments, build products and caches.
 .venv/

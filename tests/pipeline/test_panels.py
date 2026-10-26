@@ -1,3 +1,4 @@
+from conftest import FIXTURES
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -48,7 +49,7 @@ def test_excludes_unmapped_unapproved_and_worked_examples():
 
 
 def test_packet_indication_screen():
-    packet = json.loads((Path(__file__).resolve().parents[2] / "fixtures/evidence_packet.json").read_text())
+    packet = json.loads((FIXTURES / "evidence_packet.json").read_text())
     assert packet_leakage(packet) == []
     leaked = deepcopy(packet)
     leaked["evidence"][0]["statement"] = "Approved for the panel's Disease in a clinical trial."
@@ -208,7 +209,7 @@ def test_ranking_root_defaults_to_repo_and_accepts_env_and_argument(tmp_path, mo
     from pipeline.panels import resolve_ranking_root
     monkeypatch.delenv('RANKING_ROOT', raising=False)
     monkeypatch.chdir(tmp_path)
-    assert resolve_ranking_root() == Path(__file__).resolve().parents[2]
+    assert resolve_ranking_root() == Path(__file__).resolve().parents[2] / 'core'
     monkeypatch.setenv('RANKING_ROOT', str(tmp_path / 'configured'))
     assert resolve_ranking_root() == tmp_path / 'configured'
     assert resolve_ranking_root(tmp_path / 'explicit') == tmp_path / 'explicit'

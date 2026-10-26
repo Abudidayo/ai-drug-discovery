@@ -1,5 +1,6 @@
 """Offline recorded-data checks; only explicitly marked tests use the internet."""
 
+from conftest import FIXTURES
 from copy import deepcopy
 import json
 import math
@@ -193,7 +194,7 @@ def test_bad_scores_fail():
 
 
 def assert_contract(result):
-    fixture = json.loads((Path(__file__).resolve().parents[2] / "fixtures/disease_targets.json").read_text())
+    fixture = json.loads((FIXTURES / "disease_targets.json").read_text())
     assert result.keys() == fixture.keys()
     assert result["rule"].keys() == fixture["rule"].keys()
     assert result["rule"]["score"] == "evidence_only"

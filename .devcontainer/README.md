@@ -26,7 +26,7 @@ This folder defines the environment that runs the whole stack: Python 3.11, uv, 
    ```
 
    `python` is the docking venv (`$DOCKING_VENV`). `uv run` uses the project venv: one uv workspace (stream A's `pipeline/` and `jury/` plus `api/`), synced with `uv sync --all-packages`. Docking results go to `$RESULTS_DIR` (`/workspaces/results`).
-3. Start the app and share it: `scripts/redeploy.sh` (it checks out `main`, migrates the database, builds the web app and starts everything), then make the web app public. The web app reaches the API inside the codespace, so the API port stays private.
+3. Start the app and share it: `deploy/redeploy.sh` (it checks out `main`, migrates the database, builds the web app and starts everything), then make the web app public. The web app reaches the API inside the codespace, so the API port stays private.
 
    ```bash
    gh codespace ports visibility 5173:public -c <codespace name>
@@ -41,11 +41,13 @@ This folder defines the environment that runs the whole stack: Python 3.11, uv, 
 ## Deploy
 
 GitHub Actions deploys `main` to Oracle after checks pass. The one-time setup,
-migration and activation steps are in [the Oracle guide](../infra/oracle/README.md).
+migration and activation steps are in [the Oracle guide](../deploy/oracle/README.md).
 Until Oracle is enabled, CI reports that deployment is waiting for setup.
 
-The existing Codespace remains usable during migration. Run `scripts/redeploy.sh`
-there manually when needed; the Actions workflow no longer starts or deploys to
+The existing Codespace remains usable during migration. Run `deploy/redeploy.sh`
+there manually when needed (a Codespace still on the layout before the 26 Oct folder move
+runs `git fetch origin main && git checkout --detach FETCH_HEAD` first, then
+`deploy/redeploy.sh`); the Actions workflow no longer starts or deploys to
 Codespaces. See "Before judging" for keeping a manual demo available.
 
 ## Change the docking packages

@@ -1,6 +1,6 @@
 # Shared hackathon skills
 
-Use [skills.md](../skills.md) for installation, usage and the skill list.
+Use [skills.md](skills.md) for installation, usage and the skill list.
 This guide records sources, adaptations and technical details.
 
 The fifteen selected skills are stored in `skills/`. These are actual copies,
@@ -28,7 +28,7 @@ folders, following the nv-fabric layout.
 
 ## Use and share
 
-The agent installation entry point is [skills.md](../skills.md). Give the agent
+The agent installation entry point is [skills.md](skills.md). Give the agent
 the complete bundle and say: **Read `skills.md` and set everything up.**
 The included `.agents/install-skills.py` copies all supporting files,
 keeps identical existing skills, reports conflicting definitions before copying,

@@ -1,4 +1,5 @@
 """Offline checks for the selection-only runner and failure-aware scoring."""
+from conftest import FIXTURES
 import json
 from pathlib import Path
 
@@ -92,7 +93,7 @@ def test_bakeoff_revalidates_refusals_partial_juries_and_usage(bakeoff, monkeypa
 
 
 def test_bakeoff_passes_effort_to_current_adapter(tmp_path, monkeypatch):
-    packet = json.loads(Path('fixtures/evidence_packet.json').read_text())
+    packet = json.loads((FIXTURES / 'evidence_packet.json').read_text())
     job = {'path': str(tmp_path / 'run.json'), 'model': 'grok-4.7', 'condition': 'blind',
            'disease_id': packet['disease']['id'], 'packet': packet, 'name_aliases': [],
            'prompt': pilot.build_prompt(packet, [c['label'] for c in packet['candidates']]),
