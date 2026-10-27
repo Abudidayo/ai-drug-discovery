@@ -17,8 +17,9 @@ Live at **https://halflife-bio.vercel.app** (Vercel project `halflife`, also
   Postgres job queues in the background (`wait_until`). The browser polls while
   work is live, so jobs move on while someone is watching; a job whose function
   ended mid-way is recovered by the next request (stale heartbeat). A drain
-  claims new jobs for 60 s, so each job ends inside the 300 s limit. The Cortex
-  call timeout is 90 s (`SNOWFLAKE_TIMEOUT_SECONDS`) for the same reason.
+  claims new jobs for 30 s (`OXHACK_DRAIN_CLAIM_S`), so each job ends inside the
+  300 s limit: a jury makes at most two 120 s attempts per model
+  (`SNOWFLAKE_TIMEOUT_SECONDS`); Kimi K3 took about 75 s per attempt here.
 - **Docking outlives functions.** Each job gets a sandbox named after it,
   restored from a snapshot with the pinned toolchain. A drain watches the run
   for up to two minutes, then puts the job back in the queue; the next drain
@@ -89,7 +90,8 @@ Done for `halflife` on 26-27 October 2026; repeat for a new project.
    SNOWFLAKE_PAT=<programmatic access token>
    SNOWFLAKE_MODELS=["openai-gpt-5.4","glm-5.3","kimi-k3"]
    SNOWFLAKE_REASONING_EFFORT={"glm-5.3":"low","kimi-k3":"low"}
-   SNOWFLAKE_TIMEOUT_SECONDS=90
+   SNOWFLAKE_TIMEOUT_SECONDS=120
+   OXHACK_DRAIN_CLAIM_S=30
    ```
 
    A Snowflake programmatic access token works only for a user with a network
