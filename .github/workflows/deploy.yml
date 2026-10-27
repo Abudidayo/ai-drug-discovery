@@ -229,10 +229,9 @@ jobs:
           set -euo pipefail
           uv run deploy/vercel/build.py --data "$RUNNER_TEMP/data" --sha "$DEPLOY_SHA" --out "$RUNNER_TEMP/deploy"
           cd "$RUNNER_TEMP/deploy"
-          vercel=(npx --yes vercel@65.3.1)
-          "${vercel[@]}" pull --yes --environment=production --token "$VERCEL_TOKEN"
-          "${vercel[@]}" build --prod --token "$VERCEL_TOKEN"
-          "${vercel[@]}" deploy --prebuilt --prod --token "$VERCEL_TOKEN"
+          # Vercel builds it on Linux: a prebuilt upload would add the Python packages'
+          # thousands of files, past the Hobby plan's 5,000 uploaded files a day.
+          npx --yes vercel@65.3.1 deploy --prod --yes --token "$VERCEL_TOKEN"
       - name: Verify the public release SHA
         env:
           URL: ${{ vars.DEMO_URL }}

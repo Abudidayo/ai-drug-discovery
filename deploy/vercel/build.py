@@ -29,6 +29,7 @@ import gzip
 import json
 import shutil
 import subprocess
+import tarfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -46,6 +47,11 @@ UPLOAD_LIMIT = 95 * 2**20
 """Vercel refuses deployment files over 100 MB: larger ones ship gzipped, with
 PACKED_SUFFIX, and index.py restores them on start-up."""
 PACKED_SUFFIX = ".vercel.gz"
+FOLDER_LIMIT = 100
+"""Vercel's Hobby plan accepts 5,000 uploaded files a day: a data folder holding more
+files than this (the ChEMBL and HTTP caches) ships as one archive, FOLDER_SUFFIX,
+which index.py unpacks on start-up."""
+FOLDER_SUFFIX = ".vercel.tgz"
 DATA_LEFT_OUT = {"experiments", "docking", "string"}
 """Run-time output (audits, docking results) and STRING's raw download, which only
 `prepare` reads."""
@@ -86,6 +92,21 @@ def copy_data(source: str, target: str) -> None:
         shutil.copyfileobj(raw, packed, 1 << 20)
 
 
+def pack_folders(data: Path) -> None:
+    """Replace each folder under `data` holding more than FOLDER_LIMIT files with
+    one archive of it, keeping the folder's name inside."""
+    for folder in sorted(p for p in data.rglob("*") if p.is_dir()):
+        if not folder.exists():  # inside a folder packed already
+            continue
+        if sum(1 for p in folder.rglob("*") if p.is_file()) <= FOLDER_LIMIT:
+            continue
+        with tarfile.open(
+            folder.with_name(folder.name + FOLDER_SUFFIX), "w:gz"
+        ) as archive:
+            archive.add(folder, arcname=folder.name)
+        shutil.rmtree(folder)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument(
@@ -109,9 +130,11 @@ def main() -> None:
             (out / target).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(REPO / source, out / target)
     shutil.copy2(REPO / "deploy/vercel/index.py", out / "index.py")
+    shutil.copy2(REPO / "deploy/vercel/mirror.py", out / "mirror.py")
     shutil.copytree(
         data, out / "data", ignore=data_ignore(data), copy_function=copy_data
     )
+    pack_folders(out / "data")
     subprocess.run(
         [
             "uv", "export", "--frozen", "--no-dev", "--package", "oxhack-api",
