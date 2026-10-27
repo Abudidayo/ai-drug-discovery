@@ -20,3 +20,6 @@ __pycache__/
 !/.env.example
 /.aws/
 /secrets/
+
+# Assembled by deploy/vercel/build.py
+.vercel-deploy/

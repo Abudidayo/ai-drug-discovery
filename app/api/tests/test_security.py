@@ -201,6 +201,28 @@ def test_origin_validation_without_fetch_metadata(client: TestClient) -> None:
     )
 
 
+def test_reader_ip_comes_from_the_configured_proxy_header_only(
+    settings: Settings, make_client: Callable[..., TestClient]
+) -> None:
+    # On Vercel every request arrives from Vercel's edge, which overwrites this header.
+    settings.client_ip_header = "x-vercel-forwarded-for"
+    settings.requests_per_minute = 1
+    client = make_client()
+
+    def fresh_browser(headers: dict[str, str]) -> int:
+        client.cookies.clear()
+        return client.get("/api/experiments", headers=headers).status_code
+
+    # Each reader gets the per-IP budget of three browsers.
+    reader = {"X-Vercel-Forwarded-For": "192.0.2.1"}
+    assert [fresh_browser(reader) for _ in range(4)] == [200, 200, 200, 429]
+    assert fresh_browser({"X-Vercel-Forwarded-For": "192.0.2.2, 10.0.0.1"}) == 200
+    # A missing or malformed header, or another forwarding header the caller controls,
+    # falls back to the connection's peer: these share one budget.
+    others = [{}, {"X-Vercel-Forwarded-For": "not-an-ip"}, {"X-Forwarded-For": "198.51.100.4"}, {}]
+    assert [fresh_browser(headers) for headers in others] == [200, 200, 200, 429]
+
+
 def test_malformed_origin_is_rejected(client: TestClient) -> None:
     response = client.post(
         "/api/experiments",

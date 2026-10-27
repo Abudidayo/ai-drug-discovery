@@ -122,9 +122,9 @@ core/          The science
   ranking/       Network, scoring, shortlist, evaluation
 deploy/        Running it
   db/            Database migrations
-  oracle/        Oracle cloud setup and deploy scripts
+  vercel/        Vercel deployment: function entry, deploy folder, docking snapshot
   serve.sh       Start the API and workers
-  redeploy.sh    Redeploy the Codespace demo
+  redeploy.sh    Run the demo in a Codespace
 docs/          Glossary, build reference, ranking method notes, research notes
 results/       Sealed experiments, protocols, errata
 tests/         Pipeline and jury tests; sample data formats in tests/fixtures/
@@ -132,15 +132,13 @@ tests/         Pipeline and jury tests; sample data formats in tests/fixtures/
 
 ## Deployment
 
-Every push to `main` runs the applicable checks, then deploys that exact commit
-to Oracle over SSH once Oracle setup is enabled. Pull requests run checks only.
-Failed checks prevent deployment; a failed migration or health check restores
-the previous release and database.
+Everything runs on Vercel's free Hobby plan: the website, the API as one Python
+function, a Neon Postgres database, and docking in Vercel Sandbox microVMs. Every
+push to `main` runs the applicable checks, then deploys that exact commit.
+Pull requests run checks only, and failed checks prevent deployment.
 
-The one-time setup, migration and recovery procedure is in
-[`deploy/oracle/README.md`](deploy/oracle/README.md). Start with
-`deploy/oracle/setup.sh`. While account setup is pending, CI reports that Oracle
-deployment is disabled. The existing Codespace stays available during cutover.
+How it fits together, and the one-time setup, are in
+[`deploy/vercel/README.md`](deploy/vercel/README.md).
 
 ## Run the tests
 

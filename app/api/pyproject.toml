@@ -18,6 +18,7 @@ dependencies = [
   "starlette>=1.10,<2",
   "typing-extensions>=4.12",
   "uvicorn[standard]>=0.32",
+  "vercel>=0.12.1",
 ]
 
 [dependency-groups]

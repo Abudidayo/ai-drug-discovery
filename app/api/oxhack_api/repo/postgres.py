@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import math
 import time
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime
@@ -53,7 +53,7 @@ from ..schemas import (
 )
 from .base import AlreadyExists, DockInputs, DuplicateComputation
 
-SCHEMA_VERSION = "0009"
+SCHEMA_VERSION = "0010"
 """The newest file in `db/migrations/` this code needs applied."""
 
 Conn = Connection[DictRow]
@@ -710,6 +710,23 @@ class PostgresRepo:
                     job.id,
                 ),
             )
+
+    def save_dock_files(self, job_id: UUID, files: Mapping[str, bytes]) -> None:
+        with self.connection() as conn:
+            conn.execute("delete from dock_files where job_id = %s", (job_id,))
+            with conn.cursor() as cursor:
+                cursor.executemany(
+                    "insert into dock_files (job_id, name, content) values (%s, %s, %s)",
+                    [(job_id, name, content) for name, content in files.items()],
+                )
+
+    def dock_file(self, job_id: UUID, name: str) -> bytes | None:
+        with self.connection() as conn:
+            row = conn.execute(
+                "select content from dock_files where job_id = %s and name = %s",
+                (job_id, name),
+            ).fetchone()
+        return None if row is None else bytes(row["content"])
 
     def find_reusable_dock_job(self, cache_key: str, fixture: bool) -> DockJob | None:
         with self.connection() as conn:

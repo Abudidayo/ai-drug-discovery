@@ -40,15 +40,11 @@ This folder defines the environment that runs the whole stack: Python 3.11, uv, 
 
 ## Deploy
 
-GitHub Actions deploys `main` to Oracle after checks pass. The one-time setup,
-migration and activation steps are in [the Oracle guide](../deploy/oracle/README.md).
-Until Oracle is enabled, CI reports that deployment is waiting for setup.
-
-The existing Codespace remains usable during migration. Run `deploy/redeploy.sh`
-there manually when needed (a Codespace still on the layout before the 26 Oct folder move
-runs `git fetch origin main && git checkout --detach FETCH_HEAD` first, then
-`deploy/redeploy.sh`); the Actions workflow no longer starts or deploys to
-Codespaces. See "Before judging" for keeping a manual demo available.
+GitHub Actions deploys `main` to Vercel after checks pass
+([deploy/vercel/README.md](../deploy/vercel/README.md)). A Codespace is for
+development: run `deploy/redeploy.sh` there to try a branch with real data (a
+Codespace still on the layout before the 26 Oct folder move runs
+`git fetch origin main && git checkout --detach FETCH_HEAD` first).
 
 ## Change the docking packages
 

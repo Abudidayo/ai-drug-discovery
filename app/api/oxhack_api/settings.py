@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="OXHACK_", extra="ignore", populate_by_name=True)
 
     session_cookie_secure: bool = False
+    client_ip_header: str | None = Field(
+        default=None,
+        description=(
+            "A request header holding the reader's IP, for rate limits: only behind a "
+            "proxy that always overwrites it, such as Vercel's x-vercel-forwarded-for. "
+            "Unset: the connection's peer, as Uvicorn's trusted proxy handling gives it."
+        ),
+    )
     requests_per_minute: int = Field(default=240, ge=1)
     writes_per_minute: int = Field(default=30, ge=1)
     max_active_requests: int = Field(default=32, ge=1, le=128)
@@ -164,6 +172,34 @@ class Settings(BaseSettings):
     job_max_attempts: int = Field(
         default=3, ge=1, description="Claims of one job before a stale one is failed instead."
     )
+    after_request_jobs: bool = Field(
+        default=False,
+        description=(
+            "With repo postgres, run queued jobs in the API process after its responses, "
+            "for serverless hosts with no worker process (Vercel). Each process drains "
+            "the queues one job at a time, also recovering jobs whose runner stopped."
+        ),
+    )
+    drain_claim_s: float = Field(
+        default=60,
+        gt=0,
+        description=(
+            "An after-request drain claims new jobs for this long, then lets the job it "
+            "runs finish, so the job ends inside the host's request time limit."
+        ),
+    )
+
+    # Docking in a Vercel Sandbox (serverless) ----------------------------------
+
+    dock_snapshot_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("OXHACK_DOCK_SNAPSHOT_ID", "DOCK_SNAPSHOT_ID"),
+        description=(
+            "A Vercel Sandbox snapshot with the docking toolchain in /opt/dock "
+            "(`deploy/vercel/dock_snapshot.py`). With docking vina and this set, the API "
+            "process docks jobs in sandboxes restored from it, needing no docking worker."
+        ),
+    )
 
     @model_validator(mode="after")
     def _resolve_data_dir(self) -> Settings:
@@ -203,6 +239,11 @@ class Settings(BaseSettings):
             raise ValueError("OXHACK_REPO=postgres needs DATABASE_URL (or OXHACK_DATABASE_URL)")
         if self.job_heartbeat_s >= self.job_stale_after_s:
             raise ValueError("OXHACK_JOB_HEARTBEAT_S must be shorter than OXHACK_JOB_STALE_AFTER_S")
+        if self.after_request_jobs and self.repo != "postgres":
+            raise ValueError(
+                "OXHACK_AFTER_REQUEST_JOBS needs OXHACK_REPO=postgres: the jobs wait there "
+                "between requests"
+            )
         return self
 
 

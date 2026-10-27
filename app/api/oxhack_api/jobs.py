@@ -30,7 +30,7 @@ from uuid import UUID
 from .errors import Unavailable
 from .repo import Repo
 from .schemas import BuildStage, DockJob, Juror, JuryModel, JuryRun
-from .services.docking import DockingBackend, DockingFailed, DockResult
+from .services.docking import DockingBackend, DockingFailed, DockingInProgress, DockResult
 from .services.jury import JurorStarted, JuryBackend, JuryEvent, JuryUnavailable
 from .services.source import EarlyResult, ExperimentSource, SourceError
 
@@ -279,11 +279,18 @@ def _jury_failed(run: JuryRun, error: str) -> JuryRun:
 # ---------------------------------------------------------------------------
 
 
+DOCK_CRASHED = "Docking crashed"
+"""Starts the error of a docking run that crashed (a fault in our code or the host,
+not a docking result), so a redock control that crashed can be run again."""
+
+
 def run_dock(repo: Repo, backend: DockingBackend, job_id: UUID) -> Job:
     job = repo.get_dock_job(job_id)
     if job is None or job.status in ("done", "failed"):
         return None
-    job = save_dock_job(repo, job.model_copy(update={"status": "running", "started_at": utcnow()}))
+    # A run picked up again after DockingInProgress keeps its start time.
+    started = {"status": "running", "started_at": job.started_at or utcnow()}
+    job = save_dock_job(repo, job.model_copy(update=started))
     yield {}
     result: DockResult | None = None
     error: str | None = None
@@ -291,9 +298,13 @@ def run_dock(repo: Repo, backend: DockingBackend, job_id: UUID) -> Job:
         result = yield from _each(backend.dock(job), lambda _: {})
     except DockingFailed as exc:
         error = str(exc)
+    except DockingInProgress:
+        raise
     except Exception as exc:
         log.exception("docking job %s crashed", job_id)
-        error = f"Docking crashed ({type(exc).__name__})."
+        error = f"{DOCK_CRASHED} ({type(exc).__name__})."
+    if result is not None and result.contents:
+        repo.save_dock_files(job.id, result.contents)
     update: dict[str, Any] = (
         {
             "status": "done",

@@ -17,12 +17,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable, Generator, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, Protocol
-from uuid import UUID, uuid5
+from uuid import UUID, uuid4, uuid5
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -58,6 +58,8 @@ class DockResult:
     """The result files, when the run wrote them."""
     control_rmsd: float | None = None
     """For a redock control: the top pose's measured RMSD to the crystal pose."""
+    contents: Mapping[str, bytes] | None = None
+    """The result files' bytes by name, saved in the repo so any process can serve them."""
 
 
 DockSteps = Generator[None, None, DockResult]
@@ -80,6 +82,11 @@ FILE_MEDIA_TYPES: dict[DockFileName, str] = {
 
 class DockingFailed(Exception):
     """The docking run failed. The message is the tail of its log."""
+
+
+class DockingInProgress(Exception):
+    """The run goes on elsewhere (a sandbox) past this process's time: the job goes
+    back in the queue as it is, and the next claim picks the run up again."""
 
 
 def file_url(job_id: UUID, name: DockFileName) -> str:
@@ -447,7 +454,20 @@ class VinaDocking:
         if name not in FILE_MEDIA_TYPES:  # never build a path from anything else
             return None
         path = self.results_dir / str(job_id) / name
-        return path if path.is_file() else None
+        if path.is_file():
+            return path
+        # Docked by another process that shares no disk with this one (serverless).
+        content = self._repo.dock_file(job_id, name)
+        if content is None:
+            return None
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f".{name}.{uuid4().hex}.tmp")
+        try:
+            temporary.write_bytes(content)
+            temporary.replace(path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        return path
 
     def _find(self, structure_id: str) -> _Prepared | None:
         return next((p for p in self._prepared if p.id == structure_id), None)

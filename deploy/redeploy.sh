@@ -7,9 +7,8 @@
 #   deploy/redeploy.sh             # in the codespace
 #   deploy/redeploy.sh <commit-sha-or-branch>
 #
-# Manual Codespaces deployment during development or migration. GitHub Actions
-# deploys to Oracle using deploy/oracle/deploy.sh. Local tracked changes in
-# this Codespace are overwritten.
+# Manual Codespaces deployment for development. GitHub Actions deploys main to
+# Vercel (deploy/vercel/). Local tracked changes in this Codespace are overwritten.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ref=${1:-main}
