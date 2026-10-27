@@ -1,6 +1,6 @@
 # Dev container and demo codespace
 
-This folder defines the environment that runs the whole stack: Python 3.11, uv, Node LTS, Docker, `psql`, and the docking toolchain (Vina, Meeko, RDKit, gemmi, PoseBusters). The shared demo host is a GitHub Codespace built from it. Account setup is in [build reference §1](../docs/build-reference.md#github-codespaces-stream-c).
+This folder defines the environment that runs the whole stack: Python 3.11, uv, Node LTS, Docker, `psql`, and the docking toolchain (Vina, Meeko, RDKit, gemmi, PoseBusters). The shared demo host is a GitHub Codespace built from it. Account setup is in [build reference §1](../docs/engineering/build-reference.md#github-codespaces-stream-c).
 
 ## Team workflow
 

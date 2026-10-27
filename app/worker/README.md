@@ -1,6 +1,6 @@
 # oxhack-worker: the AutoDock Vina docking worker
 
-Computes binding poses for the app (plan.md section 7, docs/build-reference.md
+Computes binding poses for the app (plan.md section 7, docs/engineering/build-reference.md
 C1-C9). A pose is a geometric hypothesis and a Vina score is a rough, unitless
 estimate of fit: neither is a measured binding affinity, probability of binding
 or clinical effect.

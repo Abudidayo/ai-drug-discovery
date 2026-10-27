@@ -11,7 +11,7 @@ import { Box3, Matrix4, Quaternion, Vector3 } from "three";
 import { tokenColor } from "./plate";
 
 /**
- * A binding pose drawn with 3Dmol.js in the figure's print style (docs/design.md, "Binding
+ * A binding pose drawn with 3Dmol.js in the figure's print style (docs/engineering/design.md, "Binding
  * pose"): the protein as a thin backbone trace with ink outlines, the drug in sticks, the pocket's
  * residues as fine grey sticks. Optional: a translucent surface over the pocket and the drug's
  * crystal position, in the redock colour, to compare with the pose.

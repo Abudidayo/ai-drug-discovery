@@ -1,4 +1,4 @@
-"""The AutoDock Vina docking worker (plan.md section 7, docs/build-reference.md C1-C9).
+"""The AutoDock Vina docking worker (plan.md section 7, docs/engineering/build-reference.md C1-C9).
 
 Two Pythons are involved:
 

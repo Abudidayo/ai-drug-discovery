@@ -19,7 +19,7 @@ The audit used the actual files:
 - Saved Stage 2 results in `data/ranking/stage2/MONDO_0009693.json` and `MONDO_0100096.json`.
 - Frozen Stage 3 bundle in `data/evaluation/stage3-smoke/`, particularly `references.json`, `manifest.json`, `results.json` and the CSVs.
 
-Reference extraction ([references.py](../../core/ranking/references.py:8)) uses exact membership in `approval.disease_ids` for a drug whose aggregate `approval.sources` includes FDA, EMA Human Drugs, PMDA or DailyMed. It never derives labels from ranks, scores, shortlist membership or a known-answer example. The extracted sets match the source exactly: **32 myeloma references and one COVID-19 reference**.
+Reference extraction ([references.py](../../../core/ranking/references.py#L8)) uses exact membership in `approval.disease_ids` for a drug whose aggregate `approval.sources` includes FDA, EMA Human Drugs, PMDA or DailyMed. It never derives labels from ranks, scores, shortlist membership or a known-answer example. The extracted sets match the source exactly: **32 myeloma references and one COVID-19 reference**.
 
 Approval provenance is aggregated **per drug**, not attached to individual indication IDs. Thus the provider column below reports the available drug-level provenance; it does not certify that each provider approved that specific Disease relationship. The reference set measures recorded indication relationships, which can include supportive uses, rather than a uniformly verified set of Disease-modifying therapies. No such clinical classification was added in this audit.
 
@@ -99,7 +99,7 @@ The FDA label explicitly includes baricitinib for hospitalized adults with COVID
 
 To investigate the source gap, a **separate audit-only** query of the [Open Targets GraphQL endpoint](https://api.platform.opentargets.org/api/v4/graphql) was saved at `2026-10-24T22:34:49.360Z`. It returns the exact drug and Disease IDs, no parent molecule and no obsolete COVID-19 terms. Of 71 drug-indication rows, the COVID-19 row is `PHASE_3` with 22 ClinicalTrials.gov reports and no regulator reports. The regulator-backed `APPROVAL` rows correspond to the three indication IDs stored in the local source. An additional `APPROVAL` row for juvenile dermatomyositis has trial-only provenance and fails the regulator-source requirement.
 
-This live response is consistent with the omission under the documented approval criteria ([build-reference.md, A6](../build-reference.md:169)). It corroborates an upstream relationship-curation gap; the original raw export is unavailable, so it cannot prove the precise historical extraction steps. The live API response is unversioned in this snapshot and must not be represented as a verified replay of release 26.09. Neither this response nor the FDA label was added to the frozen evaluation.
+This live response is consistent with the omission under the documented approval criteria ([build-reference.md, A6](../../engineering/build-reference.md#L169)). It corroborates an upstream relationship-curation gap; the original raw export is unavailable, so it cannot prove the precise historical extraction steps. The live API response is unversioned in this snapshot and must not be represented as a verified replay of release 26.09. Neither this response nor the FDA label was added to the frozen evaluation.
 
 ## Coverage and the 649 `not_scorable` Candidates
 
@@ -131,11 +131,11 @@ The upstream unresolved-source entries attached to these Candidates also retain 
 | `missing_parent` | 12 |
 | `ambiguous_uniprot_mapping` | 13 |
 
-The complete 649-Candidate roster, with IDs, names, coverage, condition and exact calculation reason, is saved in [not_scorable_candidates.csv](../../data/evaluation/stage3-audit/not_scorable_candidates.csv).
+The complete 649-Candidate roster, with IDs, names, coverage, condition and exact calculation reason, is saved in [not_scorable_candidates.csv](../../../data/evaluation/stage3-audit/not_scorable_candidates.csv).
 
 ## Metric audit and unchanged results
 
-[retrieval_metrics](../../core/ranking/evaluation.py:126) computes `|top K ∩ known ∩ universe| / |known ∩ universe|`. All in-scope positives contribute to the denominator, including positives with missing scores. Per-Disease reciprocal rank is `1 / rank` for the **first** retrieved positive, or zero if none is retrieved. MRR is the macro mean of those Disease-level values; it is not a mean over all positive drugs.
+[retrieval_metrics](../../../core/ranking/evaluation.py#L126) computes `|top K ∩ known ∩ universe| / |known ∩ universe|`. All in-scope positives contribute to the denominator, including positives with missing scores. Per-Disease reciprocal rank is `1 / rank` for the **first** retrieved positive, or zero if none is retrieved. MRR is the macro mean of those Disease-level values; it is not a mean over all positive drugs.
 
 The verified policies are:
 
@@ -146,7 +146,7 @@ The verified policies are:
 - **Ties:** direct evidence sorts by descending score, descending breadth, then ChEMBL ID; shared count by descending count then ID; raw proximity by ascending distance then ID; z-score by ascending z, ascending raw distance, then ID. IDs use lexical ordering. Ties receive deterministic ordinal ranks, not averaged ranks or fractional Recall credit. Reversing input order leaves rankings unchanged.
 - **Shortlist and random baseline:** shortlist Recall@15 uses the frozen, deduplicated Stage 2 shortlist, with no common-subset refill. The random baseline is one reproducible SHA256-keyed permutation with seed 0; common-scope evaluation filters the same permutation.
 
-Existing tests cover all these cases ([test_evaluation.py](../../core/ranking/tests/test_evaluation.py:35)). Independent audit calculations rebuilt method orders from saved scores, recomputed metrics with rational arithmetic, and checked all 3,912 Candidate coverage/status records against source Target IDs and Stage 1 indexes. All matched.
+Existing tests cover all these cases ([test_evaluation.py](../../../core/ranking/tests/test_evaluation.py#L35)). Independent audit calculations rebuilt method orders from saved scores, recomputed metrics with rational arithmetic, and checked all 3,912 Candidate coverage/status records against source Target IDs and Stage 1 indexes. All matched.
 
 **No corrected metrics:** the audited values below equal the original Stage 3 results. All Recall@5 and Recall@10 values are zero. Values are rounded for display; saved JSON/CSVs retain full precision.
 
@@ -214,10 +214,10 @@ Commands run successfully:
 
 Supporting local artifacts, all under gitignored `data/`:
 
-- [audit_checks.json](../../data/evaluation/stage3-audit/audit_checks.json): all reference diagnostic rows, independently checked metrics, first-positive ranks, reason counts and protected input/output hashes.
-- [not_scorable_candidates.csv](../../data/evaluation/stage3-audit/not_scorable_candidates.csv): complete 649-Candidate roster.
-- [open_targets_baricitinib_live.json](../../data/evaluation/stage3-audit/open_targets_baricitinib_live.json): separate query/response snapshot; 60,310 bytes.
-- [replay_checks.json](../../data/evaluation/stage3-audit/replay_checks.json): all nine byte-hash comparisons against the fresh Stage 3 replay.
+- [audit_checks.json](../../../data/evaluation/stage3-audit/audit_checks.json): all reference diagnostic rows, independently checked metrics, first-positive ranks, reason counts and protected input/output hashes.
+- [not_scorable_candidates.csv](../../../data/evaluation/stage3-audit/not_scorable_candidates.csv): complete 649-Candidate roster.
+- [open_targets_baricitinib_live.json](../../../data/evaluation/stage3-audit/open_targets_baricitinib_live.json): separate query/response snapshot; 60,310 bytes.
+- [replay_checks.json](../../../data/evaluation/stage3-audit/replay_checks.json): all nine byte-hash comparisons against the fresh Stage 3 replay.
 
 No code bug was found, so no algorithm correction or new regression test was needed. Existing edge-case tests and the independent real-data checks passed. No teammate pipeline, jury, frontend or docking file was modified.
 

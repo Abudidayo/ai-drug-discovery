@@ -6,7 +6,7 @@ import httpx
 
 
 URL = "https://api.platform.opentargets.org/api/v4/graphql"
-# Copied from docs/build-reference.md A2; do not add datasource overrides.
+# Copied from docs/engineering/build-reference.md A2; do not add datasource overrides.
 ASSOC = '''query Assoc($id: String!, $i: Int!, $size: Int!) {
   disease(efoId: $id) {
     associatedTargets(page: {index: $i, size: $size}) {

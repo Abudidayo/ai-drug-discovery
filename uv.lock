@@ -15,6 +15,9 @@ members = [
     "oxhack-worker",
 ]
 
+[manifest.dependency-groups]
+dev = [{ name = "pytest", specifier = ">=8" }]
+
 [[package]]
 name = "annotated-doc"
 version = "0.0.5"
@@ -834,7 +837,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
-    { name = "oxhack-drug-repurposing", editable = "." },
+    { name = "oxhack-drug-repurposing", editable = "core" },
     { name = "oxhack-ranking", editable = "core/ranking" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "psycopg-pool", specifier = ">=3.2,<4" },
@@ -857,16 +860,11 @@ dev = [
 [[package]]
 name = "oxhack-drug-repurposing"
 version = "0.1.0"
-source = { editable = "." }
+source = { editable = "core" }
 dependencies = [
     { name = "duckdb" },
     { name = "httpx" },
     { name = "openai" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
 ]
 
 [package.metadata]
@@ -875,9 +873,6 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "openai", specifier = ">=1.50" },
 ]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8" }]
 
 [[package]]
 name = "oxhack-ranking"

@@ -4,12 +4,12 @@ Stage 1 builds a disease-independent, undirected, unweighted Ensembl-gene
 network and reusable shortest-path distances. Stage 2 reuses those artifacts for
 raw proximity, conditional degree-matched scoring, baselines and shortlisting.
 
-See [Stage 2 usage and output contract](../../docs/ranking/STAGE2.md) and
-[measured Stage 2 results](../../docs/ranking/STAGE2_RESULTS.md). The sections below describe the
+See [Stage 2 usage and output contract](../../docs/method/ranking/STAGE2.md) and
+[measured Stage 2 results](../../docs/method/ranking/STAGE2_RESULTS.md). The sections below describe the
 Stage 1 foundation; its saved graph and distance matrix remain reusable.
 
-Stage 3 adds [retrospective evaluation and API adaptation](../../docs/ranking/STAGE3.md), with
-[the measured two-Disease smoke test](../../docs/ranking/STAGE3_RESULTS.md). It reads frozen
+Stage 3 adds [retrospective evaluation and API adaptation](../../docs/method/ranking/STAGE3.md), with
+[the measured two-Disease smoke test](../../docs/method/ranking/STAGE3_RESULTS.md). It reads frozen
 Stage 2 rankings and separate reference labels without rerunning scoring.
 
 ## Inputs inspected in this checkout

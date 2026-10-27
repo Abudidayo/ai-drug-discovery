@@ -23,7 +23,7 @@ diagnostics)`; distribution is `None` when seeds are missing, convergence fails
 or iteration encounters a numerical error. Invalid graph/configuration inputs
 raise explicit `ValueError`s. A final unconverged iterate is never scored.
 
-The initial configuration is frozen in [rwr_protocol.json](../../core/ranking/rwr_protocol.json):
+The initial configuration is frozen in [rwr_protocol.json](../../../core/ranking/rwr_protocol.json):
 restart probability 0.3, L1 consecutive-distribution tolerance 1e-12, at most
 1,000 iterations, and top 50 evidence-only Disease Targets selected before graph
 coverage filtering. Uniform restart is over the retained Disease Targets.

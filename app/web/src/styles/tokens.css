@@ -1,5 +1,5 @@
 /*
- * Design tokens from docs/design.md, plus a small reset. Components use CSS Modules and read
+ * Design tokens from docs/engineering/design.md, plus a small reset. Components use CSS Modules and read
  * only these custom properties; no raw hex values or font sizes outside this file.
  */
 

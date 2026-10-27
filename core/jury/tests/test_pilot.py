@@ -1,4 +1,4 @@
-from conftest import FIXTURES
+from tests.conftest import FIXTURES
 from collections import Counter
 from copy import deepcopy
 import json

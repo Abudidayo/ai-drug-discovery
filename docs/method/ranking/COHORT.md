@@ -43,7 +43,7 @@ refuses existing ranking/evaluation directories. Partial collection can reuse
 archived responses before sealing. A failed execution is left visible for
 diagnosis rather than overwritten or silently retried with different settings.
 
-The tracked [protocol](../../core/ranking/cohort_protocol.json) predeclares 16 names, eight areas,
+The tracked [protocol](../../../core/ranking/cohort_protocol.json) predeclares 16 names, eight areas,
 coverage criteria, approval-record criteria, seeds and exclusions. Name
 resolution uses unique exact canonical names, then unique exact synonyms from
 the pinned Disease table. Unknown or ambiguous names are reported, not guessed.

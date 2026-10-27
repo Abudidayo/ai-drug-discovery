@@ -18,7 +18,7 @@ import { fakeApi, http, serveExperiment, server } from "../test/server";
 const E = `/e/${EXPERIMENT_ID}`;
 const MODELS = ["Claude Sonnet 5", "GPT-5.4", "GLM-5.3"];
 
-/** Each string is said exactly once on screen (docs/design.md, "Say everything once"). */
+/** Each string is said exactly once on screen (docs/engineering/design.md, "Say everything once"). */
 function expectOnce(...texts: string[]) {
   for (const text of texts) {
     const found = screen.getAllByText(text, {

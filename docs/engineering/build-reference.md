@@ -6,7 +6,7 @@
 - the approval and bioactivity rules;
 - docking.
 
-IDs follow `plan.md` section 3, and terms follow [`glossary.md`](glossary.md). The research behind these recipes is in `docs/research-notes/OxHack 26 drug repurposing plan/`.
+IDs follow `plan.md` section 3, and terms follow [`glossary.md`](../method/glossary.md). The research behind these recipes is in `docs/research/planning/`.
 
 ## 1. Account setup
 
@@ -54,7 +54,7 @@ The demo codespace owner does this once:
    - set the default idle timeout to 240 minutes;
    - leave retention at the default (30 days).
 3. Tiger Cloud: Codespaces has no fixed outgoing IP. Check that the service has no IP allow list, or allow all IPs for the event.
-4. Create and check the codespace as in [`.devcontainer/README.md`](../.devcontainer/README.md).
+4. Create and check the codespace as in [`.devcontainer/README.md`](../../.devcontainer/README.md).
 
 ### Data cache (stream A)
 

@@ -81,7 +81,7 @@ disease.
 
 The shortest paths from each drug's targets to the disease's proteins are saved as its
 explanation. The maths, settings and test results are in
-[`docs/ranking/RWR.md`](docs/ranking/RWR.md).
+[`docs/method/ranking/RWR.md`](docs/method/ranking/RWR.md).
 
 ## 🤖 The Model jury on Snowflake Cortex
 
@@ -194,10 +194,9 @@ every one is listed in [`.env.example`](.env.example) and [`app/api/README.md`](
 Run the tests:
 
 ```bash
-uv run pytest                                          # pipeline and jury
-python -m pip install -e ./core/ranking
-python -m unittest discover -s core/ranking/tests      # network ranking
-cd app/web && npm test && npm run e2e                  # website
+uv run pytest                                   # pipeline, jury and ranking
+(cd app/api && uv run pytest)                   # API
+cd app/web && npm test && npm run e2e           # website
 ```
 
 The jury has a mock mode, so no Snowflake account is needed for tests. Building real
@@ -206,20 +205,24 @@ rankings needs the source data; see [`core/ranking/README.md`](core/ranking/READ
 ## 📁 Repository map
 
 ```text
-app/           The product
-  web/           Website and app
-  api/           Backend API
-  worker/        Docking worker
-core/          The science
-  pipeline/      Data: diseases, drugs, protein mapping, evidence packets
-  jury/          Model jury client and checks
-  ranking/       Network, scoring, shortlist, evaluation
-deploy/        Running it
-  db/            Database migrations
-  vercel/        Vercel deployment: function entry, deploy folder, docking snapshot
-  serve.sh       Start the API and workers
-  redeploy.sh    Run the demo in a Codespace
-docs/          Glossary, build reference, ranking method notes, research notes
-results/       Sealed experiments, protocols, errata
-tests/         Pipeline and jury tests; sample data formats in tests/fixtures/
+app/            The product
+  web/            Website and app
+  api/            Backend API
+  worker/         Docking worker
+core/           The science; each package keeps its tests/ beside it
+  pipeline/       Data: diseases, drugs, protein mapping, evidence packets
+  jury/           Model jury client and checks
+  ranking/        Network, scoring, shortlist, evaluation
+deploy/         Running it
+  db/             Database migrations
+  vercel/         Vercel deployment: function entry, deploy folder, docking snapshot
+  serve.sh        Start the API and workers
+  redeploy.sh     Run the full stack in a Codespace, with real data
+docs/
+  method/         How the science works: glossary, data manifest, ranking notes
+  research/       Background reading and early planning research
+  engineering/    Build reference, design system, security audit
+  images/         Figures used in this README
+results/        Sealed experiments, protocols, errata
+tests/          Sample data formats shared across packages (tests/fixtures/)
 ```

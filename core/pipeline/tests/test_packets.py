@@ -1,5 +1,5 @@
 """Offline A4 checks against small recorded primary-source responses."""
-from conftest import FIXTURES
+from tests.conftest import FIXTURES
 from copy import deepcopy
 from hashlib import sha256
 import json
@@ -20,7 +20,7 @@ from pipeline.packets import (
 )
 from pipeline.drugs import build_universe
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 SAMPLES = Path(__file__).parent / 'data/packets'
 
 
