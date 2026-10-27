@@ -170,9 +170,12 @@ jobs:
             [[ "$CODE" == false && "$PYTHON" == skipped && "$WEB" == skipped ]]
           fi
 
+  # Docs-only pushes skip python and web; without !cancelled(), GitHub would skip
+  # these too, because a job any ancestor of which was skipped is skipped.
   deployment-status:
     needs: test
     if: >-
+      !cancelled() && needs.test.result == 'success' &&
       github.ref == 'refs/heads/main' && github.event_name != 'pull_request' &&
       (vars.VERCEL_PROJECT_ID == '' || vars.DATA_RELEASE == '')
     runs-on: ubuntu-24.04
@@ -187,6 +190,7 @@ jobs:
   deploy:
     needs: test
     if: >-
+      !cancelled() && needs.test.result == 'success' &&
       github.ref == 'refs/heads/main' && github.event_name != 'pull_request' &&
       vars.VERCEL_PROJECT_ID != '' && vars.DATA_RELEASE != ''
     runs-on: ubuntu-24.04
