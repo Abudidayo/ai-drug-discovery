@@ -4,7 +4,7 @@
 
 Pick a disease. HalfLife finds approved drugs that might help, shows why, and lets three AI models argue over the evidence.
 
-**Live demo:** https://half-life-v6rwgp49g76cpx6p-5173.app.github.dev/
+**Live demo:** https://halflife-bio.vercel.app/
 
 The ranking comes from biomedical data and graph algorithms, not from an AI model. The AI only reviews the shortlist.
 
