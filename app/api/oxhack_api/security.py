@@ -3,6 +3,7 @@
 import hashlib
 import re
 import secrets
+from ipaddress import ip_address
 from urllib.parse import urlsplit
 
 from starlette.datastructures import MutableHeaders
@@ -37,9 +38,7 @@ class BrowserSecurity:
         if fresh:
             token = secrets.token_urlsafe(32)
         scope.setdefault("state", {})["session_id"] = hashlib.sha256(token.encode()).hexdigest()
-        # Read only the ASGI peer, normalized by Uvicorn's trusted proxy handling.
-        # Accepting arbitrary X-Forwarded-For here would let callers bypass quotas.
-        peer = request.client.host if request.client else "unknown"
+        peer = self.peer(request)
         scope["state"]["client_id"] = hashlib.sha256(peer.encode()).hexdigest()
 
         async def secure_send(message: Message) -> None:
@@ -109,3 +108,17 @@ class BrowserSecurity:
             await self.app(scope, receive, secure_send)
         finally:
             self.active -= 1
+
+    def peer(self, request: Request) -> str:
+        """The reader's IP: the connection's peer, normalized by Uvicorn's trusted proxy
+        handling, or OXHACK_CLIENT_IP_HEADER's address behind a proxy that overwrites
+        it. Accepting a header the caller controls, such as X-Forwarded-For through an
+        external rewrite, would let callers bypass quotas."""
+        peer = request.client.host if request.client else "unknown"
+        header = self.settings.client_ip_header
+        if header is None:
+            return peer
+        try:
+            return str(ip_address(request.headers.get(header, "").split(",")[0].strip()))
+        except ValueError:
+            return peer

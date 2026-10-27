@@ -13,14 +13,15 @@ from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 
 from . import __version__, stream_b
 from .deps import Components
+from .drain import DrainAfterResponse, make_drain
 from .errors import install_error_handlers
-from .jobs import JobFactory, Runner, ThreadRunner
+from .jobs import DOCK_CRASHED, JobFactory, Runner, ThreadRunner, save_dock_job
 from .jobs_pg import PostgresQueue, PostgresWorker
 from .repo import AlreadyExists, MemoryRepo, Repo
 from .repo.postgres import PostgresRepo
 from .routes.api import router
 from .security import BrowserSecurity
-from .services.docking import DockingBackend, FixtureDocking, VinaDocking
+from .services.docking import DockExecutor, DockingBackend, FixtureDocking, VinaDocking
 from .services.evaluation import EvaluationSource, FixtureEvaluation
 from .services.jury import FixtureJury, JuryBackend
 from .services.ligands import ChemblLigands
@@ -87,9 +88,12 @@ def build_components(
     )
 
 
-def open_docking(settings: Settings, repo: Repo) -> DockingBackend:
+def open_docking(
+    settings: Settings, repo: Repo, execute: DockExecutor | None = None
+) -> DockingBackend:
     """The docking backend the settings name. Vina mode needs the prepared structures
-    (`python -m oxhack_worker.prepare`); only the docking worker runs its jobs."""
+    (`python -m oxhack_worker.prepare`). Only a process given an `execute` runs its
+    jobs: the docking worker's, or a serverless API's sandbox runner."""
     if settings.docking == "fixture":
         return FixtureDocking(settings.fixtures_dir)
     # Live Candidates beyond the fixture's are docked as ChEMBL's SMILES, cached in data_dir.
@@ -99,6 +103,7 @@ def open_docking(settings: Settings, repo: Repo) -> DockingBackend:
         settings.results_dir,
         settings.fixtures_dir,
         repo,
+        execute=execute,
         ligands=ligands,
     )
 
@@ -172,7 +177,8 @@ def seed_dock_jobs(repo: Repo, docking: DockingBackend) -> None:
     """Save the jobs the backend starts with: fixture results computed ahead of time,
     or queued redock controls for the docking worker. A saved precomputed result that
     differs (its files were prepared again, say) is refreshed, with the jobs that
-    reuse it; a queued control is only ever added."""
+    reuse it; a queued control is only added, or queued again after its run crashed
+    (DOCK_CRASHED), which says nothing about the structure."""
     for job, inputs in docking.seed_jobs():
         saved = repo.get_dock_job(job.id)
         if saved is None:
@@ -182,6 +188,10 @@ def seed_dock_jobs(repo: Repo, docking: DockingBackend) -> None:
                 # Another process (the API or the worker) saved it first, or another job
                 # already computes the same inputs.
                 log.info("docking job %s is already saved", job.id)
+        elif saved.status == "failed" and (saved.error or "").startswith(DOCK_CRASHED):
+            log.info("queueing docking job %s again: its run crashed", job.id)
+            again = {"status": "queued", "error": None, "started_at": None, "finished_at": None}
+            save_dock_job(repo, saved.model_copy(update=again))
         elif job.status == "done" and saved != job:
             log.info("refreshing docking job %s from the fixtures", job.id)
             shared = {"scores": job.scores, "files": job.files, "fixture": job.fixture}
@@ -216,6 +226,7 @@ def create_app(settings: Settings | None = None, components: Components | None =
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         current = components or build_components(settings or Settings())
         app.state.components = current
+        app.state.drain = make_drain(current)
         worker = start_inprocess_worker(current)
         try:
             yield
@@ -238,9 +249,13 @@ def create_app(settings: Settings | None = None, components: Components | None =
         lifespan=lifespan,
         generate_unique_id_function=_operation_id,
     )
+    app.state.drain = None
     if components is not None:
         app.state.components = components
+        app.state.drain = make_drain(components)
     current_settings = components.settings if components else settings or Settings()
+    if current_settings.after_request_jobs:
+        app.add_middleware(DrainAfterResponse, drain=lambda: app.state.drain)
     app.add_middleware(RequestBodyLimitMiddleware, max_body_size=16_384)
     app.add_middleware(BrowserSecurity, settings=current_settings)
     install_error_handlers(app)

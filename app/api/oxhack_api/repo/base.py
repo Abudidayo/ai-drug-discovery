@@ -17,6 +17,7 @@ Background jobs are queued by the `Runner` (see `jobs.py`), not here.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime
@@ -137,6 +138,15 @@ class Repo(Protocol):
 
     def update_dock_job(self, job: DockJob) -> None:
         """Save the job's progress and results (status, scores, files, error, times)."""
+        ...
+
+    def save_dock_files(self, job_id: UUID, files: Mapping[str, bytes]) -> None:
+        """Keep a finished job's result files (name to content), replacing any saved
+        for it, so a process that shares no disk with the one that docked can serve them."""
+        ...
+
+    def dock_file(self, job_id: UUID, name: str) -> bytes | None:
+        """A result file saved with `save_dock_files`, or None."""
         ...
 
     def find_reusable_dock_job(self, cache_key: str, fixture: bool) -> DockJob | None:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -43,6 +43,7 @@ class MemoryRepo:
         self._experiments: dict[UUID, Experiment] = {}
         self._jury: dict[UUID, JuryRun] = {}
         self._dock: dict[UUID, _DockRow] = {}
+        self._dock_files: dict[UUID, dict[str, bytes]] = {}
         self._owners: dict[UUID, str | None] = {}
         self._limits = MemoryLimits()
 
@@ -193,6 +194,16 @@ class MemoryRepo:
     def update_dock_job(self, job: DockJob) -> None:
         with self._lock:
             self._dock[job.id].job = job.model_copy(deep=True)
+
+    def save_dock_files(self, job_id: UUID, files: Mapping[str, bytes]) -> None:
+        with self._lock:
+            if job_id not in self._dock:
+                raise KeyError(job_id)
+            self._dock_files[job_id] = dict(files)
+
+    def dock_file(self, job_id: UUID, name: str) -> bytes | None:
+        with self._lock:
+            return self._dock_files.get(job_id, {}).get(name)
 
     def find_reusable_dock_job(self, cache_key: str, fixture: bool) -> DockJob | None:
         with self._lock:

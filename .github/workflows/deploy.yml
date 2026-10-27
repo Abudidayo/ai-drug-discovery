@@ -94,9 +94,10 @@ jobs:
         run: uv run --no-sync pytest deploy/db/tests -q
       - name: Deployment script regression tests
         run: |
-          uv run --no-sync ruff check deploy/oracle deploy/tests/test_oracle.py deploy/db/tests/test_oracle_restore.py
-          uv run --no-sync ruff format --check deploy/oracle deploy/tests/test_oracle.py deploy/db/tests/test_oracle_restore.py
+          uv run --no-sync ruff check deploy/vercel
+          uv run --no-sync ruff format --check deploy/vercel
           uv run --no-sync pytest deploy/tests -q
+          shellcheck -e SC1091 deploy/*.sh
 
   web:
     needs: changes
@@ -148,30 +149,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  oracle:
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          persist-credentials: false
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
-        with:
-          terraform_version: 1.13.5
-          terraform_wrapper: false
-      - name: Validate free resource guards without cloud credentials
-        run: |
-          terraform -chdir=deploy/oracle init -backend=false -input=false -lockfile=readonly
-          terraform -chdir=deploy/oracle fmt -check
-          terraform -chdir=deploy/oracle validate
-          terraform -chdir=deploy/oracle test
-          shellcheck -e SC1091 deploy/oracle/*.sh
-
   # A stable required check succeeds on docs-only changes and fails closed on cancelled jobs.
   test:
-    needs: [changes, python, web, oracle]
+    needs: [changes, python, web]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -182,73 +162,77 @@ jobs:
           CODE: ${{ needs.changes.outputs.code }}
           PYTHON: ${{ needs.python.result }}
           WEB: ${{ needs.web.result }}
-          ORACLE: ${{ needs.oracle.result }}
         run: |
           [[ "$CHANGES" == success ]]
           if [[ "$CODE" == true ]]; then
-            [[ "$PYTHON" == success && "$WEB" == success && "$ORACLE" == success ]]
+            [[ "$PYTHON" == success && "$WEB" == success ]]
           else
-            [[ "$CODE" == false && "$PYTHON" == skipped && "$WEB" == skipped && "$ORACLE" == skipped ]]
+            [[ "$CODE" == false && "$PYTHON" == skipped && "$WEB" == skipped ]]
           fi
 
   deployment-status:
     needs: test
     if: >-
       github.ref == 'refs/heads/main' && github.event_name != 'pull_request' &&
-      vars.ORACLE_DEPLOY_ENABLED != 'true'
+      (vars.VERCEL_PROJECT_ID == '' || vars.DATA_RELEASE == '')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Report pending Oracle setup
+      - name: Report pending Vercel setup
         run: |
-          echo '::notice::Checks passed. Oracle deployment is waiting for one-time account and server setup.'
-          echo 'Oracle deployment is disabled until deploy/oracle/configure-ci.sh is run with --enable. See deploy/oracle/README.md.' >> "$GITHUB_STEP_SUMMARY"
+          echo '::notice::Checks passed. Deployment waits for the Vercel project settings and the data release.'
+          echo 'Set VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID and DATA_RELEASE (deploy/vercel/README.md) to deploy main.' >> "$GITHUB_STEP_SUMMARY"
 
+  # Every passing push to main deploys that exact commit. Pull requests never deploy.
   deploy:
     needs: test
     if: >-
       github.ref == 'refs/heads/main' && github.event_name != 'pull_request' &&
-      vars.ORACLE_DEPLOY_ENABLED == 'true'
+      vars.VERCEL_PROJECT_ID != '' && vars.DATA_RELEASE != ''
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 30
     concurrency:
-      group: deploy-demo
+      group: deploy-production
       cancel-in-progress: false
     environment:
-      name: demo
+      name: production
       url: ${{ vars.DEMO_URL }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Deploy the tested archive to Oracle
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/web/package-lock.json
+      - name: Fetch the prepared data
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DATA_RELEASE: ${{ vars.DATA_RELEASE }}
+        run: |
+          gh release download "$DATA_RELEASE" --repo "$GITHUB_REPOSITORY" --pattern 'data.tar.gz' --dir "$RUNNER_TEMP"
+          mkdir -p "$RUNNER_TEMP/data"
+          tar -xzf "$RUNNER_TEMP/data.tar.gz" -C "$RUNNER_TEMP/data"
+      - name: Build and deploy the tested commit to Vercel
         env:
           DEPLOY_SHA: ${{ github.sha }}
-          ORACLE_HOST: ${{ vars.ORACLE_HOST }}
-          ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
-          ORACLE_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
         run: |
           set -euo pipefail
-          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]
-          if [[ ! "$ORACLE_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ || -z "$ORACLE_SSH_KEY" || -z "$ORACLE_KNOWN_HOSTS" ]]; then
-            echo '::error::Oracle SSH settings are incomplete. Run deploy/oracle/configure-ci.sh (deploy/oracle/README.md).'
-            exit 1
-          fi
-          umask 077
-          mkdir -p ~/.ssh
-          printf '%s\n' "$ORACLE_SSH_KEY" > ~/.ssh/oracle
-          printf '%s\n' "$ORACLE_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          trap 'rm -f ~/.ssh/oracle' EXIT
-          ssh_opts=(-i ~/.ssh/oracle -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
-          git archive --format=tar.gz --output="$RUNNER_TEMP/release.tgz" "$DEPLOY_SHA"
-          digest=$(sha256sum "$RUNNER_TEMP/release.tgz" | cut -d ' ' -f 1)
-          scp "${ssh_opts[@]}" "$RUNNER_TEMP/release.tgz" \
-            "halflife@$ORACLE_HOST:/srv/half-life/incoming/$DEPLOY_SHA.tgz"
-          scp "${ssh_opts[@]}" deploy/oracle/deploy.sh \
-            "halflife@$ORACLE_HOST:/srv/half-life/incoming/deploy-$DEPLOY_SHA.sh"
-          ssh "${ssh_opts[@]}" "halflife@$ORACLE_HOST" \
-            "bash /srv/half-life/incoming/deploy-$DEPLOY_SHA.sh $DEPLOY_SHA /srv/half-life/incoming/$DEPLOY_SHA.tgz $digest" < /dev/null
+          uv run deploy/vercel/build.py --data "$RUNNER_TEMP/data" --sha "$DEPLOY_SHA" --out "$RUNNER_TEMP/deploy"
+          cd "$RUNNER_TEMP/deploy"
+          vercel=(npx --yes vercel@65.3.1)
+          "${vercel[@]}" pull --yes --environment=production --token "$VERCEL_TOKEN"
+          "${vercel[@]}" build --prod --token "$VERCEL_TOKEN"
+          "${vercel[@]}" deploy --prebuilt --prod --token "$VERCEL_TOKEN"
       - name: Verify the public release SHA
         env:
           URL: ${{ vars.DEMO_URL }}
@@ -263,11 +247,11 @@ jobs:
         run: |
           [[ "$URL" == https://* ]]
           for _ in $(seq 1 30); do
-            if curl --connect-timeout 5 --max-time 10 -fsS "${URL%/}/api/health" | \
+            if curl --connect-timeout 5 --max-time 30 -fsS "${URL%/}/api/health" | \
               python3 -c 'import json,sys; assert json.load(sys.stdin)["status"] == "ok"'; then
               exit 0
             fi
             sleep 5
           done
-          echo '::error::The public demo API failed its health check.'
+          echo '::error::The public API failed its health check.'
           exit 1

@@ -39,7 +39,7 @@ from typing import Any
 from oxhack_api.app import build_components, open_repo
 from oxhack_api.jobs_pg import PostgresWorker
 from oxhack_api.repo.postgres import PostgresRepo
-from oxhack_api.schemas import DockJob, PoseScore
+from oxhack_api.schemas import DOCK_FILE_NAMES, DockJob, PoseScore
 from oxhack_api.services.docking import (
     DockingFailed,
     DockResult,
@@ -209,7 +209,10 @@ class DockRunner:
                 files = describe_files(job.id, final)
             except ValueError as exc:
                 raise DockingFailed(f"The docking run left out a result file: {exc}.") from exc
-            return DockResult(scores=scores, files=files, control_rmsd=control_rmsd)
+            contents = {name: (final / name).read_bytes() for name in DOCK_FILE_NAMES.values()}
+            return DockResult(
+                scores=scores, files=files, control_rmsd=control_rmsd, contents=contents
+            )
         finally:
             shutil.rmtree(work, ignore_errors=True)
 

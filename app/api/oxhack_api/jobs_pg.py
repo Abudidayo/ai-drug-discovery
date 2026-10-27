@@ -29,7 +29,8 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from collections.abc import Collection
+from collections.abc import Collection, Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Final, Literal
 from uuid import UUID
@@ -42,6 +43,7 @@ from .errors import Unavailable
 from .jobs import Job, JobFactory, JobRef, Progress, save_dock_job
 from .repo import AlreadyExists
 from .repo.postgres import Conn, PostgresRepo
+from .services.docking import DockingInProgress
 from .settings import Settings
 
 log = logging.getLogger(__name__)
@@ -130,6 +132,11 @@ class PostgresWorker:
         self._active_lock = threading.Lock()
         self._running: list[threading.Thread] = []
 
+    @property
+    def stale_after(self) -> float:
+        """Seconds without a heartbeat after which a running job is recovered."""
+        return self._stale_after
+
     @classmethod
     def from_settings(
         cls, repo: PostgresRepo, factory: JobFactory, settings: Settings
@@ -166,6 +173,19 @@ class PostgresWorker:
         for thread in self._running:
             thread.join(max(0.0, deadline - time.monotonic()))
         self._running.clear()
+
+    @contextmanager
+    def heartbeats(self) -> Generator[None]:
+        """Keep the heartbeats of jobs run with `run_once` fresh, and re-queue stale
+        ones, while the block runs: for a caller that runs jobs itself, not `start`."""
+        self._stopping.clear()
+        thread = threading.Thread(target=self._keep_alive, name="oxhack-heartbeat", daemon=True)
+        thread.start()
+        try:
+            yield
+        finally:
+            self._stopping.set()
+            thread.join(self._heartbeat + 5)
 
     def _loop(self) -> None:
         while not self._stopping.is_set():
@@ -273,6 +293,9 @@ class PostgresWorker:
         except _Stopped:
             self._release(claim)
             return
+        except DockingInProgress:
+            self._release(claim, keep_start=True)
+            return
         except Exception as exc:
             log.exception("job %s (%s) crashed", claim.id, claim.ref.kind)
             error = f"The background job crashed ({type(exc).__name__})."
@@ -320,9 +343,10 @@ class PostgresWorker:
                 ("failed" if error else "done", error, claim.id),
             )
 
-    def _release(self, claim: Claim) -> None:
+    def _release(self, claim: Claim, *, keep_start: bool = False) -> None:
         """Put a job this worker stopped part-way back in the queue; the claim is not
-        counted as an attempt."""
+        counted as an attempt. `keep_start` keeps a docking run's start time, for a run
+        that goes on in a sandbox."""
         with self._repo.connection() as conn:
             if claim.queue == "jobs":
                 conn.execute(
@@ -338,7 +362,7 @@ class PostgresWorker:
                     "update dock_jobs set attempts = greatest(attempts - 1, 0) where id = %s",
                     (claim.id,),
                 )
-                self._requeue_dock(claim.id)
+                self._requeue_dock(claim.id, keep_start=keep_start)
 
     # Recovery ---------------------------------------------------------------
 
@@ -413,12 +437,13 @@ class PostgresWorker:
             changed.append(row["id"])
         return changed
 
-    def _requeue_dock(self, job_id: UUID) -> None:
+    def _requeue_dock(self, job_id: UUID, *, keep_start: bool = False) -> None:
         with self._repo.connection() as conn:
             job = self._repo.get_dock_job(job_id)
             if job is None or job.status != "running":
                 return
-            queued = job.model_copy(update={"status": "queued", "started_at": None})
+            started_at = job.started_at if keep_start else None
+            queued = job.model_copy(update={"status": "queued", "started_at": started_at})
             save_dock_job(self._repo, queued)
             conn.execute("update dock_jobs set heartbeat_at = null where id = %s", (job_id,))
 

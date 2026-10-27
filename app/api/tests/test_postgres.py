@@ -37,6 +37,7 @@ from fastapi.testclient import TestClient
 
 from oxhack_api.app import build_components, create_app
 from oxhack_api.deps import Components
+from oxhack_api.drain import make_drain
 from oxhack_api.jobs_pg import PostgresQueue, PostgresWorker
 from oxhack_api.repo.postgres import SCHEMA_VERSION, PostgresRepo, SchemaOutOfDate
 from oxhack_api.schemas import DockJob, DockSettings, Structure
@@ -627,3 +628,77 @@ def test_token_usage_and_reasoning_effort_round_trip(
     assert query(conninfo, "select jury_config -> 'reasoning_effort' from experiments") == [
         ({"openai-gpt-5.4": "low"},)
     ]
+
+
+def drained(pg_settings: Settings, **settings: Any) -> Components:
+    """Components as a serverless deployment runs them: no worker process; jobs run
+    after the API's responses (OXHACK_AFTER_REQUEST_JOBS)."""
+    return build_components(pg_settings.model_copy(update={"after_request_jobs": True, **settings}))
+
+
+def test_jobs_run_after_the_response_with_no_worker(pg_settings: Settings) -> None:
+    components = drained(pg_settings)
+    try:
+        client = client_for(components)
+        experiment_id = create(client)["id"]
+        conninfo = components.settings.database_url or ""
+        # The create request's own drain runs the build in the background.
+        poll(lambda: query(conninfo, "select status from jobs"), lambda r: r == [("done",)])
+        assert client.get(f"/api/experiments/{experiment_id}").json()["status"] == "ready"
+    finally:
+        components.close()
+
+
+def test_a_drain_recovers_a_job_whose_function_stopped(
+    queued: Components, pg_settings: Settings
+) -> None:
+    client = client_for(queued)
+    experiment_id = create(client)["id"]
+    conninfo = queued.settings.database_url or ""
+    # A function claimed the build and was frozen mid-job: its heartbeat went stale.
+    execute(
+        conninfo,
+        "update jobs set status = 'running', attempts = 1, "
+        "started_at = now() - interval '3 minutes', "
+        "heartbeat_at = now() - interval '2 minutes'",
+    )
+    components = drained(pg_settings)
+    try:
+        drain = make_drain(components)
+        assert drain is not None
+        assert drain.pending()
+        assert drain.run() == 1
+        assert query(conninfo, "select status, attempts from jobs") == [("done", 2)]
+        assert not drain.pending()
+        assert drain.run() == 0, "an empty queue costs one query"
+    finally:
+        components.close()
+    assert client.get(f"/api/experiments/{experiment_id}").json()["status"] == "ready"
+
+
+def test_a_drain_claims_one_job_at_least_then_stops_after_its_budget(
+    queued: Components, pg_settings: Settings
+) -> None:
+    client = client_for(queued)
+    for _ in range(2):
+        create(client)
+    components = drained(pg_settings, drain_claim_s=0.001)
+    try:
+        drain = make_drain(components)
+        assert drain is not None
+        assert drain.run() == 1, "a spent budget still runs one job to its end"
+    finally:
+        components.close()
+    conninfo = queued.settings.database_url or ""
+    assert sorted(query(conninfo, "select status from jobs")) == [("done",), ("queued",)]
+
+
+def test_docking_files_round_trip_through_the_database(queued: Components) -> None:
+    """A serverless instance serves files another instance docked: none are on its disk."""
+    repo = queued.repo
+    control = FixtureDocking(FIXTURES_DIR).seed_jobs()[0][0]  # seeded with the components
+    repo.save_dock_files(control.id, {"poses.sdf": b"pose\n", "log.txt": b"log\n"})
+    assert repo.dock_file(control.id, "poses.sdf") == b"pose\n"
+    repo.save_dock_files(control.id, {"poses.sdf": b"again\n"})
+    assert repo.dock_file(control.id, "poses.sdf") == b"again\n"
+    assert repo.dock_file(control.id, "log.txt") is None, "a save replaces the job's files"

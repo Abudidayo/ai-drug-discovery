@@ -23,11 +23,13 @@ from conftest import (
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from oxhack_api.app import seed_dock_jobs
 from oxhack_api.repo import Repo
 from oxhack_api.schemas import DockJob, Structure
 from oxhack_api.services.docking import (
     DockInputs,
     FixtureDocking,
+    VinaDocking,
     unsupported_reason,
 )
 from oxhack_api.services.source import FixtureSource
@@ -322,3 +324,24 @@ def test_a_live_server_never_reuses_a_made_up_result(
     assert job["fixture"] is False
     assert job["status"] == "queued"
     assert len(runner.jobs) == 1, "the live server docks the pair itself"
+
+
+def test_a_crashed_redock_control_is_queued_again_but_a_failed_one_is_not(
+    repo: Repo, tmp_path: Path
+) -> None:
+    docking = VinaDocking(REPO_ROOT / "app" / "worker" / "structures", tmp_path, FIXTURES_DIR, repo)
+    seed_dock_jobs(repo, docking)
+    crashed, failed = (job for job, _ in docking.seed_jobs()[:2])
+    for job, error in (
+        (crashed, "Docking crashed (SandboxApiError)."),
+        (failed, "Vina found no pose in the box."),
+    ):
+        update = {"status": "failed", "error": error, "finished_at": job.created_at}
+        repo.update_dock_job(job.model_copy(update=update))
+    seed_dock_jobs(repo, docking)  # the next start
+    again = repo.get_dock_job(crashed.id)
+    assert again is not None
+    assert (again.status, again.error, again.finished_at) == ("queued", None, None)
+    kept = repo.get_dock_job(failed.id)
+    assert kept is not None
+    assert (kept.status, kept.error) == ("failed", "Vina found no pose in the box.")
