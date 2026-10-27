@@ -30,6 +30,9 @@ def test_packed_data_is_restored_byte_for_byte(tmp_path, monkeypatch):
         target = data / "cache" / "http" / f"{i % 3}" / f"{i}.json"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(f'{{"i": {i}}}')
+    # macOS metadata a tarball made on a Mac carries: never shipped as data.
+    (data / "few" / "._a.json").write_bytes(b"\x00\x05\x16\x07")
+    (data / ".DS_Store").write_bytes(b"Bud1")
     (data / "experiments").mkdir()  # run-time output stays behind
     (data / "experiments" / "audit.json").write_text("{}")
 
@@ -47,7 +50,10 @@ def test_packed_data_is_restored_byte_for_byte(tmp_path, monkeypatch):
     expected = {
         p.relative_to(data): p.read_bytes()
         for p in data.rglob("*")
-        if p.is_file() and "experiments" not in p.parts
+        if p.is_file()
+        and "experiments" not in p.parts
+        and not p.name.startswith("._")
+        and p.name != ".DS_Store"
     }
     got = {
         p.relative_to(restored): p.read_bytes()

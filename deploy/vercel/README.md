@@ -99,8 +99,11 @@ Done for `halflife` on 26-27 October 2026; repeat for a new project.
    and attach it to a GitHub release (data is git-ignored):
 
    ```bash
-   tar --exclude=./experiments --exclude=./docking --exclude=./string -czf data.tar.gz -C data .
+   # COPYFILE_DISABLE: macOS tar otherwise adds ._ metadata files, which DuckDB reads as parquet.
+   COPYFILE_DISABLE=1 tar --exclude=./experiments --exclude=./docking --exclude=./string \
+     --exclude='._*' -czf data.tar.gz -C data .
    gh release create data-2026-10-26 data.tar.gz --prerelease --title "Prepared data for deployment"
+   # Replacing it later: gh release upload data-2026-10-26 data.tar.gz --clobber
    ```
 6. **GitHub Actions** (repository settings):
 

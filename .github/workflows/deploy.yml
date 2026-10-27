@@ -220,6 +220,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/data"
           tar -xzf "$RUNNER_TEMP/data.tar.gz" -C "$RUNNER_TEMP/data"
       - name: Build and deploy the tested commit to Vercel
+        id: deploy
         env:
           DEPLOY_SHA: ${{ github.sha }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -232,14 +233,22 @@ jobs:
           # Vercel builds it on Linux: a prebuilt upload would add the Python packages'
           # thousands of files, past the Hobby plan's 5,000 uploaded files a day.
           npx --yes vercel@65.3.1 deploy --prod --yes --token "$VERCEL_TOKEN"
+      # A deploy that fails these checks is rolled back to the previous production one.
       - name: Verify the public release SHA
         env:
           URL: ${{ vars.DEMO_URL }}
           DEPLOY_SHA: ${{ github.sha }}
         run: |
           [[ "$URL" == https://* ]]
-          curl --connect-timeout 5 --max-time 15 -fsS "${URL%/}/release.json" | \
-            python3 -c 'import json,sys; assert json.load(sys.stdin)["sha"]==sys.argv[1]' "$DEPLOY_SHA"
+          for _ in $(seq 1 24); do
+            if curl --connect-timeout 5 --max-time 15 -fsS "${URL%/}/release.json" | \
+              python3 -c 'import json,sys; assert json.load(sys.stdin)["sha"]==sys.argv[1]' "$DEPLOY_SHA"; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo '::error::The public site does not serve the deployed commit.'
+          exit 1
       - name: Check the public API answers
         env:
           URL: ${{ vars.DEMO_URL }}
@@ -254,3 +263,13 @@ jobs:
           done
           echo '::error::The public API failed its health check.'
           exit 1
+      - name: Roll back a failed deploy
+        if: failure() && steps.deploy.outcome == 'success'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+        working-directory: ${{ runner.temp }}/deploy
+        run: |
+          npx --yes vercel@65.3.1 rollback --yes --token "$VERCEL_TOKEN"
+          echo '::error::The deploy failed its checks; production was rolled back to the previous deployment.'

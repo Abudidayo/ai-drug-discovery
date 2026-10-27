@@ -61,6 +61,13 @@ VERCEL_CONFIG = {
     "git": {"deploymentEnabled": False},
     # Web app routes are the single page app's; files in public/ are served first.
     "rewrites": [{"source": "/((?!api/).*)", "destination": "/index.html"}],
+    # CI checks the deployed commit here right after each deploy.
+    "headers": [
+        {
+            "source": "/release.json",
+            "headers": [{"key": "Cache-Control", "value": "no-store"}],
+        }
+    ],
 }
 
 
@@ -75,7 +82,16 @@ def code_ignore(folder: str, names: list[str]) -> set[str]:
 def data_ignore(root: Path):
     def ignore(folder: str, names: list[str]) -> set[str]:
         top = Path(folder) == root
-        return {n for n in names if (top and n in DATA_LEFT_OUT) or n.endswith(".tmp")}
+        # macOS tar and Finder metadata (._name, .DS_Store) would pass for data:
+        # DuckDB's *.parquet glob reads ._part.parquet and fails.
+        return {
+            n
+            for n in names
+            if (top and n in DATA_LEFT_OUT)
+            or n.endswith(".tmp")
+            or n.startswith("._")
+            or n == ".DS_Store"
+        }
 
     return ignore
 
