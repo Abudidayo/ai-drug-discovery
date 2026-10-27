@@ -174,21 +174,21 @@ jobs:
     needs: test
     if: >-
       github.ref == 'refs/heads/main' && github.event_name != 'pull_request' &&
-      vars.VERCEL_PROJECT_ID == ''
+      (vars.VERCEL_PROJECT_ID == '' || vars.DATA_RELEASE == '')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Report pending Vercel setup
         run: |
-          echo '::notice::Checks passed. Deployment waits for the Vercel project settings.'
-          echo 'Set VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID (deploy/vercel/README.md) to deploy main.' >> "$GITHUB_STEP_SUMMARY"
+          echo '::notice::Checks passed. Deployment waits for the Vercel project settings and the data release.'
+          echo 'Set VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID and DATA_RELEASE (deploy/vercel/README.md) to deploy main.' >> "$GITHUB_STEP_SUMMARY"
 
   # Every passing push to main deploys that exact commit. Pull requests never deploy.
   deploy:
     needs: test
     if: >-
       github.ref == 'refs/heads/main' && github.event_name != 'pull_request' &&
-      vars.VERCEL_PROJECT_ID != ''
+      vars.VERCEL_PROJECT_ID != '' && vars.DATA_RELEASE != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     concurrency:
@@ -216,7 +216,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           DATA_RELEASE: ${{ vars.DATA_RELEASE }}
         run: |
-          [[ -n "$DATA_RELEASE" ]] || { echo '::error::Set DATA_RELEASE (deploy/vercel/README.md).'; exit 1; }
           gh release download "$DATA_RELEASE" --repo "$GITHUB_REPOSITORY" --pattern 'data.tar.gz' --dir "$RUNNER_TEMP"
           mkdir -p "$RUNNER_TEMP/data"
           tar -xzf "$RUNNER_TEMP/data.tar.gz" -C "$RUNNER_TEMP/data"

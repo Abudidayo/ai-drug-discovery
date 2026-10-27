@@ -109,7 +109,8 @@ Done for `halflife` on 26-27 October 2026; repeat for a new project.
    ```
 
    Only `VERCEL_TOKEN` is a secret; the others are variables. Until
-   `VERCEL_PROJECT_ID` is set, CI reports that deployment waits for setup.
+   `VERCEL_PROJECT_ID` and `DATA_RELEASE` are set, CI reports that deployment waits
+   for setup.
 
 ## Operations
 
