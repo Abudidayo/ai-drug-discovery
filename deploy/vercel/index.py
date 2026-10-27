@@ -7,7 +7,7 @@ Vercel serves this module's `app` for /api/* while public/ holds the web app.
 - The bundle is read-only, so the prepared data is mirrored into /tmp as folders
   of symlinks: readers see every bundled file, and caches written at run time
   (ChEMBL, PubChem, HTTP responses, audits) become real files beside them. Files
-  build.py packed for Vercel's upload limit are restored there.
+  and folders build.py packed for Vercel's upload limits are restored there.
 - There is no worker process: jobs run after the API's responses (oxhack_api.drain).
 - Docking runs in Vercel Sandboxes restored from DOCK_SNAPSHOT_ID
   (oxhack_worker.sandbox); its result files are kept in Postgres.
@@ -19,15 +19,14 @@ Vercel serves this module's `app` for /api/* while public/ holds the web app.
 
 from __future__ import annotations
 
-import gzip
 import logging
 import os
-import shutil
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 sys.path[:0] = [
+    str(ROOT),
     str(ROOT / "app" / "api"),
     str(ROOT / "app" / "worker"),
     str(ROOT / "core"),
@@ -35,38 +34,7 @@ sys.path[:0] = [
 ]
 SCRATCH = Path(os.environ.get("HALFLIFE_SCRATCH", "/tmp/halflife"))
 
-
-PACKED_SUFFIX = ".vercel.gz"
-"""build.py gzips files over Vercel's upload limit; they are restored in the mirror."""
-
-
-def writable_mirror(bundled: Path, mirror: Path) -> Path:
-    """`mirror` with `bundled`'s folders, each file a symlink to the bundled one, or a
-    restored copy of a packed one."""
-    for folder, _, files in os.walk(bundled):
-        relative = Path(folder).relative_to(bundled)
-        (mirror / relative).mkdir(parents=True, exist_ok=True)
-        for name in files:
-            if name.endswith(PACKED_SUFFIX):
-                restore(
-                    Path(folder) / name,
-                    mirror / relative / name.removesuffix(PACKED_SUFFIX),
-                )
-                continue
-            link = mirror / relative / name
-            if not link.exists():
-                link.symlink_to(Path(folder) / name)
-    return mirror
-
-
-def restore(packed: Path, target: Path) -> None:
-    if target.exists():
-        return
-    temporary = target.with_name(f".{target.name}.{os.getpid()}.tmp")
-    with gzip.open(packed, "rb") as source, temporary.open("wb") as output:
-        shutil.copyfileobj(source, output, 1 << 20)
-    temporary.replace(target)
-
+from mirror import writable_mirror  # deploy/vercel/mirror.py, beside this file
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
 # The Vercel SDK logs each HTTP call at INFO; a docking poll makes one every 2 s.

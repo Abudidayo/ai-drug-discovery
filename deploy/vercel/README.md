@@ -30,7 +30,10 @@ Live at **https://halflife-bio.vercel.app** (Vercel project `halflife`, also
   `index.py` mirrors `data/` into `/tmp` as symlinks, so caches written at run
   time land beside the bundled files. Vercel refuses deployment files over
   100 MB, so the network's 158 MB distance matrix ships gzipped and is restored
-  there (byte for byte; the ranking checks its hash).
+  there (byte for byte; the ranking checks its hash). Hobby also accepts only
+  5,000 uploaded files a day, so data folders of more than 100 files (the ChEMBL
+  and HTTP caches) ship as one archive each and are unpacked there: a deploy is
+  about 250 files.
 - **Migrations run on cold start**, under an advisory lock, so the pipeline never
   holds the database's credentials. The API uses `DATABASE_URL_UNPOOLED`: it
   relies on session settings and advisory locks that a transaction pooler drops.
@@ -41,8 +44,9 @@ Live at **https://halflife-bio.vercel.app** (Vercel project `halflife`, also
 Vercel's Python builder installs only a uv workspace's root project, so CI does
 not point Vercel at this repository. `build.py` assembles an explicit folder
 (requirements exported from `uv.lock`, the code at its repository paths, the
-data, the built website), and CI deploys it with `vercel build` and
-`vercel deploy --prebuilt` on Linux.
+data, the built website), and CI uploads it with `vercel deploy`, so Vercel
+installs the Python packages on its own Linux build machines; a prebuilt upload
+would add their thousands of files to the daily upload count.
 
 ## Free plan limits
 
