@@ -85,8 +85,8 @@ jobs:
           uv run --no-sync ruff check .
           uv run --no-sync pyright
           uv run --no-sync pytest -q
-      - name: Pipeline and ranking tests
-        run: uv run --no-sync pytest tests core/ranking/tests -q
+      - name: Pipeline, jury and ranking tests
+        run: uv run --no-sync pytest tests core -q
       - name: Docking queue tests (no Vina required)
         working-directory: app/worker
         run: uv run --no-sync pytest -q

@@ -1,5 +1,5 @@
 # pyright: reportMissingImports=false, reportMissingTypeStubs=false
-"""The redocking control (docs/build-reference.md C6): RMSD to the crystal pose.
+"""The redocking control (docs/engineering/build-reference.md C6): RMSD to the crystal pose.
 
     python -m oxhack_worker.control 6WTO [--out DIR]     # in $DOCKING_VENV
 

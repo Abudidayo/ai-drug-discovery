@@ -1,6 +1,6 @@
 """Offline integration and fixture-contract checks, including saved real runs."""
 
-from conftest import FIXTURES
+from tests.conftest import FIXTURES
 from copy import deepcopy
 from hashlib import sha256
 import json

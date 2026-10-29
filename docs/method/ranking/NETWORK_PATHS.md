@@ -1,6 +1,6 @@
 # Network-path explanations
 
-Implemented as additive enrichment in [paths.py](../../core/ranking/paths.py). The scorer, null
+Implemented as additive enrichment in [paths.py](../../../core/ranking/paths.py). The scorer, null
 model, shortlist selection and evaluator are unchanged. Existing Stage 1–3 and
 benchmark outputs remain untouched. All **80 tests pass** (68 existing plus 12
 path tests).

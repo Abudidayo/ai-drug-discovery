@@ -10,7 +10,7 @@ import { http, serveExperiment, server } from "../test/server";
 const E = `/e/${EXPERIMENT_ID}`;
 
 /**
- * Each of these strings is said exactly once on screen (docs/design.md, "Say everything once").
+ * Each of these strings is said exactly once on screen (docs/engineering/design.md, "Say everything once").
  * Labels drawn on the 3D figures themselves (protein symbols, the drug's node) mark points in
  * the picture rather than repeat a statement, as in the prototype, so they don't count.
  */

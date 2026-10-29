@@ -230,7 +230,7 @@ its bytes, so the web app can load them straight into the viewer.
 - A job that is queued, running or failed, or a fixture result made up on
   request (scores only, `files: null`), answers 404 with the reason.
 - Live docking jobs will keep their files in `$RESULTS_DIR/{job_id}/`
-  (docs/build-reference.md C7); in fixture mode they are in
+  (docs/engineering/build-reference.md C7); in fixture mode they are in
   `oxhack_api/fixtures/docking_files/{job_id}/`. The API hashes them when it
   starts, and refreshes a saved demo job (and the jobs reusing it) whose
   files changed.

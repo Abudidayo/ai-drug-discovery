@@ -17,7 +17,7 @@ import {
 } from "./plate";
 
 /**
- * What the network shows on a step (docs/design.md, "Protein network"):
+ * What the network shows on a step (docs/engineering/design.md, "Protein network"):
  * - `disease`: disease proteins in vermilion, everything else neutral;
  * - `roles`: disease proteins, drug targets (blue) and proteins that are both (split);
  * - `path`: roles, plus the route from one drug to a disease protein in green.

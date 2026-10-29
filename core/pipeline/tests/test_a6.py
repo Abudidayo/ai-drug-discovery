@@ -1,5 +1,5 @@
 """Offline comparison checks using the small shared ballots and recorded CLI ranks."""
-from conftest import FIXTURES
+from tests.conftest import FIXTURES
 from copy import deepcopy
 import json
 

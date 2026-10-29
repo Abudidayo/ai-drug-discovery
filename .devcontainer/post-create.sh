@@ -6,11 +6,11 @@ cd "$(dirname "$0")/.."
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends postgresql-client
 
-# One uv workspace (root pyproject.toml): core/pipeline/ and core/jury/, app/api/
+# One uv workspace (root pyproject.toml): core/ (pipeline and jury), app/api/
 # and app/worker/, in one .venv with one uv.lock.
 uv sync --all-packages
 
-# Docking toolchain (docs/build-reference.md C1-C6), kept apart from the project
+# Docking toolchain (docs/engineering/build-reference.md C1-C6), kept apart from the project
 # venv: Vina has Linux x86_64 wheels only, so it cannot join the cross-platform
 # uv.lock, and `uv sync` never removes it from here. The docking worker
 # (app/worker/oxhack_worker/queue.py) runs it as a subprocess.

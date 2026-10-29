@@ -1,5 +1,5 @@
 """Offline packet projection checks; graph reconstruction belongs to ranking."""
-from conftest import FIXTURES
+from tests.conftest import FIXTURES
 from copy import deepcopy
 import json
 from urllib.parse import parse_qs, urlparse

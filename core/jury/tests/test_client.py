@@ -1,4 +1,4 @@
-from conftest import FIXTURES
+from tests.conftest import FIXTURES
 from collections import Counter
 from copy import deepcopy
 import json
@@ -19,7 +19,7 @@ from jury.client import (
 )
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 PACKET = json.loads((FIXTURES / "evidence_packet.json").read_text())
 FIXTURE = json.loads((FIXTURES / "jury_result.json").read_text())
 CONFIG = json.loads((ROOT / "core/jury/config.json").read_text())

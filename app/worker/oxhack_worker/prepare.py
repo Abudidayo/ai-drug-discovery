@@ -1,5 +1,5 @@
 # pyright: reportMissingImports=false, reportMissingTypeStubs=false
-"""Prepare the docking structures (docs/build-reference.md C2 and C3).
+"""Prepare the docking structures (docs/engineering/build-reference.md C2 and C3).
 
     python -m oxhack_worker.prepare            # every structure, in $DOCKING_VENV
     python -m oxhack_worker.prepare 6WTO 6WTN  # some of them
@@ -51,7 +51,7 @@ LISTING = REPO_ROOT / "api" / "oxhack_api" / "fixtures" / "structures.json"
 
 BOX_SIZE = 25.0
 SETTINGS = {"engine": "vina", "exhaustiveness": 8, "seed": 42, "n_poses": 9}
-"""docs/build-reference.md C5. Run times at 8, 16 and 32 are in worker/README.md."""
+"""docs/engineering/build-reference.md C5. Run times at 8, 16 and 32 are in worker/README.md."""
 
 ENTRY_URL = "https://files.rcsb.org/download/{pdb_id}.pdb"
 ENTRY_API = "https://data.rcsb.org/rest/v1/core/entry/{pdb_id}"

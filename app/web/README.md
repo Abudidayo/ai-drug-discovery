@@ -1,7 +1,7 @@
 # web
 
 The React app: Vite, React 19 and TypeScript (strict). It follows the "Figure" design in
-[`docs/design.md`](../../docs/design.md), which is binding.
+[`docs/engineering/design.md`](../../docs/engineering/design.md), which is binding.
 
 ## Run it
 
@@ -35,7 +35,7 @@ Locally it reuses servers already running on ports 8000 and 4173; `E2E_API_PORT`
 
 ## Layout
 
-- `src/styles/tokens.css`: every colour, type size and spacing step from `docs/design.md`, plus
+- `src/styles/tokens.css`: every colour, type size and spacing step from `docs/engineering/design.md`, plus
   a small reset. Components use CSS Modules and read only these custom properties.
 - `src/copy/en.ts`: the copy deck. Every interface sentence lives here. Text that depends on the
   Disease (evidence, objections, model names) comes from the API instead.

@@ -49,7 +49,7 @@ function AxisBreak({ x, y }: { x: number; y: number }) {
 }
 
 /**
- * The candidate drugs' slope chart (docs/design.md, "Slope chart"). Each drug is named once, on
+ * The candidate drugs' slope chart (docs/engineering/design.md, "Slope chart"). Each drug is named once, on
  * its row: closeness on the left, then its name and network rank, then a line to its evidence
  * rank on the right. Both rank axes are ordinal and labelled with the true ranks; where ranks
  * jump, the axis shows a break. A drug whose closeness can't be measured gets no dot (never a

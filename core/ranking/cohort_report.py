@@ -215,6 +215,6 @@ def generate(root, output):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
-    parser.add_argument("--output", type=Path, default=Path("docs/ranking/COHORT_RESULTS.md"))
+    parser.add_argument("--output", type=Path, default=Path("docs/method/ranking/COHORT_RESULTS.md"))
     args = parser.parse_args()
     generate(args.root, args.output)

@@ -1,4 +1,4 @@
-# Docking toolchain from docs/build-reference.md C1-C6. Edit this file, then regenerate the lock:
+# Docking toolchain from docs/engineering/build-reference.md C1-C6. Edit this file, then regenerate the lock:
 #   uv pip compile .devcontainer/docking-requirements.in --python-version 3.11 \
 #     --python-platform x86_64-manylinux_2_28 --only-binary :all: -o .devcontainer/docking-requirements.txt
 # ProDy is left out: it has no Python 3.11 wheel, and gemmi covers receptor clean-up (C3).

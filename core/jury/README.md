@@ -15,8 +15,8 @@ be checked in the account before freezing an Experiment.
 
 ```sh
 .venv/bin/python -m jury tests/fixtures/evidence_packet.json --out /tmp/jury-live.json
-.venv/bin/python -m pytest tests/jury -q
-.venv/bin/python -m pytest tests/jury -q -m network
+.venv/bin/python -m pytest core/jury/tests -q
+.venv/bin/python -m pytest core/jury/tests -q -m network
 ```
 
 Requests default to a 300-second timeout for slower jurors such as GLM.
@@ -71,7 +71,7 @@ The fixture includes the additive consensus failure metadata described below.
 
 Prompt `jury-v2` makes qualitative comparisons explicit: a review must not
 repeat another Candidate's measurements that its own citations cannot support.
-`tests/jury/data/gpt_cross_candidate_vote.json` records a live reply rejected
+`core/jury/tests/data/gpt_cross_candidate_vote.json` records a live reply rejected
 for exactly that reason; the exact-number check is unchanged.
 
 Only the fixture allowlist enters the evidence payload. `rank` appears solely
@@ -102,7 +102,7 @@ shuffle uses `shuffle_seed + its configuration index`; independent shuffles may
 coincidentally match, particularly for small panels. Mock consensus has no
 scientific meaning and must remain labelled when displayed.
 
-`tests/jury/data/live_recording.json` preserves the supplied 2026-10-24 pilot's
+`core/jury/tests/data/live_recording.json` preserves the supplied 2026-10-24 pilot's
 retained replies and failure metadata without request headers or credentials.
 Claude's retained reply is fenced JSON. GLM returned no reply before two
 60-second SDK timeouts. GPT's failed first reply was not retained, so its exact

@@ -120,7 +120,10 @@ class DockingBackend(Protocol):
         ...
 
     def seed_jobs(self) -> list[tuple[DockJob, DockInputs]]:
-        """Results computed ahead of time (docs/build-reference.md C9), with their inputs."""
+        """Results computed ahead of time, with their inputs.
+
+        See docs/engineering/build-reference.md C9.
+        """
         ...
 
     def dock(self, job: DockJob) -> DockSteps:

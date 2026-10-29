@@ -2,7 +2,7 @@ import { useId, type ReactNode } from "react";
 import styles from "./Figure.module.css";
 
 /**
- * A step's figure composition (docs/design.md, "One step, one figure"): at most three panels on
+ * A step's figure composition (docs/engineering/design.md, "One step, one figure"): at most three panels on
  * one grid. `layout` picks the grid; each panel names its own area in it.
  */
 export type FigureLayout =

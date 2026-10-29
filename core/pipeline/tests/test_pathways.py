@@ -1,5 +1,5 @@
 """Offline source-mapping, fixed selection and packet-contract regressions."""
-from conftest import FIXTURES
+from tests.conftest import FIXTURES
 from copy import deepcopy
 import json
 from pathlib import Path

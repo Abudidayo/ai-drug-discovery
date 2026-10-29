@@ -1,34 +1,13 @@
-[project]
-name = "oxhack-drug-repurposing"
-version = "0.1.0"
-requires-python = ">=3.11"
-dependencies = [
-  "duckdb>=1.1",
-  "httpx>=0.27",
-  "openai>=1.50",
-]
+# The uv workspace: one .venv and one uv.lock for every Python package here.
+[tool.uv.workspace]
+members = ["core", "core/ranking", "app/api", "app/worker"]
 
 [dependency-groups]
 dev = ["pytest>=8"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "core"]
 # The repository root, so tests can import shared helpers as tests.*.
 pythonpath = ["."]
 addopts = "-m 'not network'"
 markers = ["network: needs internet access; run with -m network"]
-
-# --- Added for workstream C (please approve, Jessica) -------------------------
-# Makes core/pipeline/ and core/jury/ an installable package, so the API (app/api/)
-# depends on them instead of copying them, and joins app/api/ into one uv workspace:
-# one .venv and one uv.lock at the repository root. Nothing above this line changed.
-# core/ranking/ (stream B) is a member too, so the API imports its engine.
-[build-system]
-requires = ["hatchling>=1.25"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["core/pipeline", "core/jury"]
-
-[tool.uv.workspace]
-members = ["app/api", "core/ranking", "app/worker"]

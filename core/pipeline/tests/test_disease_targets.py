@@ -1,6 +1,6 @@
 """Offline recorded-data checks; only explicitly marked tests use the internet."""
 
-from conftest import FIXTURES
+from tests.conftest import FIXTURES
 from copy import deepcopy
 import json
 import math
@@ -317,7 +317,7 @@ def test_retry_exhaustion_and_deadline(monkeypatch):
 
 
 def test_query_is_copied_from_pinned_recipe():
-    reference = (Path(__file__).resolve().parents[2] / "docs/build-reference.md").read_text()
+    reference = (Path(__file__).resolve().parents[3] / "docs/engineering/build-reference.md").read_text()
     assert ASSOC.strip() in reference
     assert all(path.stat().st_size < 200_000 for path in DATA.glob("*"))
 

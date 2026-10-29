@@ -1,5 +1,5 @@
 """Offline checks for the selection-only runner and failure-aware scoring."""
-from conftest import FIXTURES
+from tests.conftest import FIXTURES
 import json
 from pathlib import Path
 
@@ -7,7 +7,7 @@ import pytest
 
 from jury import pilot
 from jury.client import ModelReply, mock_model
-from tests.jury.test_pilot import _v2_fixture
+from test_pilot import _v2_fixture
 
 
 @pytest.fixture

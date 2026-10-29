@@ -103,7 +103,7 @@ Full per-Disease metrics, ranks, missing IDs, coverage and paired comparisons ar
 
 Evaluation artifacts are in `data/evaluation/stage3-smoke/`; adapted JSON files
 are in `data/ranking/stage3-api/`. Both locations remain gitignored. Usage and
-the reusable evaluation/reference contract are documented in `docs/ranking/STAGE3.md`.
+the reusable evaluation/reference contract are documented in `docs/method/ranking/STAGE3.md`.
 
 There were no execution blockers. Completing the ten-Disease research pilot
 requires at least eight additional Disease cases with defined reference labels;

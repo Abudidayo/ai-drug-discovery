@@ -24,7 +24,7 @@ const decisions = {
 } satisfies Record<Decision, string>;
 
 /**
- * The copy deck: every sentence the interface says, in one place (docs/design.md, "Plain words").
+ * The copy deck: every sentence the interface says, in one place (docs/engineering/design.md, "Plain words").
  *
  * Only wording that holds for any Disease lives here. Text that depends on the Disease or the
  * Experiment (evidence statements, juror objections, model names, warnings, data versions) comes

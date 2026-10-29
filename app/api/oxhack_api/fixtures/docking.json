@@ -1,5 +1,5 @@
 {
-  "fixture_note": "Fixture data. Structures and SMILES are real; every docking score and RMSD is fictional. The redock control's result files (docking_files/{job_id}/) hold the real 6WTO receptor and crystal ligand; its pose 1 is a copy of the crystal ligand, not a docking result. Real values are measured by the docking worker (docs/build-reference.md C6).",
+  "fixture_note": "Fixture data. Structures and SMILES are real; every docking score and RMSD is fictional. The redock control's result files (docking_files/{job_id}/) hold the real 6WTO receptor and crystal ligand; its pose 1 is a copy of the crystal ligand, not a docking result. Real values are measured by the docking worker (docs/engineering/build-reference.md C6).",
   "settings": {
     "engine": "vina",
     "engine_version": "1.2.7",

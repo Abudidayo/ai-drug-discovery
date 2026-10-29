@@ -1,6 +1,6 @@
 """Offline tests use projected, recorded OT 26.09 / ChEMBL 37 source rows."""
 
-from conftest import FIXTURES
+from tests.conftest import FIXTURES
 from copy import deepcopy
 import json
 from pathlib import Path
